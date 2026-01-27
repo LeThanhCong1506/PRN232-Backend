@@ -1,0 +1,6 @@
+@MV.PresentationLayer_HostAddress = http://localhost:5255
+
+GET {{MV.PresentationLayer_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
