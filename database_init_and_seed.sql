@@ -4,21 +4,21 @@
 -- ============================================
 -- 
 -- HUONG DAN CHAY:
--- 1. Tao database: CREATE DATABASE ecommerce_db WITH ENCODING 'UTF8';
--- 2. Ket noi: \c ecommerce_db
+-- 1. Tao database: CREATE DATABASE "STEM-DB" WITH ENCODING 'UTF8';
+-- 2. Ket noi: \c "STEM-DB"
 -- 3. Chay file nay: \i database_init_and_seed.sql
 -- 
 -- Hoac chay truc tiep: psql -U your_username -d postgres -f database_init_and_seed.sql
 -- ============================================
 
 -- Xoa database neu da ton tai (CAN THAN!)
-DROP DATABASE IF EXISTS ecommerce_db;
+DROP DATABASE IF EXISTS "STEM-DB";
 
 -- Tao database moi
-CREATE DATABASE ecommerce_db WITH ENCODING 'UTF8';
+CREATE DATABASE "STEM-DB" WITH ENCODING 'UTF8';
 
 -- Ket noi vao database
-\c ecommerce_db
+\c "STEM-DB"
 
 -- ============================================
 -- TAO ENUMS
