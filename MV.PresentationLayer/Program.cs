@@ -18,6 +18,17 @@ namespace MV.PresentationLayer
             // Add services to the container.
             builder.Services.AddControllers();
 
+            // Configure CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", policy =>
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+                });
+            });
+
             // Register DbContext with connection string from appsettings
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
