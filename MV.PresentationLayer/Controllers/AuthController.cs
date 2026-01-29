@@ -45,7 +45,7 @@ public class AuthController : ControllerBase
             return BadRequest(result);
         }
 
-        return CreatedAtAction(nameof(GetProfile), new { }, result);
+        return Ok(result);
     }
 
     /// <summary>

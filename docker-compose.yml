@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: stemstore-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: ecommerce_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database_init_and_seed.sql:/docker-entrypoint-initdb.d/database_init_and_seed.sql:ro
+      - ./docker/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d ecommerce_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stemstore-network
+
+  # .NET 8 API
+  api:
+    build:
+      context: .
+      dockerfile: MV.PresentationLayer/Dockerfile
+    container_name: stemstore-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=ecommerce_db;Username=postgres;Password=12345
+    ports:
+      - "5255:8080"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - stemstore-network
+
+  # pgAdmin Web UI
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: stemstore-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres-db
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - stemstore-network
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+
+networks:
+  stemstore-network:
+    driver: bridge
