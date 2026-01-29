@@ -1,25 +1,30 @@
 ﻿namespace MV.DomainLayer.DTOs.ResponseModels
 {
-    public class PagedResponse<T> : ApiResponse<List<T>>
+    public class PagedResponse<T>
     {
-        public int PageNumber { get; set; }
-        public int PageSize { get; set; }
-        public int TotalPages { get; set; }
-        public int TotalRecords { get; set; }
-        public bool HasPreviousPage => PageNumber > 1;
-        public bool HasNextPage => PageNumber < TotalPages;
+        public List<T> Items { get; set; }
+        public PaginationMetadata Pagination { get; set; }
 
-        public PagedResponse(List<T> data, int pageNumber, int pageSize, int totalRecords)
+        public PagedResponse(List<T> items, int pageNumber, int pageSize, int totalRecords)
         {
-            PageNumber = pageNumber;
-            PageSize = pageSize;
-            TotalRecords = totalRecords;
-            TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
-
-            Data = data;
-            Success = true;
-            Message = "Success";
-            Errors = null;
+            Items = items;
+            Pagination = new PaginationMetadata
+            {
+                CurrentPage = pageNumber,
+                PageSize = pageSize,
+                TotalItems = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize)
+            };
         }
+    }
+
+    public class PaginationMetadata
+    {
+        public int CurrentPage { get; set; }
+        public int PageSize { get; set; }
+        public int TotalItems { get; set; }
+        public int TotalPages { get; set; }
+        public bool HasNext => CurrentPage < TotalPages;
+        public bool HasPrevious => CurrentPage > 1;
     }
 }
