@@ -9,5 +9,6 @@ namespace MV.InfrastructureLayer.Interfaces
         Task<(List<Product> Items, int TotalCount)> GetPagedProductsAsync(ProductFilter filter);
         Task<List<CategoryResponseDto>> GetAllCategoriesWithCountAsync();
         Task<List<BrandResponseDto>> GetAllBrandsWithCountAsync();
+        Task<Product> GetProductByIdAsync(int productId);
     }
 }

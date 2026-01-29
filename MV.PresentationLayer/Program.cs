@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MV.ApplicationLayer.Interfaces;
 using MV.ApplicationLayer.Services;
+using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
@@ -39,11 +40,13 @@ namespace MV.PresentationLayer
             // Register Application Services
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<ICartService, CartService>();
 
 
 
             // Register Application Repositories
             builder.Services.AddScoped<IProductRepository, ProductRepository>();
+            builder.Services.AddScoped<ICartRepository, CartRepository>();
 
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
