@@ -53,5 +53,18 @@ namespace MV.ApplicationLayer.Services
             // 4. Bọc trong ApiResponse và trả về
             return ApiResponse<PagedResponse<ProductResponseDto>>.SuccessResponse(pagedData);
         }
+
+        public async Task<ApiResponse<List<CategoryResponseDto>>> GetAllCategoriesAsync()
+        {
+            var categories = await _productRepository.GetAllCategoriesWithCountAsync();
+
+            return ApiResponse<List<CategoryResponseDto>>.SuccessResponse(categories);
+        }
+
+        public async Task<ApiResponse<List<BrandResponseDto>>> GetAllBrandsAsync()
+        {
+            var brands = await _productRepository.GetAllBrandsWithCountAsync();
+            return ApiResponse<List<BrandResponseDto>>.SuccessResponse(brands);
+        }
     }
 }

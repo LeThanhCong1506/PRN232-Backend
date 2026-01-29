@@ -22,5 +22,19 @@ namespace MV.PresentationLayer.Controllers
             var result = await _productService.GetProductsAsync(filter);
             return Ok(result);
         }
+
+        [HttpGet("categories")]
+        public async Task<IActionResult> GetAllCategories()
+        {
+            var result = await _productService.GetAllCategoriesAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("brands")]
+        public async Task<IActionResult> GetAllBrands()
+        {
+            var result = await _productService.GetAllBrandsAsync();
+            return Ok(result);
+        }
     }
 }
