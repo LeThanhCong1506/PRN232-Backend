@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -6,6 +5,9 @@ using Microsoft.OpenApi.Models;
 using MV.ApplicationLayer.Interfaces;
 using MV.ApplicationLayer.Services;
 using MV.InfrastructureLayer.DBContext;
+using MV.InfrastructureLayer.Interfaces;
+using MV.InfrastructureLayer.Repositories;
+using System.Text;
 
 namespace MV.PresentationLayer
 {
@@ -36,6 +38,12 @@ namespace MV.PresentationLayer
 
             // Register Application Services
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IProductService, ProductService>();
+
+
+
+            // Register Application Repositories
+            builder.Services.AddScoped<IProductRepository, ProductRepository>();
 
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");

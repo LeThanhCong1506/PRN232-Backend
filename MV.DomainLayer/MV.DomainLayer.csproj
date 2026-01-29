@@ -6,6 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="DTO\**" />
+    <EmbeddedResource Remove="DTO\**" />
+    <None Remove="DTO\**" />
+  </ItemGroup>
+
 	<ItemGroup>
 		<PackageReference Include="ClosedXML" Version="0.104.1" />
 		<PackageReference Include="Google.Cloud.AIPlatform.V1" Version="3.51.0" />
@@ -23,8 +29,6 @@
 
   <ItemGroup>
     <Folder Include="Configuration\" />
-    <Folder Include="DTO\ResponseModels\" />
-    <Folder Include="DTO\RequestModels\" />
     <Folder Include="Enums\" />
     <Folder Include="Exceptions\" />
     <Folder Include="Configuration\" />
