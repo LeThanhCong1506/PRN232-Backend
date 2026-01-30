@@ -7,6 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="kl\**" />
+    <EmbeddedResource Remove="kl\**" />
+    <None Remove="kl\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Hub\" />
   </ItemGroup>
 

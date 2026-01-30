@@ -1,0 +1,175 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{C2746605-9F78-4C79-9E8C-41EC1AE3D562}|MV.DomainLayer\\MV.DomainLayer.csproj|d:\\hoc_tap\\hk8\\prn232-backend\\mv.domainlayer\\entities\\category.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C2746605-9F78-4C79-9E8C-41EC1AE3D562}|MV.DomainLayer\\MV.DomainLayer.csproj|solutionrelative:mv.domainlayer\\entities\\category.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{AEA9C1D0-9DF1-43BA-A677-E3DCE3D41ADC}|MV.PresentationLayer\\MV.PresentationLayer.csproj|d:\\hoc_tap\\hk8\\prn232-backend\\mv.presentationlayer\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{AEA9C1D0-9DF1-43BA-A677-E3DCE3D41ADC}|MV.PresentationLayer\\MV.PresentationLayer.csproj|solutionrelative:mv.presentationlayer\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B630A78F-47EA-4CB2-9232-CAEA61343BCE}|MV.InfrastructureLayer\\MV.InfrastructureLayer.csproj|d:\\hoc_tap\\hk8\\prn232-backend\\mv.infrastructurelayer\\dbcontext\\stemdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B630A78F-47EA-4CB2-9232-CAEA61343BCE}|MV.InfrastructureLayer\\MV.InfrastructureLayer.csproj|solutionrelative:mv.infrastructurelayer\\dbcontext\\stemdbcontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C2746605-9F78-4C79-9E8C-41EC1AE3D562}|MV.DomainLayer\\MV.DomainLayer.csproj|d:\\hoc_tap\\hk8\\prn232-backend\\mv.domainlayer\\mv.domainlayer.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{C2746605-9F78-4C79-9E8C-41EC1AE3D562}|MV.DomainLayer\\MV.DomainLayer.csproj|solutionrelative:mv.domainlayer\\mv.domainlayer.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{AEA9C1D0-9DF1-43BA-A677-E3DCE3D41ADC}|MV.PresentationLayer\\MV.PresentationLayer.csproj|d:\\hoc_tap\\hk8\\prn232-backend\\mv.presentationlayer\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{AEA9C1D0-9DF1-43BA-A677-E3DCE3D41ADC}|MV.PresentationLayer\\MV.PresentationLayer.csproj|solutionrelative:mv.presentationlayer\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 10,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:132:0:{75c83ab3-5264-45e8-ad32-5c8a41ad477d}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{13b12e3e-c1b4-4539-9371-4fe9a0d523fc}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:131:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:130:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:5:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Category.cs",
+              "DocumentMoniker": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.DomainLayer\\Entities\\Category.cs",
+              "RelativeDocumentMoniker": "MV.DomainLayer\\Entities\\Category.cs",
+              "ToolTip": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.DomainLayer\\Entities\\Category.cs",
+              "RelativeToolTip": "MV.DomainLayer\\Entities\\Category.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-27T02:47:43.247Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "StemDbContext.cs",
+              "DocumentMoniker": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.InfrastructureLayer\\DBContext\\StemDbContext.cs",
+              "RelativeDocumentMoniker": "MV.InfrastructureLayer\\DBContext\\StemDbContext.cs",
+              "ToolTip": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.InfrastructureLayer\\DBContext\\StemDbContext.cs",
+              "RelativeToolTip": "MV.InfrastructureLayer\\DBContext\\StemDbContext.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-27T02:41:17.515Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "MV.DomainLayer.csproj",
+              "DocumentMoniker": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.DomainLayer\\MV.DomainLayer.csproj",
+              "RelativeDocumentMoniker": "MV.DomainLayer\\MV.DomainLayer.csproj",
+              "ToolTip": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.DomainLayer\\MV.DomainLayer.csproj",
+              "RelativeToolTip": "MV.DomainLayer\\MV.DomainLayer.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-01-27T01:58:09.998Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "appsettings.json",
+              "DocumentMoniker": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.PresentationLayer\\appsettings.json",
+              "RelativeDocumentMoniker": "MV.PresentationLayer\\appsettings.json",
+              "ToolTip": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.PresentationLayer\\appsettings.json",
+              "RelativeToolTip": "MV.PresentationLayer\\appsettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-01-27T01:50:18.52Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.PresentationLayer\\Program.cs",
+              "RelativeDocumentMoniker": "MV.PresentationLayer\\Program.cs",
+              "ToolTip": "D:\\Hoc_Tap\\HK8\\PRN232-Backend\\MV.PresentationLayer\\Program.cs",
+              "RelativeToolTip": "MV.PresentationLayer\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACoAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-27T01:49:38.22Z"
+            }
+          ]
+        },
+        {
+          "DockedWidth": 256,
+          "SelectedChildIndex": -1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:21:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{eefa5220-e298-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c64b9c2-e352-428e-a56d-0ace190b99a6}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:332826238:0:{83107a3e-496a-485e-b455-16ddb978e55e}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:2:0:{e8034f19-ab72-4f06-83fd-f6832b41aa63}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

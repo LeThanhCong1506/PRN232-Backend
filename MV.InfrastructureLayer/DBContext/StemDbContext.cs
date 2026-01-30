@@ -1,7 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using MV.DomainLayer.Entities;
+using System;
+using System.Collections.Generic;
 
 namespace MV.InfrastructureLayer.DBContext;
 
@@ -65,7 +66,8 @@ public partial class StemDbContext : DbContext
             .HasPostgresEnum("instance_status_enum", new[] { "IN_STOCK", "SOLD", "WARRANTY", "DEFECTIVE", "RETURNED" })
             .HasPostgresEnum("order_status_enum", new[] { "PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED" })
             .HasPostgresEnum("payment_method_enum", new[] { "COD", "BANK_TRANSFER", "MOMO", "ZALO_PAY" })
-            .HasPostgresEnum("payment_status_enum", new[] { "PENDING", "COMPLETED", "FAILED" });
+            .HasPostgresEnum("payment_status_enum", new[] { "PENDING", "COMPLETED", "FAILED" })
+            .HasPostgresEnum("product_type_enum", new[] { "MODULE", "KIT", "COMPONENT" });
 
         modelBuilder.Entity<Brand>(entity =>
         {
@@ -290,8 +292,6 @@ public partial class StemDbContext : DbContext
 
             entity.HasIndex(e => e.Sku, "idx_product_sku");
 
-            entity.HasIndex(e => e.ProductType, "idx_product_type");
-
             entity.HasIndex(e => e.Sku, "product_sku_key").IsUnique();
 
             entity.Property(e => e.ProductId).HasColumnName("product_id");
@@ -310,9 +310,6 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.Price)
                 .HasPrecision(12, 2)
                 .HasColumnName("price");
-            entity.Property(e => e.ProductType)
-                .HasMaxLength(50)
-                .HasColumnName("product_type");
             entity.Property(e => e.Sku)
                 .HasMaxLength(50)
                 .HasColumnName("sku");
