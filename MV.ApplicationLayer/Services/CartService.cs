@@ -88,19 +88,7 @@ namespace MV.ApplicationLayer.Services
                 {
                     Success = false,
                     Message = "Product out of stock",
-                    // Trả về object chứa availableQuantity = 0 theo yêu cầu
                     Data = new { availableQuantity = 0 }
-                };
-            }
-
-            // CHECK 2: Requested quantity exceeds stock
-            if (request.Quantity > currentStock)
-            {
-                return new ApiResponse<object>
-                {
-                    Success = false,
-                    Message = "Requested quantity exceeds available stock",
-                    Data = new { availableQuantity = currentStock }
                 };
             }
 
@@ -111,7 +99,28 @@ namespace MV.ApplicationLayer.Services
                 cart = await _cartRepository.CreateCartAsync(userId);
             }
 
-            // 3. Thêm vào DB (Repository sẽ tự xử lý cộng dồn)
+            // 3. Lấy số lượng hiện tại của sản phẩm trong giỏ hàng (nếu có)
+            int existingQuantity = 0;
+            var existingCartItem = cart.CartItems?.FirstOrDefault(ci => ci.ProductId == request.ProductId);
+            if (existingCartItem != null)
+            {
+                existingQuantity = existingCartItem.Quantity ?? 0;
+            }
+
+            // CHECK 2: Tổng số lượng (existing + new) không được vượt quá stock
+            int totalQuantity = existingQuantity + request.Quantity;
+            if (totalQuantity > currentStock)
+            {
+                int canAddMore = currentStock - existingQuantity;
+                return new ApiResponse<object>
+                {
+                    Success = false,
+                    Message = "Requested quantity exceeds available stock",
+                    Data = new { availableQuantity = canAddMore > 0 ? canAddMore : 0 }
+                };
+            }
+
+            // 4. Thêm vào DB (Repository sẽ tự xử lý cộng dồn)
             var cartItem = await _cartRepository.AddOrUpdateItemAsync(cart.CartId, request.ProductId, request.Quantity);
 
             // 4. Map kết quả trả về (Success 201)
@@ -139,9 +148,21 @@ namespace MV.ApplicationLayer.Services
             // 2. Validate cơ bản
             if (cartItem == null) return ApiResponse<object>.ErrorResponse("Cart item not found");
             if (cartItem.Cart.UserId != userId) return ApiResponse<object>.ErrorResponse("Unauthorized access to this cart item");
-            if (quantity <= 0) return ApiResponse<object>.ErrorResponse("Quantity must be greater than 0");
+            if (quantity < 0) return ApiResponse<object>.ErrorResponse("Quantity cannot be negative");
 
-            // 3. Check Stock
+            // 3. Nếu quantity = 0 -> Xóa cart item
+            if (quantity == 0)
+            {
+                await _cartRepository.DeleteCartItemAsync(cartItem);
+                return new ApiResponse<object>
+                {
+                    Success = true,
+                    Message = "Cart item removed",
+                    Data = null
+                };
+            }
+
+            // 4. Check Stock
             int currentStock = cartItem.Product.StockQuantity ?? 0;
             if (quantity > currentStock)
             {
@@ -158,11 +179,11 @@ namespace MV.ApplicationLayer.Services
                 };
             }
 
-            // 4. Update
+            // 5. Update
             cartItem.Quantity = quantity;
             await _cartRepository.UpdateCartItemAsync(cartItem);
 
-            // 5. Map kết quả trả về
+            // 6. Map kết quả trả về
             var responseData = new CartItemResponseDto
             {
                 CartItemId = cartItem.CartItemId,
