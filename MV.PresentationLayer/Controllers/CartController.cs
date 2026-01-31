@@ -116,5 +116,25 @@ namespace MV.PresentationLayer.Controllers
             // Trả về 200 OK với Message thành công
             return Ok(result);
         }
+
+        /// <summary>
+        /// API 15: Clear Cart - Xóa tất cả sản phẩm trong giỏ hàng
+        /// </summary>
+        [HttpDelete]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> ClearCart()
+        {
+            // 1. Lấy UserId từ Token
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+            if (userIdClaim == null) return Unauthorized(ApiResponse<object>.ErrorResponse("Invalid Token"));
+
+            int userId = int.Parse(userIdClaim.Value);
+
+            // 2. Gọi Service để xóa tất cả items trong cart
+            var result = await _cartService.ClearCartAsync(userId);
+
+            // 3. Trả về kết quả
+            return Ok(result);
+        }
     }
 }

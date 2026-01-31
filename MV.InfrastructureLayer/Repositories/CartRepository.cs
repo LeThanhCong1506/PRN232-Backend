@@ -2,6 +2,8 @@
 using MV.DomainLayer.Entities;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
+using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace MV.InfrastructureLayer.Repositories
@@ -90,6 +92,19 @@ namespace MV.InfrastructureLayer.Repositories
         {
             _context.CartItems.Remove(cartItem);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task ClearCartAsync(int cartId)
+        {
+            var cartItems = await _context.CartItems
+                .Where(ci => ci.CartId == cartId)
+                .ToListAsync();
+
+            if (cartItems.Any())
+            {
+                _context.CartItems.RemoveRange(cartItems);
+                await _context.SaveChangesAsync();
+            }
         }
     }
 }

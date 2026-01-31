@@ -10,5 +10,6 @@ namespace MV.ApplicationLayer.Interfaces
         Task<ApiResponse<object>> AddToCartAsync(int userId, AddToCartRequestDto request);
         Task<ApiResponse<object>> UpdateCartItemQuantityAsync(int userId, int cartItemId, int quantity);
         Task<ApiResponse<object>> RemoveCartItemAsync(int userId, int cartItemId);
+        Task<ApiResponse<object>> ClearCartAsync(int userId);
     }
 }

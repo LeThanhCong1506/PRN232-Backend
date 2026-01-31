@@ -3,6 +3,7 @@ using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.Interfaces;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -227,6 +228,34 @@ namespace MV.ApplicationLayer.Services
                 Success = true,
                 Message = "Cart item removed",
                 Data = null // Không cần trả về data gì thêm
+            };
+        }
+
+        public async Task<ApiResponse<object>> ClearCartAsync(int userId)
+        {
+            // 1. Lấy giỏ hàng của user
+            var cart = await _cartRepository.GetCartByUserIdAsync(userId);
+
+            // 2. Nếu chưa có cart hoặc cart rỗng -> vẫn trả về success
+            if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
+            {
+                return new ApiResponse<object>
+                {
+                    Success = true,
+                    Message = "Cart cleared",
+                    Data = null
+                };
+            }
+
+            // 3. Xóa tất cả cart items (giữ lại cart record)
+            await _cartRepository.ClearCartAsync(cart.CartId);
+
+            // 4. Trả về thành công
+            return new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Cart cleared",
+                Data = null
             };
         }
     }

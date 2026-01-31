@@ -10,5 +10,6 @@ namespace MV.DomainLayer.Interfaces
         Task<CartItem> AddOrUpdateItemAsync(int cartId, int productId, int quantity);
         Task UpdateCartItemAsync(CartItem cartItem);
         Task DeleteCartItemAsync(CartItem cartItem);
+        Task ClearCartAsync(int cartId);
     }
 }
