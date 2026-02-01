@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Enums;
 using System;
 using System.Collections.Generic;
 
@@ -67,7 +68,7 @@ public partial class StemDbContext : DbContext
             .HasPostgresEnum("order_status_enum", new[] { "PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED" })
             .HasPostgresEnum("payment_method_enum", new[] { "COD", "BANK_TRANSFER", "MOMO", "ZALO_PAY" })
             .HasPostgresEnum("payment_status_enum", new[] { "PENDING", "COMPLETED", "FAILED" })
-            .HasPostgresEnum("product_type_enum", new[] { "MODULE", "KIT", "COMPONENT" });
+            .HasPostgresEnum<ProductTypeEnum>("product_type_enum");
 
         modelBuilder.Entity<Brand>(entity =>
         {
@@ -310,6 +311,8 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.Price)
                 .HasPrecision(12, 2)
                 .HasColumnName("price");
+            entity.Property(e => e.ProductType)
+                .HasColumnName("product_type");
             entity.Property(e => e.Sku)
                 .HasMaxLength(50)
                 .HasColumnName("sku");
