@@ -4,21 +4,21 @@
 -- ============================================
 -- 
 -- HUONG DAN CHAY:
--- 1. Tao database: CREATE DATABASE "STEM-DB" WITH ENCODING 'UTF8';
--- 2. Ket noi: \c "STEM-DB"
+-- 1. Tao database: CREATE DATABASE ecommerce_db WITH ENCODING 'UTF8';
+-- 2. Ket noi: \c ecommerce_db
 -- 3. Chay file nay: \i database_init_and_seed.sql
 -- 
 -- Hoac chay truc tiep: psql -U your_username -d postgres -f database_init_and_seed.sql
 -- ============================================
 
 -- Xoa database neu da ton tai (CAN THAN!)
-DROP DATABASE IF EXISTS "STEM-DB";
+DROP DATABASE IF EXISTS ecommerce_db;
 
 -- Tao database moi
-CREATE DATABASE "STEM-DB" WITH ENCODING 'UTF8';
+CREATE DATABASE ecommerce_db WITH ENCODING 'UTF8';
 
 -- Ket noi vao database
-\c "STEM-DB"
+\c ecommerce_db
 
 -- ============================================
 -- TAO ENUMS
@@ -1038,16 +1038,3 @@ UNION ALL SELECT 'Order Items: ' || COUNT(*) FROM ORDER_ITEM
 UNION ALL SELECT 'Payments: ' || COUNT(*) FROM PAYMENT
 UNION ALL SELECT 'Warranties: ' || COUNT(*) FROM WARRANTY
 UNION ALL SELECT 'Warranty Claims: ' || COUNT(*) FROM WARRANTY_CLAIM;
-
--- ============================================
--- UPDATE 29/01/2026: Chuyển product_type từ Enum sang VARCHAR
--- ============================================
-
--- 1. Thay đổi kiểu dữ liệu của cột product_type sang VARCHAR(50)
--- Sử dụng mệnh đề USING để ép kiểu dữ liệu cũ (Enum) sang chuỗi (text)
-ALTER TABLE public.product 
-ALTER COLUMN product_type TYPE VARCHAR(50) 
-USING product_type::text;
-
--- 2. Xóa kiểu Enum cũ để làm sạch database
-DROP TYPE IF EXISTS public.product_type_enum;

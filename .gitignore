@@ -1,48 +1,52 @@
-## --- VISUAL STUDIO SPECIFIC ---
+## .NET Optimized Gitignore (By Gemini)
+
+# --- Build results ---
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# --- Visual Studio (CHẶN TOÀN BỘ RÁC) ---
+# Thay vì liệt kê từng file, dòng này chặn tất cả mọi thứ trong .vs
 .vs/
-[Vv]7/
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
-*.opendb
-*.db-shm
-*.db-wal
 
-## --- GITHUB COPILOT ---
-.vs/**/CopilotIndices/
-.vs/**/copilot-chat/
-
-## --- BUILD RESULTS ---
-[Bb]in/
-[Oo]bj/
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-bld/
-[Ll]og/
-[Ll]ogs/
-
-## --- .NET CORE / .NET 5+ ---
+# --- .NET Core ---
 project.lock.json
 project.fragment.lock.json
 artifacts/
 
-## --- NUGET ---
+# --- ASP.NET Scaffolding ---
+ScaffoldingReadMe.txt
+
+# --- NuGet Packages ---
 *.nupkg
 *.snupkg
-# Không nên ignore folder packages nếu bạn dùng .NET Framework cũ, 
-# nhưng với .NET 6/7/8/9 thì nên ignore:
-packages/
-node_modules/
 
-## --- OS SPECIFIC ---
-.DS_Store
-thumbs.db
-desktop.ini
-
-## --- USER SPECIFIC ---
-*.swp
-*~
+# --- Others & IDEs ---
+.vscode/
+.idea/
 ~$*
+*~
+CodeCoverage/
+*.binlog
+
+# --- Testing (NUnit/MSTest) ---
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
