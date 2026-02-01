@@ -60,6 +60,11 @@ namespace MV.InfrastructureLayer.Repositories
             return (items, totalCount);
         }
 
+        public async Task<Product> GetProductByIdAsync(int productId)
+        {
+            return await _context.Products.FindAsync(productId);
+        }
+
         public async Task<List<CategoryResponseDto>> GetAllCategoriesWithCountAsync()
         {
             var query = _context.Categories

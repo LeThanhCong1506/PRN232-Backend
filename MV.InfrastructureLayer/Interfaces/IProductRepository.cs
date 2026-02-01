@@ -26,5 +26,6 @@ namespace MV.InfrastructureLayer.Interfaces
         Task AddCategoriesToProductAsync(int productId, List<int> categoryIds);
         Task RemoveCategoryFromProductAsync(int productId, int categoryId);
         Task<List<int>> GetCategoryIdsByProductIdAsync(int productId);
+        Task<Product> GetProductByIdAsync(int productId);
     }
 }

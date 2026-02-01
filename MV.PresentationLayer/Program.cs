@@ -4,11 +4,11 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MV.ApplicationLayer.Interfaces;
 using MV.ApplicationLayer.Services;
+using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
 using System.Text;
-using Microsoft.OpenApi.Models;
 
 namespace MV.PresentationLayer
 {
@@ -40,8 +40,13 @@ namespace MV.PresentationLayer
                 });
             });
 
+            // Configure JWT Authentication
+            var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+            var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+
 
             builder.Services.AddSwaggerGen(c =>
+            builder.Services.AddAuthentication(options =>
             {
                 c.EnableAnnotations();
                 c.SwaggerDoc("v1", new OpenApiInfo
@@ -78,7 +83,7 @@ namespace MV.PresentationLayer
             Array.Empty<string>()
         }
     });
-            });
+            }));
 
 
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -112,11 +117,14 @@ namespace MV.PresentationLayer
 
             builder.Services.AddScoped<IRoleRepository, RoleRepository>();
             builder.Services.AddScoped<IRoleService, RoleService>();
-            builder.Services.AddScoped<IProductRepository, ProductRepository>();    
+            builder.Services.AddScoped<IProductRepository, ProductRepository>();
+            builder.Services.AddScoped<ICartRepository, CartRepository>();
+            builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<ICartService, CartService>();
 
             builder.Services.AddScoped<IBrandRepository, BrandRepository>();
             builder.Services.AddScoped<IBrandService, BrandService>();
