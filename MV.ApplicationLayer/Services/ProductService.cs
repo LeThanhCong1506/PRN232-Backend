@@ -1,6 +1,11 @@
 ﻿using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
+using MV.DomainLayer.DTOs.Product.Request;
+using MV.DomainLayer.DTOs.Product.Response;
+using MV.DomainLayer.Entities;
+using MV.DomainLayer.Enums;
+using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.ApplicationLayer.Services
@@ -8,10 +13,20 @@ namespace MV.ApplicationLayer.Services
     public class ProductService : IProductService
     {
         private readonly IProductRepository _productRepository;
+        private readonly IBrandRepository _brandRepository;
+        private readonly ICategoryRepository _categoryRepository;
+        private readonly StemDbContext _context;
 
-        public ProductService(IProductRepository productRepository)
+        public ProductService(
+            IProductRepository productRepository,
+            IBrandRepository brandRepository,
+            ICategoryRepository categoryRepository,
+            StemDbContext context)
         {
             _productRepository = productRepository;
+            _brandRepository = brandRepository;
+            _categoryRepository = categoryRepository;
+            _context = context;
         }
 
         public async Task<ApiResponse<PagedResponse<ProductResponseDto>>> GetProductsAsync(ProductFilter filter)
@@ -65,6 +80,329 @@ namespace MV.ApplicationLayer.Services
         {
             var brands = await _productRepository.GetAllBrandsWithCountAsync();
             return ApiResponse<List<BrandResponseDto>>.SuccessResponse(brands);
+        }
+
+        public async Task<ApiResponse<ProductDetailResponse>> GetByIdAsync(int productId)
+        {
+            var product = await _productRepository.GetDetailByIdAsync(productId);
+
+            if (product == null)
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found");
+            }
+
+            var response = MapToDetailResponse(product);
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product retrieved successfully");
+        }
+
+        public async Task<ApiResponse<ProductDetailResponse>> CreateAsync(CreateProductRequest request)
+        {
+            // Validation: SKU unique
+            if (await _productRepository.SkuExistsAsync(request.Sku))
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists");
+            }
+
+            // Validation: Brand exists
+            if (!await _brandRepository.ExistsAsync(request.BrandId))
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found");
+            }
+
+            // Validation: WarrantyPolicy exists (if provided)
+            if (request.WarrantyPolicyId.HasValue)
+            {
+                // Add warranty policy validation if needed
+            }
+
+            // Validation: Categories exist
+            if (request.CategoryIds.Any())
+            {
+                foreach (var categoryId in request.CategoryIds)
+                {
+                    if (!await _categoryRepository.ExistsAsync(categoryId))
+                    {
+                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Category with ID {categoryId} not found");
+                    }
+                }
+            }
+
+            // Create product
+            var product = new Product
+            {
+                Name = request.Name,
+                Sku = request.Sku,
+                Description = request.Description,
+                ProductType = request.ProductType,
+                Price = request.Price,
+                StockQuantity = request.HasSerialTracking ? 0 : request.StockQuantity,
+                BrandId = request.BrandId,
+                WarrantyPolicyId = request.WarrantyPolicyId,
+                HasSerialTracking = request.HasSerialTracking
+            };
+
+            var createdProduct = await _productRepository.CreateAsync(product);
+
+            // Add categories
+            if (request.CategoryIds.Any())
+            {
+                await _productRepository.AddCategoriesToProductAsync(createdProduct.ProductId, request.CategoryIds);
+            }
+
+            // Get full detail
+            var detail = await _productRepository.GetDetailByIdAsync(createdProduct.ProductId);
+            var response = MapToDetailResponse(detail!);
+
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product created successfully");
+        }
+
+        public async Task<ApiResponse<ProductDetailResponse>> CreateKitAsync(CreateKitRequest request)
+        {
+            // Validation: SKU unique
+            if (await _productRepository.SkuExistsAsync(request.Sku))
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists");
+            }
+
+            // Validation: Brand exists
+            if (!await _brandRepository.ExistsAsync(request.BrandId))
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found");
+            }
+
+            // Validation: All component products exist and are not KITs
+            foreach (var component in request.Components)
+            {
+                var childProduct = await _productRepository.GetByIdAsync(component.ProductId);
+                
+                if (childProduct == null)
+                {
+                    return ApiResponse<ProductDetailResponse>.ErrorResponse($"Component product with ID {component.ProductId} not found");
+                }
+
+                if (childProduct.ProductType == ProductTypeEnum.KIT)
+                {
+                    return ApiResponse<ProductDetailResponse>.ErrorResponse($"Cannot add KIT product '{childProduct.Name}' as a component. Only MODULE and COMPONENT types are allowed.");
+                }
+            }
+
+            // Validation: Categories exist
+            if (request.CategoryIds.Any())
+            {
+                foreach (var categoryId in request.CategoryIds)
+                {
+                    if (!await _categoryRepository.ExistsAsync(categoryId))
+                    {
+                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Category with ID {categoryId} not found");
+                    }
+                }
+            }
+
+            // Validation: No duplicate components
+            var duplicates = request.Components
+                .GroupBy(c => c.ProductId)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicates.Any())
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Duplicate component product IDs found: {string.Join(", ", duplicates)}");
+            }
+
+            // Create KIT product
+            var product = new Product
+            {
+                Name = request.Name,
+                Sku = request.Sku,
+                Description = request.Description,
+                ProductType = ProductTypeEnum.KIT,
+                Price = request.Price,
+                StockQuantity = 0, // KIT stock is calculated from components
+                BrandId = request.BrandId,
+                WarrantyPolicyId = request.WarrantyPolicyId,
+                HasSerialTracking = false
+            };
+
+            var createdProduct = await _productRepository.CreateAsync(product);
+
+            // Add categories
+            if (request.CategoryIds.Any())
+            {
+                await _productRepository.AddCategoriesToProductAsync(createdProduct.ProductId, request.CategoryIds);
+            }
+
+            // Add components to bundle
+            foreach (var component in request.Components)
+            {
+                var bundle = new ProductBundle
+                {
+                    ParentProductId = createdProduct.ProductId,
+                    ChildProductId = component.ProductId,
+                    Quantity = component.Quantity
+                };
+
+                await _context.ProductBundles.AddAsync(bundle);
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Get full detail
+            var detail = await _productRepository.GetDetailByIdAsync(createdProduct.ProductId);
+            var response = MapToDetailResponse(detail!);
+
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "KIT created successfully with all components");
+        }
+
+        public async Task<ApiResponse<ProductDetailResponse>> UpdateAsync(int productId, UpdateProductRequest request)
+        {
+            var product = await _productRepository.GetByIdAsync(productId);
+
+            if (product == null)
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found");
+            }
+
+            // Validation: SKU unique (exclude current product)
+            if (await _productRepository.SkuExistsAsync(request.Sku, productId))
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists");
+            }
+
+            // Validation: Brand exists
+            if (!await _brandRepository.ExistsAsync(request.BrandId))
+            {
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found");
+            }
+
+            // Update product
+            product.Name = request.Name;
+            product.Sku = request.Sku;
+            product.Description = request.Description;
+            product.ProductType = request.ProductType;
+            product.Price = request.Price;
+            product.StockQuantity = request.StockQuantity;
+            product.BrandId = request.BrandId;
+            product.WarrantyPolicyId = request.WarrantyPolicyId;
+            product.HasSerialTracking = request.HasSerialTracking;
+
+            await _productRepository.UpdateAsync(product);
+
+            // Update categories: Clear and re-add
+            var currentCategoryIds = await _productRepository.GetCategoryIdsByProductIdAsync(productId);
+            foreach (var categoryId in currentCategoryIds)
+            {
+                await _productRepository.RemoveCategoryFromProductAsync(productId, categoryId);
+            }
+
+            if (request.CategoryIds.Any())
+            {
+                await _productRepository.AddCategoriesToProductAsync(productId, request.CategoryIds);
+            }
+
+            // Get full detail
+            var detail = await _productRepository.GetDetailByIdAsync(productId);
+            var response = MapToDetailResponse(detail!);
+
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product updated successfully");
+        }
+
+        public async Task<ApiResponse<bool>> DeleteAsync(int productId)
+        {
+            if (!await _productRepository.ExistsAsync(productId))
+            {
+                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found");
+            }
+
+            // Check if product has orders
+            if (await _productRepository.HasOrdersAsync(productId))
+            {
+                return ApiResponse<bool>.ErrorResponse("Cannot delete product that has been ordered");
+            }
+
+            await _productRepository.DeleteAsync(productId);
+            return ApiResponse<bool>.SuccessResponse(true, "Product deleted successfully");
+        }
+
+        public async Task<ApiResponse<bool>> AddCategoriesToProductAsync(int productId, List<int> categoryIds)
+        {
+            if (!await _productRepository.ExistsAsync(productId))
+            {
+                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found");
+            }
+
+            foreach (var categoryId in categoryIds)
+            {
+                if (!await _categoryRepository.ExistsAsync(categoryId))
+                {
+                    return ApiResponse<bool>.ErrorResponse($"Category with ID {categoryId} not found");
+                }
+            }
+
+            await _productRepository.AddCategoriesToProductAsync(productId, categoryIds);
+            return ApiResponse<bool>.SuccessResponse(true, "Categories added successfully");
+        }
+
+        public async Task<ApiResponse<bool>> RemoveCategoryFromProductAsync(int productId, int categoryId)
+        {
+            if (!await _productRepository.ExistsAsync(productId))
+            {
+                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found");
+            }
+
+            await _productRepository.RemoveCategoryFromProductAsync(productId, categoryId);
+            return ApiResponse<bool>.SuccessResponse(true, "Category removed successfully");
+        }
+
+        private ProductDetailResponse MapToDetailResponse(Product product)
+        {
+            return new ProductDetailResponse
+            {
+                ProductId = product.ProductId,
+                Sku = product.Sku,
+                Name = product.Name,
+                Description = product.Description,
+                ProductType = product.ProductType,
+                Price = product.Price,
+                StockQuantity = product.StockQuantity ?? 0,
+                AvailableQuantity = product.StockQuantity ?? 0, // Will calculate based on ProductInstances later
+                HasSerialTracking = product.HasSerialTracking ?? false,
+                CreatedAt = product.CreatedAt,
+                Brand = new ProductDetailResponse.BrandInfo
+                {
+                    BrandId = product.Brand.BrandId,
+                    Name = product.Brand.Name,
+                    LogoUrl = product.Brand.LogoUrl
+                },
+                WarrantyPolicy = product.WarrantyPolicy != null ? new ProductDetailResponse.WarrantyPolicyInfo
+                {
+                    PolicyId = product.WarrantyPolicy.PolicyId,
+                    PolicyName = product.WarrantyPolicy.PolicyName,
+                    DurationMonths = product.WarrantyPolicy.DurationMonths,
+                    Description = product.WarrantyPolicy.Description
+                } : null,
+                Categories = product.Categories.Select(c => new ProductDetailResponse.CategoryInfo
+                {
+                    CategoryId = c.CategoryId,
+                    Name = c.Name
+                }).ToList(),
+                Images = product.ProductImages.Select(img => new ProductDetailResponse.ProductImageInfo
+                {
+                    ImageId = img.ImageId,
+                    ImageUrl = img.ImageUrl,
+                    CreatedAt = img.CreatedAt
+                }).ToList(),
+                Reviews = new ProductDetailResponse.ReviewSummary
+                {
+                    TotalReviews = product.Reviews.Count,
+                    AverageRating = product.Reviews.Any() ? product.Reviews.Average(r => r.Rating) : 0,
+                    FiveStarCount = product.Reviews.Count(r => r.Rating == 5),
+                    FourStarCount = product.Reviews.Count(r => r.Rating == 4),
+                    ThreeStarCount = product.Reviews.Count(r => r.Rating == 3),
+                    TwoStarCount = product.Reviews.Count(r => r.Rating == 2),
+                    OneStarCount = product.Reviews.Count(r => r.Rating == 1)
+                }
+            };
         }
     }
 }
