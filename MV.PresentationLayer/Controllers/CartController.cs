@@ -136,5 +136,43 @@ namespace MV.PresentationLayer.Controllers
             // 3. Trả về kết quả
             return Ok(result);
         }
+
+        /// <summary>
+        /// API 16: Validate Coupon - Kiểm tra và áp dụng mã giảm giá
+        /// </summary>
+        [HttpPost("validate-coupon")]
+        [ProducesResponseType(typeof(ApiResponse<ValidateCouponResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> ValidateCoupon([FromBody] ValidateCouponRequestDto request)
+        {
+            // 1. Lấy UserId từ Token
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+            if (userIdClaim == null) return Unauthorized(ApiResponse<object>.ErrorResponse("Invalid Token"));
+
+            int userId = int.Parse(userIdClaim.Value);
+
+            // 2. Gọi Service để validate coupon
+            var result = await _cartService.ValidateCouponAsync(userId, request);
+
+            // 3. Xử lý kết quả
+            if (!result.Success)
+            {
+                // Nếu là lỗi min order value not met, trả về format đặc biệt
+                if (result.Message == "Minimum order value not met" && result.Data != null)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = result.Message,
+                        minOrderValue = result.Data.DiscountValue,
+                        currentSubtotal = result.Data.CartSubtotal
+                    });
+                }
+
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
     }
 }

@@ -9,7 +9,6 @@ using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
 using System.Text;
-using Microsoft.OpenApi.Models;
 
 namespace MV.PresentationLayer
 {
@@ -38,23 +37,12 @@ namespace MV.PresentationLayer
                 });
             });
 
-
-            builder.Services.AddSwaggerGen(c =>
-            // Register Application Services
-            builder.Services.AddScoped<IAuthService, AuthService>();
-            builder.Services.AddScoped<IProductService, ProductService>();
-            builder.Services.AddScoped<ICartService, CartService>();
-
-
-
-            // Register Application Repositories
-            builder.Services.AddScoped<IProductRepository, ProductRepository>();
-            builder.Services.AddScoped<ICartRepository, CartRepository>();
-
             // Configure JWT Authentication
             var jwtSettings = builder.Configuration.GetSection("JwtSettings");
             var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
 
+
+            builder.Services.AddSwaggerGen(c =>
             builder.Services.AddAuthentication(options =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo
@@ -86,7 +74,7 @@ namespace MV.PresentationLayer
             Array.Empty<string>()
         }
     });
-            });
+            }));
 
 
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -116,11 +104,14 @@ namespace MV.PresentationLayer
 
             builder.Services.AddScoped<IRoleRepository, RoleRepository>();
             builder.Services.AddScoped<IRoleService, RoleService>();
-            builder.Services.AddScoped<IProductRepository, ProductRepository>();    
+            builder.Services.AddScoped<IProductRepository, ProductRepository>();
+            builder.Services.AddScoped<ICartRepository, CartRepository>();
+            builder.Services.AddScoped<ICouponRepository, CouponRepository>();
 
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<ICartService, CartService>();
 
             // Register DbContext with connection string from appsettings
             builder.Services.AddDbContext<StemDbContext>(options =>

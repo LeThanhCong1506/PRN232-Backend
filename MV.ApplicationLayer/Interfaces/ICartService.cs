@@ -11,5 +11,6 @@ namespace MV.ApplicationLayer.Interfaces
         Task<ApiResponse<object>> UpdateCartItemQuantityAsync(int userId, int cartItemId, int quantity);
         Task<ApiResponse<object>> RemoveCartItemAsync(int userId, int cartItemId);
         Task<ApiResponse<object>> ClearCartAsync(int userId);
+        Task<ApiResponse<ValidateCouponResponseDto>> ValidateCouponAsync(int userId, ValidateCouponRequestDto request);
     }
 }

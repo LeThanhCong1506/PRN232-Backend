@@ -3,6 +3,7 @@ using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.Interfaces;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,11 +14,13 @@ namespace MV.ApplicationLayer.Services
     {
         private readonly ICartRepository _cartRepository;
         private readonly IProductRepository _productRepository;
+        private readonly ICouponRepository _couponRepository;
 
-        public CartService(ICartRepository cartRepository, IProductRepository productRepository)
+        public CartService(ICartRepository cartRepository, IProductRepository productRepository, ICouponRepository couponRepository)
         {
             _cartRepository = cartRepository;
             _productRepository = productRepository;
+            _couponRepository = couponRepository;
         }
 
         public async Task<ApiResponse<CartResponseDto>> GetCartAsync(int userId)
@@ -257,6 +260,83 @@ namespace MV.ApplicationLayer.Services
                 Message = "Cart cleared",
                 Data = null
             };
+        }
+
+        public async Task<ApiResponse<ValidateCouponResponseDto>> ValidateCouponAsync(int userId, ValidateCouponRequestDto request)
+        {
+            // 1. Tìm coupon theo code
+            var coupon = await _couponRepository.GetCouponByCodeAsync(request.CouponCode);
+
+            // 2. Check coupon tồn tại
+            if (coupon == null)
+            {
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid");
+            }
+
+            // 3. Check thời gian hiệu lực (start_date <= NOW <= end_date)
+            var now = DateTime.UtcNow;
+            if (now < coupon.StartDate || now > coupon.EndDate)
+            {
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid");
+            }
+
+            // 4. Check usage_limit > used_count (nếu có giới hạn)
+            if (coupon.UsageLimit.HasValue && coupon.UsedCount.HasValue)
+            {
+                if (coupon.UsedCount >= coupon.UsageLimit)
+                {
+                    return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid");
+                }
+            }
+
+            // 5. Lấy giỏ hàng của user và tính subtotal
+            var cart = await _cartRepository.GetCartByUserIdAsync(userId);
+            if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
+            {
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Cart is empty");
+            }
+
+            decimal cartSubtotal = cart.CartItems.Sum(ci => (ci.Quantity ?? 0) * ci.Product.Price);
+
+            // 6. Check min_order_value
+            if (coupon.MinOrderValue.HasValue && cartSubtotal < coupon.MinOrderValue.Value)
+            {
+                return new ApiResponse<ValidateCouponResponseDto>
+                {
+                    Success = false,
+                    Message = "Minimum order value not met",
+                    Data = new ValidateCouponResponseDto
+                    {
+                        CartSubtotal = cartSubtotal,
+                        DiscountValue = coupon.MinOrderValue.Value
+                    }
+                };
+            }
+
+            // 7. Tính discount (FIXED_AMOUNT - vì không có discountType)
+            decimal calculatedDiscount = coupon.DiscountValue;
+
+            // Đảm bảo discount không vượt quá subtotal
+            if (calculatedDiscount > cartSubtotal)
+            {
+                calculatedDiscount = cartSubtotal;
+            }
+
+            decimal newTotal = cartSubtotal - calculatedDiscount;
+
+            // 8. Trả về kết quả thành công
+            var responseData = new ValidateCouponResponseDto
+            {
+                CouponId = coupon.CouponId,
+                Code = coupon.Code,
+                DiscountValue = coupon.DiscountValue,
+                CalculatedDiscount = calculatedDiscount,
+                CartSubtotal = cartSubtotal,
+                NewTotal = newTotal,
+                Message = $"Coupon applied: {coupon.DiscountValue:N0} VND off"
+            };
+
+            return ApiResponse<ValidateCouponResponseDto>.SuccessResponse(responseData, "Coupon applied successfully");
         }
     }
 }
