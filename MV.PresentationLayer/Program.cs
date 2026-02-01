@@ -21,6 +21,26 @@ namespace MV.PresentationLayer
 
             var builder = WebApplication.CreateBuilder(args);
 
+            // Configure CORS for Frontend
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowFrontend", policy =>
+                {
+                    policy.WithOrigins(
+                            "http://localhost:5173",  
+                            "http://localhost:3000",  
+                            "http://127.0.0.1:5173",
+                            "http://localhost:5174",
+                            "http://localhost:5175",
+                            "http://127.0.0.1:3000"
+                        )
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials();
+                });
+            });
+
+
             builder.Services.AddSwaggerGen(c =>
             {
                 c.EnableAnnotations();
@@ -92,9 +112,11 @@ namespace MV.PresentationLayer
 
             builder.Services.AddScoped<IRoleRepository, RoleRepository>();
             builder.Services.AddScoped<IRoleService, RoleService>();
+            builder.Services.AddScoped<IProductRepository, ProductRepository>();    
 
             builder.Services.AddScoped<IUserRepository, UserRepository>();
             builder.Services.AddScoped<IUserService, UserService>();
+            builder.Services.AddScoped<IProductService, ProductService>();
 
             builder.Services.AddScoped<IBrandRepository, BrandRepository>();
             builder.Services.AddScoped<IBrandService, BrandService>();
@@ -138,7 +160,9 @@ namespace MV.PresentationLayer
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            // Enable Swagger in Development or when EnableSwagger is true (for Docker)
+            var enableSwagger = app.Configuration.GetValue<bool>("EnableSwagger", false);
+            if (app.Environment.IsDevelopment() || enableSwagger)
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
@@ -146,8 +170,11 @@ namespace MV.PresentationLayer
 
             app.UseHttpsRedirection();
 
-            app.UseAuthentication();
+            // Enable CORS - must be before Authentication/Authorization
+            app.UseCors("AllowFrontend");
 
+            app.UseAuthentication();
+            
             app.UseAuthorization();
 
             app.MapControllers();
