@@ -40,13 +40,8 @@ namespace MV.PresentationLayer
                 });
             });
 
-            // Configure JWT Authentication
-            var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-            var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
-
-
+            // Configure Swagger
             builder.Services.AddSwaggerGen(c =>
-            builder.Services.AddAuthentication(options =>
             {
                 c.EnableAnnotations();
                 c.SwaggerDoc("v1", new OpenApiInfo
@@ -70,39 +65,38 @@ namespace MV.PresentationLayer
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-            }));
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
+                    }
+                });
+            });
 
-
+            // Configure JWT Authentication
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
-        )
-    };
-});
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                        ValidAudience = builder.Configuration["Jwt:Audience"],
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+                        )
+                    };
+                });
 
             builder.Services.AddAuthorization();
 
@@ -116,32 +110,28 @@ namespace MV.PresentationLayer
                 });
 
             builder.Services.AddScoped<IRoleRepository, RoleRepository>();
-            builder.Services.AddScoped<IRoleService, RoleService>();
             builder.Services.AddScoped<IProductRepository, ProductRepository>();
             builder.Services.AddScoped<ICartRepository, CartRepository>();
             builder.Services.AddScoped<ICouponRepository, CouponRepository>();
-
             builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+            builder.Services.AddScoped<IBrandRepository, BrandRepository>();
+            builder.Services.AddScoped<IProductRepository, ProductRepository>();
+            builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
+            builder.Services.AddScoped<IProductBundleRepository, ProductBundleRepository>();
+            builder.Services.AddScoped<IWarrantyRepository, WarrantyRepository>();
+
+
+
+            builder.Services.AddScoped<IRoleService, RoleService>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICartService, CartService>();
-
-            builder.Services.AddScoped<IBrandRepository, BrandRepository>();
             builder.Services.AddScoped<IBrandService, BrandService>();
-
-            builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
             builder.Services.AddScoped<ICategoryService, CategoryService>();
-
-            builder.Services.AddScoped<IProductRepository, ProductRepository>();
             builder.Services.AddScoped<IProductService, ProductService>();
-
-            builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
             builder.Services.AddScoped<IProductImageService, ProductImageService>();
-
-            builder.Services.AddScoped<IProductBundleRepository, ProductBundleRepository>();
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
-
-            builder.Services.AddScoped<IWarrantyRepository, WarrantyRepository>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
 
             // Register Npgsql enum mappings BEFORE DbContext
