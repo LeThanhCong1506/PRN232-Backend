@@ -88,5 +88,116 @@ namespace MV.InfrastructureLayer.Repositories
 
             return await query.ToListAsync();
         }
+
+        public async Task<Product?> GetByIdAsync(int productId)
+        {
+            return await _context.Products
+                .FirstOrDefaultAsync(p => p.ProductId == productId);
+        }
+
+        public async Task<Product?> GetDetailByIdAsync(int productId)
+        {
+            return await _context.Products
+                .Include(p => p.Brand)
+                .Include(p => p.Categories)
+                .Include(p => p.ProductImages)
+                .Include(p => p.WarrantyPolicy)
+                .Include(p => p.Reviews)
+                    .ThenInclude(r => r.User)
+                .FirstOrDefaultAsync(p => p.ProductId == productId);
+        }
+
+        public async Task<Product> CreateAsync(Product product)
+        {
+            product.CreatedAt = DateTime.UtcNow;
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+            return product;
+        }
+
+        public async Task UpdateAsync(Product product)
+        {
+            _context.Products.Update(product);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(int productId)
+        {
+            var product = await GetByIdAsync(productId);
+            if (product != null)
+            {
+                _context.Products.Remove(product);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<bool> ExistsAsync(int productId)
+        {
+            return await _context.Products.AnyAsync(p => p.ProductId == productId);
+        }
+
+        public async Task<bool> SkuExistsAsync(string sku, int? excludeProductId = null)
+        {
+            var query = _context.Products.Where(p => p.Sku.ToLower() == sku.ToLower());
+            
+            if (excludeProductId.HasValue)
+            {
+                query = query.Where(p => p.ProductId != excludeProductId.Value);
+            }
+            
+            return await query.AnyAsync();
+        }
+
+        public async Task<bool> HasOrdersAsync(int productId)
+        {
+            return await _context.OrderItems.AnyAsync(oi => oi.ProductId == productId);
+        }
+
+        public async Task AddCategoriesToProductAsync(int productId, List<int> categoryIds)
+        {
+            var product = await _context.Products
+                .Include(p => p.Categories)
+                .FirstOrDefaultAsync(p => p.ProductId == productId);
+
+            if (product == null) return;
+
+            var categories = await _context.Categories
+                .Where(c => categoryIds.Contains(c.CategoryId))
+                .ToListAsync();
+
+            foreach (var category in categories)
+            {
+                if (!product.Categories.Any(c => c.CategoryId == category.CategoryId))
+                {
+                    product.Categories.Add(category);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task RemoveCategoryFromProductAsync(int productId, int categoryId)
+        {
+            var product = await _context.Products
+                .Include(p => p.Categories)
+                .FirstOrDefaultAsync(p => p.ProductId == productId);
+
+            if (product == null) return;
+
+            var category = product.Categories.FirstOrDefault(c => c.CategoryId == categoryId);
+            if (category != null)
+            {
+                product.Categories.Remove(category);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<List<int>> GetCategoryIdsByProductIdAsync(int productId)
+        {
+            return await _context.Products
+                .Where(p => p.ProductId == productId)
+                .SelectMany(p => p.Categories.Select(c => c.CategoryId))
+                .ToListAsync();
+        }
     }
 }
