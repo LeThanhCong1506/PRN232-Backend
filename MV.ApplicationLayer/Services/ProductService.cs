@@ -15,17 +15,20 @@ namespace MV.ApplicationLayer.Services
         private readonly IProductRepository _productRepository;
         private readonly IBrandRepository _brandRepository;
         private readonly ICategoryRepository _categoryRepository;
+        private readonly IProductBundleRepository _bundleRepository;
         private readonly StemDbContext _context;
 
         public ProductService(
             IProductRepository productRepository,
             IBrandRepository brandRepository,
             ICategoryRepository categoryRepository,
+            IProductBundleRepository bundleRepository,
             StemDbContext context)
         {
             _productRepository = productRepository;
             _brandRepository = brandRepository;
             _categoryRepository = categoryRepository;
+            _bundleRepository = bundleRepository;
             _context = context;
         }
 
@@ -92,6 +95,22 @@ namespace MV.ApplicationLayer.Services
             }
 
             var response = MapToDetailResponse(product);
+
+            // Nếu product là KIT, load bundle components
+            if (product.ProductType == ProductTypeEnum.KIT)
+            {
+                var bundles = await _bundleRepository.GetBundleComponentsAsync(productId);
+                response.BundleComponents = bundles.Select(b => new ProductDetailResponse.BundleComponentInfo
+                {
+                    BundleId = b.BundleId,
+                    ChildProductId = b.ChildProductId,
+                    ChildProductName = b.ChildProduct.Name,
+                    ChildProductSku = b.ChildProduct.Sku,
+                    ChildProductPrice = b.ChildProduct.Price,
+                    Quantity = b.Quantity ?? 1
+                }).ToList();
+            }
+
             return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product retrieved successfully");
         }
 

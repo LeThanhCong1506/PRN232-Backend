@@ -30,6 +30,9 @@ public class ProductDetailResponse
     // Reviews summary
     public ReviewSummary Reviews { get; set; } = new ReviewSummary();
 
+    // Bundle components (chỉ có khi ProductType = KIT)
+    public List<BundleComponentInfo>? BundleComponents { get; set; }
+
     public class BrandInfo
     {
         public int BrandId { get; set; }
@@ -67,5 +70,15 @@ public class ProductDetailResponse
         public int ThreeStarCount { get; set; }
         public int TwoStarCount { get; set; }
         public int OneStarCount { get; set; }
+    }
+
+    public class BundleComponentInfo
+    {
+        public int BundleId { get; set; }
+        public int ChildProductId { get; set; }
+        public string ChildProductName { get; set; } = null!;
+        public string ChildProductSku { get; set; } = null!;
+        public decimal ChildProductPrice { get; set; }
+        public int Quantity { get; set; }
     }
 }
