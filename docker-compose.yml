@@ -13,8 +13,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database_init_and_seed.sql:/docker-entrypoint-initdb.d/database_init_and_seed.sql:ro
       - ./docker/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+      - ./database_init_and_seed.sql:/tmp/database_init_and_seed.sql:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres -d ecommerce_db" ]
       interval: 10s
