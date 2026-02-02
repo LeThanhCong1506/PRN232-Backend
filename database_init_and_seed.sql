@@ -1038,3 +1038,13 @@ UNION ALL SELECT 'Order Items: ' || COUNT(*) FROM ORDER_ITEM
 UNION ALL SELECT 'Payments: ' || COUNT(*) FROM PAYMENT
 UNION ALL SELECT 'Warranties: ' || COUNT(*) FROM WARRANTY
 UNION ALL SELECT 'Warranty Claims: ' || COUNT(*) FROM WARRANTY_CLAIM;
+
+
+-- 1. Thay đổi kiểu dữ liệu của cột product_type sang VARCHAR(50)
+-- Sử dụng mệnh đề USING để ép kiểu dữ liệu cũ (Enum) sang chuỗi (text)
+ALTER TABLE public.product 
+ALTER COLUMN product_type TYPE VARCHAR(50) 
+USING product_type::text;
+
+-- 2. (Tùy chọn) Xóa kiểu Enum cũ nếu bạn không còn dùng ở bất kỳ đâu khác để làm sạch database
+DROP TYPE IF EXISTS public.product_type_enum;
