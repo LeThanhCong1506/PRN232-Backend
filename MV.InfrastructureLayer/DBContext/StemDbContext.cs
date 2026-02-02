@@ -312,6 +312,7 @@ public partial class StemDbContext : DbContext
                 .HasPrecision(12, 2)
                 .HasColumnName("price");
             entity.Property(e => e.ProductType)
+                .HasConversion<string>()
                 .HasColumnName("product_type");
             entity.Property(e => e.Sku)
                 .HasMaxLength(50)
