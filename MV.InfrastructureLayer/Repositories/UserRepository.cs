@@ -52,5 +52,21 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(x => x.Role)
                 .FirstOrDefaultAsync(x => x.UserId == id);
         }
+
+        public async Task<bool> UpdateAsync(User user)
+        {
+            var existingUser = await _context.Users.FindAsync(user.UserId);
+            if (existingUser == null)
+                return false;
+            existingUser.Username = user.Username;
+            existingUser.Email = user.Email;
+            existingUser.Phone = user.Phone;
+            existingUser.Address = user.Address;
+            existingUser.IsActive = user.IsActive;
+            _context.Users.Update(existingUser);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
     }
 }
