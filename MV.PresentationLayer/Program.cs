@@ -134,11 +134,6 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
 
-            // Register Npgsql enum mappings BEFORE DbContext
-            Npgsql.NpgsqlConnection.GlobalTypeMapper.MapEnum<MV.DomainLayer.Enums.ProductTypeEnum>(
-                "product_type_enum",
-                new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
-
             // Register DbContext with connection string from appsettings
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
