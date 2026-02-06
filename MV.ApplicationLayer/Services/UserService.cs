@@ -30,6 +30,9 @@ namespace MV.ApplicationLayer.Services
             if (await _repo.ExistsEmailAsync(dto.Email))
                 return "Email đã tồn tại";
 
+            if (await _repo.ExistsPhoneAsync(dto.Phone!))
+                return "Số điện thoại đã tồn tại";
+
             var user = new User
             {
                 RoleId = 2, //User role
@@ -81,6 +84,8 @@ namespace MV.ApplicationLayer.Services
                 Username = u.Username,
                 Email = u.Email,
                 RoleName = u.Role.RoleName,
+                Phone = u.Phone,
+                Address = u.Address,
                 IsActive = u.IsActive,
                 CreatedAt = u.CreatedAt
             }).ToList();
@@ -97,9 +102,22 @@ namespace MV.ApplicationLayer.Services
                 Username = user.Username,
                 Email = user.Email,
                 RoleName = user.Role.RoleName,
+                Phone = user.Phone,
+                Address = user.Address,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt
             };
+        }
+
+        public async Task<bool> UpdateAsync(int id, UpdateUserDto dto)
+        {
+            var user = await _repo.GetByIdAsync(id);
+            if (user == null) return false;
+            user.Email = dto.Email;
+            user.Phone = dto.Phone;
+            user.Address = dto.Address;
+            await _repo.UpdateAsync(user);
+            return true;
         }
     }
 }

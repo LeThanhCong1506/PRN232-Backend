@@ -7,21 +7,17 @@ using System.Threading.Tasks;
 
 namespace MV.DomainLayer.DTO
 {
-    public class CreateUserDto
+    public class UpdateUserDto
     {
-        public string Username { get; set; } = null!;
-
         [Required]
         [EmailAddress(ErrorMessage = "Email không hợp lệ")]
-        public string Email { get; set; } = null!;
-        
-        public string Password { get; set; } = null!;
+        public string Email { get; set; } = null;
 
         [Required]
         [StringLength(10, MinimumLength = 10, ErrorMessage = "Số điện thoại phải đúng 10 chữ số")]
         [RegularExpression(@"^\d{10}$", ErrorMessage = "Số điện thoại chỉ được chứa số")]
         public string? Phone { get; set; }
-        
+
         public string? Address { get; set; }
     }
 }
