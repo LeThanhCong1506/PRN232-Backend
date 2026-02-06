@@ -6,11 +6,10 @@ set -e
 
 echo "=== Initializing STEM Store Database ==="
 
-# Filter out DROP DATABASE, CREATE DATABASE, and \c commands, then execute
-# These commands don't work inside Docker container (database is already created)
-grep -v "^DROP DATABASE" /docker-entrypoint-initdb.d/database_init_and_seed.sql | \
-grep -v "^CREATE DATABASE" | \
-grep -v "^\\\\c" | \
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB"
+# Run the SQL file, skipping the first 24 lines (DROP/CREATE DATABASE and \c commands)
+# PostgreSQL container already creates the database from POSTGRES_DB env var
+tail -n +25 /tmp/database_init_and_seed.sql | psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB"
 
 echo "=== Database initialization completed! ==="
+
+

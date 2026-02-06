@@ -1038,3 +1038,369 @@ UNION ALL SELECT 'Order Items: ' || COUNT(*) FROM ORDER_ITEM
 UNION ALL SELECT 'Payments: ' || COUNT(*) FROM PAYMENT
 UNION ALL SELECT 'Warranties: ' || COUNT(*) FROM WARRANTY
 UNION ALL SELECT 'Warranty Claims: ' || COUNT(*) FROM WARRANTY_CLAIM;
+
+
+-- 1. Thay đổi kiểu dữ liệu của cột product_type sang VARCHAR(50)
+-- Sử dụng mệnh đề USING để ép kiểu dữ liệu cũ (Enum) sang chuỗi (text)
+ALTER TABLE public.product 
+ALTER COLUMN product_type TYPE VARCHAR(50) 
+USING product_type::text;
+
+-- 2. (Tùy chọn) Xóa kiểu Enum cũ nếu bạn không còn dùng ở bất kỳ đâu khác để làm sạch database
+DROP TYPE IF EXISTS public.product_type_enum;
+
+----------------------------------------------------------------------------------------------
+
+-- ============================================
+-- CẬP NHẬT DATABASE CHO MILESTONE 3
+-- STEM Equipment E-Commerce
+-- Tích hợp SePay Payment Gateway
+-- Version: 1.0 | January 2026
+-- ============================================
+
+-- ============================================
+-- 1. SỬA LỖI CHÍNH TẢ
+-- ============================================
+
+ALTER TABLE ORDER_HEADER RENAME COLUMN shiping_fee TO shipping_fee;
+
+-- ============================================
+-- 2. CẬP NHẬT PAYMENT METHOD ENUM
+-- Đổi từ BANK_TRANSFER sang SEPAY
+-- Giữ lại COD, bỏ MOMO và ZALO_PAY
+-- ============================================
+
+-- Tạo enum mới
+CREATE TYPE payment_method_enum_new AS ENUM ('COD', 'SEPAY');
+
+-- Cập nhật bảng PAYMENT
+ALTER TABLE PAYMENT 
+    ALTER COLUMN payment_method TYPE payment_method_enum_new 
+    USING (
+        CASE payment_method::text
+            WHEN 'COD' THEN 'COD'::payment_method_enum_new
+            WHEN 'BANK_TRANSFER' THEN 'SEPAY'::payment_method_enum_new
+            WHEN 'MOMO' THEN 'SEPAY'::payment_method_enum_new
+            WHEN 'ZALO_PAY' THEN 'SEPAY'::payment_method_enum_new
+            ELSE 'COD'::payment_method_enum_new
+        END
+    );
+
+-- Xóa enum cũ và đổi tên enum mới
+DROP TYPE payment_method_enum;
+ALTER TYPE payment_method_enum_new RENAME TO payment_method_enum;
+
+-- ============================================
+-- 3. CẬP NHẬT BẢNG USER
+-- Thêm các trường địa chỉ chi tiết
+-- ============================================
+
+-- Thêm full_name (tách biệt với username)
+ALTER TABLE "USER" ADD COLUMN IF NOT EXISTS full_name VARCHAR(100);
+
+-- Thêm các trường địa chỉ chi tiết
+ALTER TABLE "USER" ADD COLUMN IF NOT EXISTS province VARCHAR(50);
+ALTER TABLE "USER" ADD COLUMN IF NOT EXISTS district VARCHAR(50);
+ALTER TABLE "USER" ADD COLUMN IF NOT EXISTS ward VARCHAR(50);
+ALTER TABLE "USER" ADD COLUMN IF NOT EXISTS street_address VARCHAR(200);
+
+-- Cập nhật dữ liệu hiện có (nếu có)
+UPDATE "USER" 
+SET full_name = username 
+WHERE full_name IS NULL;
+
+-- ============================================
+-- 4. CẬP NHẬT BẢNG ORDER_HEADER
+-- Thêm customer snapshot fields
+-- ============================================
+
+-- Thêm customer info snapshot
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS customer_name VARCHAR(100);
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS customer_email VARCHAR(100);
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20);
+
+-- Thêm địa chỉ chi tiết snapshot
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS province VARCHAR(50);
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS district VARCHAR(50);
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS ward VARCHAR(50);
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS street_address VARCHAR(200);
+
+-- Thêm notes cho đơn hàng
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- Thêm updated_at để track thay đổi
+ALTER TABLE ORDER_HEADER ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- ============================================
+-- 5. CẬP NHẬT BẢNG ORDER_ITEM
+-- Thêm product snapshot fields
+-- ============================================
+
+-- Thêm product info snapshot
+ALTER TABLE ORDER_ITEM ADD COLUMN IF NOT EXISTS product_name VARCHAR(255);
+ALTER TABLE ORDER_ITEM ADD COLUMN IF NOT EXISTS product_sku VARCHAR(50);
+
+-- ============================================
+-- 6. CẬP NHẬT BẢNG PAYMENT
+-- Thêm các trường cho SePay integration
+-- ============================================
+
+-- Thêm transaction tracking
+ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(100);
+
+-- Thêm thông tin ngân hàng
+ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS bank_code VARCHAR(50);
+ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS bank_account VARCHAR(50);
+
+-- Thêm response từ gateway
+ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS gateway_response TEXT;
+
+-- Thêm thời gian hết hạn thanh toán (cho QR code)
+ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS expired_at TIMESTAMP;
+
+-- Thêm mã tham chiếu thanh toán (content chuyển khoản)
+ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(100);
+
+-- Thêm updated_at
+ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- Thêm payment_status_enum mới nếu cần EXPIRED
+DO $$
+BEGIN
+    -- Kiểm tra xem EXPIRED đã tồn tại chưa
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum 
+        WHERE enumlabel = 'EXPIRED' 
+        AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'payment_status_enum')
+    ) THEN
+        ALTER TYPE payment_status_enum ADD VALUE 'EXPIRED';
+    END IF;
+END
+$$;
+
+-- ============================================
+-- 7. TẠO BẢNG SEPAY_CONFIG (Cấu hình SePay)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS SEPAY_CONFIG (
+    config_id SERIAL PRIMARY KEY,
+    bank_name VARCHAR(100) NOT NULL,
+    bank_code VARCHAR(20) NOT NULL,
+    account_number VARCHAR(50) NOT NULL,
+    account_name VARCHAR(100) NOT NULL,
+    api_key VARCHAR(255),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index cho SEPAY_CONFIG
+CREATE INDEX IF NOT EXISTS idx_sepay_config_active ON SEPAY_CONFIG(is_active);
+
+-- ============================================
+-- 8. TẠO BẢNG SEPAY_TRANSACTION (Log giao dịch)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS SEPAY_TRANSACTION (
+    transaction_id SERIAL PRIMARY KEY,
+    order_id INTEGER,
+    
+    -- Thông tin từ SePay webhook
+    sepay_id VARCHAR(100),
+    gateway VARCHAR(50),
+    transaction_date TIMESTAMP,
+    account_number VARCHAR(50),
+    
+    -- Nội dung và số tiền
+    transfer_type VARCHAR(20),
+    transfer_amount NUMERIC(12, 2),
+    accumulated NUMERIC(12, 2),
+    code VARCHAR(100),
+    content TEXT,
+    reference_number VARCHAR(100),
+    description TEXT,
+    
+    -- Trạng thái xử lý
+    is_processed BOOLEAN DEFAULT FALSE,
+    processed_at TIMESTAMP,
+    
+    -- Raw data
+    raw_data TEXT,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_sepay_order FOREIGN KEY (order_id) 
+        REFERENCES ORDER_HEADER(order_id) ON DELETE SET NULL
+);
+
+-- Indexes cho SEPAY_TRANSACTION
+CREATE INDEX IF NOT EXISTS idx_sepay_trans_order ON SEPAY_TRANSACTION(order_id);
+CREATE INDEX IF NOT EXISTS idx_sepay_trans_code ON SEPAY_TRANSACTION(code);
+CREATE INDEX IF NOT EXISTS idx_sepay_trans_processed ON SEPAY_TRANSACTION(is_processed);
+CREATE INDEX IF NOT EXISTS idx_sepay_trans_date ON SEPAY_TRANSACTION(transaction_date);
+
+-- ============================================
+-- 9. CẬP NHẬT INDEXES
+-- ============================================
+
+-- Index cho các trường mới trong ORDER_HEADER
+CREATE INDEX IF NOT EXISTS idx_order_customer_email ON ORDER_HEADER(customer_email);
+CREATE INDEX IF NOT EXISTS idx_order_customer_phone ON ORDER_HEADER(customer_phone);
+CREATE INDEX IF NOT EXISTS idx_order_updated ON ORDER_HEADER(updated_at);
+
+-- Index cho PAYMENT
+CREATE INDEX IF NOT EXISTS idx_payment_transaction ON PAYMENT(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_payment_reference ON PAYMENT(payment_reference);
+CREATE INDEX IF NOT EXISTS idx_payment_expired ON PAYMENT(expired_at);
+
+-- Index cho USER
+CREATE INDEX IF NOT EXISTS idx_user_phone ON "USER"(phone);
+CREATE INDEX IF NOT EXISTS idx_user_fullname ON "USER"(full_name);
+
+-- ============================================
+-- 10. SEED DATA CHO SEPAY
+-- ============================================
+
+-- Thêm cấu hình SePay mẫu (cần cập nhật với thông tin thực)
+INSERT INTO SEPAY_CONFIG (bank_name, bank_code, account_number, account_name, api_key, is_active)
+VALUES 
+    ('MB Bank', 'MB', '0123456789', 'CONG TY STEM SHOP', 'YOUR_SEPAY_API_KEY_HERE', TRUE)
+ON CONFLICT DO NOTHING;
+
+-- ============================================
+-- 11. TẠO FUNCTION TỰ ĐỘNG CẬP NHẬT updated_at
+-- ============================================
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Trigger cho ORDER_HEADER
+DROP TRIGGER IF EXISTS update_order_header_updated_at ON ORDER_HEADER;
+CREATE TRIGGER update_order_header_updated_at
+    BEFORE UPDATE ON ORDER_HEADER
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger cho PAYMENT
+DROP TRIGGER IF EXISTS update_payment_updated_at ON PAYMENT;
+CREATE TRIGGER update_payment_updated_at
+    BEFORE UPDATE ON PAYMENT
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger cho SEPAY_CONFIG
+DROP TRIGGER IF EXISTS update_sepay_config_updated_at ON SEPAY_CONFIG;
+CREATE TRIGGER update_sepay_config_updated_at
+    BEFORE UPDATE ON SEPAY_CONFIG
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 12. TẠO FUNCTION GENERATE ORDER NUMBER
+-- ============================================
+
+CREATE OR REPLACE FUNCTION generate_order_number()
+RETURNS VARCHAR(50) AS $$
+DECLARE
+    today_str VARCHAR(8);
+    seq_num INTEGER;
+    order_num VARCHAR(50);
+BEGIN
+    today_str := TO_CHAR(CURRENT_DATE, 'YYYYMMDD');
+    
+    SELECT COUNT(*) + 1 INTO seq_num
+    FROM ORDER_HEADER
+    WHERE order_number LIKE 'ORD' || today_str || '%';
+    
+    order_num := 'ORD' || today_str || LPAD(seq_num::TEXT, 3, '0');
+    
+    RETURN order_num;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================
+-- 13. TẠO FUNCTION GENERATE PAYMENT REFERENCE
+-- Tạo mã thanh toán unique cho SePay
+-- ============================================
+
+CREATE OR REPLACE FUNCTION generate_payment_reference(p_order_number VARCHAR)
+RETURNS VARCHAR(100) AS $$
+BEGIN
+    -- Format: STEM + OrderNumber (bỏ ORD prefix)
+    -- Ví dụ: ORD20260115001 -> STEM20260115001
+    RETURN 'STEM' || SUBSTRING(p_order_number FROM 4);
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================
+-- 14. VIEW CHO BÁO CÁO
+-- ============================================
+
+-- View đơn hàng với thông tin thanh toán
+CREATE OR REPLACE VIEW v_order_with_payment AS
+SELECT 
+    oh.order_id,
+    oh.order_number,
+    oh.customer_name,
+    oh.customer_email,
+    oh.customer_phone,
+    oh.status AS order_status,
+    oh.subtotal_amount,
+    oh.shipping_fee,
+    oh.discount_amount,
+    oh.total_amount,
+    oh.created_at AS order_date,
+    p.payment_id,
+    p.payment_method,
+    p.status AS payment_status,
+    p.payment_reference,
+    p.transaction_id,
+    p.payment_date,
+    p.expired_at
+FROM ORDER_HEADER oh
+LEFT JOIN PAYMENT p ON oh.order_id = p.order_id;
+
+-- View giao dịch SePay chưa xử lý
+CREATE OR REPLACE VIEW v_sepay_pending AS
+SELECT 
+    st.*,
+    oh.order_number,
+    oh.total_amount AS expected_amount,
+    oh.status AS order_status
+FROM SEPAY_TRANSACTION st
+LEFT JOIN ORDER_HEADER oh ON st.order_id = oh.order_id
+WHERE st.is_processed = FALSE;
+
+-- ============================================
+-- 15. COMMENTS CHO DOCUMENTATION
+-- ============================================
+
+COMMENT ON TABLE SEPAY_CONFIG IS 'Cấu hình tài khoản ngân hàng cho SePay';
+COMMENT ON TABLE SEPAY_TRANSACTION IS 'Log tất cả giao dịch nhận được từ SePay webhook';
+COMMENT ON COLUMN PAYMENT.payment_reference IS 'Mã tham chiếu thanh toán - nội dung chuyển khoản';
+COMMENT ON COLUMN PAYMENT.expired_at IS 'Thời gian hết hạn thanh toán online';
+COMMENT ON COLUMN ORDER_HEADER.customer_name IS 'Snapshot tên khách hàng tại thời điểm đặt hàng';
+
+-- ============================================
+-- KẾT THÚC SCRIPT
+-- ============================================
+
+-- Hiển thị kết quả
+SELECT 'Database update completed successfully!' AS status;
+
+-- Kiểm tra các bảng mới
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name IN ('sepay_config', 'sepay_transaction')
+ORDER BY table_name;
+
+-- Kiểm tra enum mới
+SELECT enumlabel 
+FROM pg_enum 
+WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'payment_method_enum');
