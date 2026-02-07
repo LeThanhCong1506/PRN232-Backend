@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
-using MV.DomainLayer.DTO;
+using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Response;
 
 namespace MV.PresentationLayer.Controllers
 {

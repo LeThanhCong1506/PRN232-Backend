@@ -97,7 +97,7 @@ namespace MV.ApplicationLayer.Services
             var response = MapToDetailResponse(product);
 
             // Nếu product là KIT, load bundle components
-            if (product.ProductType == ProductTypeEnum.KIT)
+            if (product.ProductType == ProductTypeEnum.KIT.ToString())
             {
                 var bundles = await _bundleRepository.GetBundleComponentsAsync(productId);
                 response.BundleComponents = bundles.Select(b => new ProductDetailResponse.BundleComponentInfo
@@ -152,7 +152,7 @@ namespace MV.ApplicationLayer.Services
                 Name = request.Name,
                 Sku = request.Sku,
                 Description = request.Description,
-                ProductType = request.ProductType,
+                ProductType = request.ProductType.ToString(),
                 Price = request.Price,
                 StockQuantity = request.HasSerialTracking ? 0 : request.StockQuantity,
                 BrandId = request.BrandId,
@@ -199,7 +199,7 @@ namespace MV.ApplicationLayer.Services
                     return ApiResponse<ProductDetailResponse>.ErrorResponse($"Component product with ID {component.ProductId} not found");
                 }
 
-                if (childProduct.ProductType == ProductTypeEnum.KIT)
+                if (childProduct.ProductType == ProductTypeEnum.KIT.ToString())
                 {
                     return ApiResponse<ProductDetailResponse>.ErrorResponse($"Cannot add KIT product '{childProduct.Name}' as a component. Only MODULE and COMPONENT types are allowed.");
                 }
@@ -235,7 +235,7 @@ namespace MV.ApplicationLayer.Services
                 Name = request.Name,
                 Sku = request.Sku,
                 Description = request.Description,
-                ProductType = ProductTypeEnum.KIT,
+                ProductType = ProductTypeEnum.KIT.ToString(),
                 Price = request.Price,
                 StockQuantity = 0, // KIT stock is calculated from components
                 BrandId = request.BrandId,
@@ -298,7 +298,7 @@ namespace MV.ApplicationLayer.Services
             product.Name = request.Name;
             product.Sku = request.Sku;
             product.Description = request.Description;
-            product.ProductType = request.ProductType;
+            product.ProductType = request.ProductType.ToString();
             product.Price = request.Price;
             product.StockQuantity = request.StockQuantity;
             product.BrandId = request.BrandId;
@@ -381,7 +381,7 @@ namespace MV.ApplicationLayer.Services
                 Sku = product.Sku,
                 Name = product.Name,
                 Description = product.Description,
-                ProductType = product.ProductType,
+                ProductType = Enum.Parse<ProductTypeEnum>(product.ProductType),
                 Price = product.Price,
                 StockQuantity = product.StockQuantity ?? 0,
                 AvailableQuantity = product.StockQuantity ?? 0, // Will calculate based on ProductInstances later

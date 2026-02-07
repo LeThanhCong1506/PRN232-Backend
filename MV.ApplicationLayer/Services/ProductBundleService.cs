@@ -28,7 +28,7 @@ public class ProductBundleService : IProductBundleService
             return ApiResponse<IEnumerable<ProductBundleResponse>>.ErrorResponse($"Product with ID {kitProductId} not found");
         }
 
-        if (parentProduct.ProductType != ProductTypeEnum.KIT)
+        if (parentProduct.ProductType != ProductTypeEnum.KIT.ToString())
         {
             return ApiResponse<IEnumerable<ProductBundleResponse>>.ErrorResponse($"Product {kitProductId} is not a KIT");
         }
@@ -48,7 +48,7 @@ public class ProductBundleService : IProductBundleService
             return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product with ID {kitProductId} not found");
         }
 
-        if (parentProduct.ProductType != ProductTypeEnum.KIT)
+        if (parentProduct.ProductType != ProductTypeEnum.KIT.ToString())
         {
             return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product {kitProductId} is not a KIT. Only KIT products can have components");
         }
@@ -61,7 +61,7 @@ public class ProductBundleService : IProductBundleService
         }
 
         // Validate child product is not a KIT (không cho phép KIT trong KIT)
-        if (childProduct.ProductType == ProductTypeEnum.KIT)
+        if (childProduct.ProductType == ProductTypeEnum.KIT.ToString())
         {
             return ApiResponse<ProductBundleResponse>.ErrorResponse("Cannot add a KIT as a component of another KIT");
         }
@@ -114,7 +114,7 @@ public class ProductBundleService : IProductBundleService
             return ApiResponse<int>.ErrorResponse($"Product with ID {kitProductId} not found");
         }
 
-        if (parentProduct.ProductType != ProductTypeEnum.KIT)
+        if (parentProduct.ProductType != ProductTypeEnum.KIT.ToString())
         {
             return ApiResponse<int>.ErrorResponse($"Product {kitProductId} is not a KIT");
         }

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MV.DomainLayer.DTO
+namespace MV.DomainLayer.DTOs.Login.Request
 {
     public class UpdateUserDto
     {

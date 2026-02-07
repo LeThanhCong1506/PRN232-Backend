@@ -1,4 +1,5 @@
-﻿using MV.DomainLayer.DTO;
+﻿using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Response;
 using MV.DomainLayer.Entities;
 using System;
 using System.Collections.Generic;

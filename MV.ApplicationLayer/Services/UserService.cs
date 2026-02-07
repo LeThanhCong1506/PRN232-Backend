@@ -1,5 +1,6 @@
 ﻿using MV.ApplicationLayer.Interfaces;
-using MV.DomainLayer.DTO;
+using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Response;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.Interfaces;
 using System;

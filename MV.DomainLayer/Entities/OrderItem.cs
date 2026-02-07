@@ -17,6 +17,24 @@ public partial class OrderItem
 
     public decimal Subtotal { get; set; }
 
+    public string? ProductName { get; set; }
+
+    public string? ProductSku { get; set; }
+
+    /// <summary>
+    /// Snapshot ảnh sản phẩm
+    /// </summary>
+    public string? ProductImageUrl { get; set; }
+
+    /// <summary>
+    /// Giảm giá cho item
+    /// </summary>
+    public decimal? DiscountAmount { get; set; }
+
+    public string? Notes { get; set; }
+
+    public DateTime? CreatedAt { get; set; }
+
     public virtual OrderHeader Order { get; set; } = null!;
 
     public virtual Product Product { get; set; } = null!;
