@@ -133,6 +133,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageService, ProductImageService>();
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
+            builder.Services.AddScoped<ICheckoutService, CheckoutService>();
 
             // Register DbContext with connection string from appsettings
             builder.Services.AddDbContext<StemDbContext>(options =>
