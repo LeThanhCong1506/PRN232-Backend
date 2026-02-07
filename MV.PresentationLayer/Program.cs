@@ -120,10 +120,10 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
             builder.Services.AddScoped<IProductBundleRepository, ProductBundleRepository>();
             builder.Services.AddScoped<IWarrantyRepository, WarrantyRepository>();
-
-
+            builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 
             builder.Services.AddScoped<IRoleService, RoleService>();
+            builder.Services.AddScoped<IOrderService, OrderService>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICartService, CartService>();
