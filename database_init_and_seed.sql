@@ -12,7 +12,7 @@
 -- ============================================
 
 -- Xoa database neu da ton tai (CAN THAN!)
-DROP DATABASE IF EXISTS ecommerce_db;
+DROP DATABASE IF EXISTS STEM-DB;
 
 -- Tao database moi
 CREATE DATABASE ecommerce_db WITH ENCODING 'UTF8';

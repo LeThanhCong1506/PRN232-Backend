@@ -22,10 +22,10 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo đơn hàng từ giỏ hàng (Checkout)
+    /// Create an order from the shopping cart (Checkout)
     /// </summary>
     [HttpPost("checkout")]
-    [SwaggerOperation(Summary = "Checkout - Tạo đơn hàng từ giỏ hàng")]
+    [SwaggerOperation(Summary = "Create an order from the shopping cart")]
     [ProducesResponseType(typeof(ApiResponse<CheckoutResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Checkout([FromBody] CreateOrderRequest request)
@@ -43,10 +43,10 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách đơn hàng của user hiện tại
+    /// Get order list of the current user
     /// </summary>
     [HttpGet("my-orders")]
-    [SwaggerOperation(Summary = "Lấy danh sách đơn hàng của tôi")]
+    [SwaggerOperation(Summary = "Get my order list")]
     [ProducesResponseType(typeof(ApiResponse<PagedResponse<OrderResponse>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyOrders([FromQuery] OrderFilterRequest filter)
     {
@@ -59,11 +59,11 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy tất cả đơn hàng (Admin only)
+    /// Get all orders (Admin/Staff only)
     /// </summary>
     [HttpGet]
     [Authorize(Roles = "Admin,Staff")]
-    [SwaggerOperation(Summary = "[Admin] Lấy tất cả đơn hàng")]
+    [SwaggerOperation(Summary = "[Admin] Get all orders")]
     [ProducesResponseType(typeof(ApiResponse<PagedResponse<OrderResponse>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllOrders([FromQuery] OrderFilterRequest filter)
     {
@@ -72,10 +72,10 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết đơn hàng
+    /// Get order details
     /// </summary>
     [HttpGet("{id}")]
-    [SwaggerOperation(Summary = "Lấy chi tiết đơn hàng")]
+    [SwaggerOperation(Summary = "Get order details")]
     [ProducesResponseType(typeof(ApiResponse<OrderDetailResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetOrderDetail(int id)
@@ -89,7 +89,7 @@ public class OrderController : ControllerBase
 
         if (!result.Success)
         {
-            if (result.Message.Contains("không tồn tại"))
+            if (result.Message.ToLower().Contains("not found"))
                 return NotFound(result);
             if (result.Message.Contains("Unauthorized"))
                 return StatusCode(403, result);
@@ -100,11 +100,11 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật trạng thái đơn hàng (Admin only)
+    /// Update order status (Admin/Staff only)
     /// </summary>
     [HttpPut("{id}/status")]
     [Authorize(Roles = "Admin,Staff")]
-    [SwaggerOperation(Summary = "[Admin] Cập nhật trạng thái đơn hàng")]
+    [SwaggerOperation(Summary = "[Admin] Update order status")]
     [ProducesResponseType(typeof(ApiResponse<OrderDetailResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateOrderStatus(int id, [FromBody] UpdateOrderStatusRequest request)
@@ -117,7 +117,7 @@ public class OrderController : ControllerBase
 
         if (!result.Success)
         {
-            if (result.Message.Contains("không tồn tại"))
+            if (result.Message.ToLower().Contains("not found"))
                 return NotFound(result);
             return BadRequest(result);
         }
@@ -126,10 +126,10 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Hủy đơn hàng
+    /// Cancel an order
     /// </summary>
     [HttpPut("{id}/cancel")]
-    [SwaggerOperation(Summary = "Hủy đơn hàng")]
+    [SwaggerOperation(Summary = "Cancel an order")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CancelOrder(int id, [FromBody] CancelOrderRequest request)
@@ -143,7 +143,7 @@ public class OrderController : ControllerBase
 
         if (!result.Success)
         {
-            if (result.Message.Contains("không tồn tại"))
+            if (result.Message.ToLower().Contains("not found"))
                 return NotFound(result);
             if (result.Message.Contains("Unauthorized"))
                 return StatusCode(403, result);

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Order.Request;
 using MV.DomainLayer.DTOs.Order.Response;
@@ -15,15 +16,18 @@ public class OrderService : IOrderService
     private readonly IOrderRepository _orderRepo;
     private readonly ICartRepository _cartRepo;
     private readonly StemDbContext _context;
+    private readonly IConfiguration _configuration;
 
     public OrderService(
         IOrderRepository orderRepo,
         ICartRepository cartRepo,
-        StemDbContext context)
+        StemDbContext context,
+        IConfiguration configuration)
     {
         _orderRepo = orderRepo;
         _cartRepo = cartRepo;
         _context = context;
+        _configuration = configuration;
     }
 
     // ==================== CHECKOUT ====================
@@ -33,14 +37,14 @@ public class OrderService : IOrderService
         // 1. Validate payment method
         if (!Enum.TryParse<PaymentMethodEnum>(request.PaymentMethod, true, out var paymentMethod))
         {
-            return ApiResponse<CheckoutResponse>.ErrorResponse("Payment method không hợp lệ. Chỉ chấp nhận COD hoặc SEPAY");
+            return ApiResponse<CheckoutResponse>.ErrorResponse("Invalid payment method. Only COD or SEPAY will be accepted.");
         }
 
         // 2. Get cart
         var cart = await _cartRepo.GetCartByUserIdAsync(userId);
         if (cart == null || !cart.CartItems.Any())
         {
-            return ApiResponse<CheckoutResponse>.ErrorResponse("Giỏ hàng trống");
+            return ApiResponse<CheckoutResponse>.ErrorResponse("Shopping cart is empty.");
         }
 
         // 3. Validate stock
@@ -51,7 +55,7 @@ public class OrderService : IOrderService
             if (stock < qty)
             {
                 return ApiResponse<CheckoutResponse>.ErrorResponse(
-                    $"Sản phẩm '{item.Product.Name}' chỉ còn {stock} trong kho, bạn yêu cầu {qty}");
+                    $"Product '{item.Product.Name}' only has {stock} left in stock, you requested {qty}.");
             }
         }
 
@@ -64,18 +68,18 @@ public class OrderService : IOrderService
             coupon = await _orderRepo.GetCouponByCodeAsync(request.CouponCode);
             if (coupon == null)
             {
-                return ApiResponse<CheckoutResponse>.ErrorResponse("Mã coupon không tồn tại");
+                return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code does not exist.");
             }
 
             var now = DateTime.Now;
             if (now < coupon.StartDate || now > coupon.EndDate)
             {
-                return ApiResponse<CheckoutResponse>.ErrorResponse("Mã coupon đã hết hạn hoặc chưa bắt đầu");
+                return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code has expired or has not started.");
             }
 
             if (coupon.UsageLimit.HasValue && (coupon.UsedCount ?? 0) >= coupon.UsageLimit.Value)
             {
-                return ApiResponse<CheckoutResponse>.ErrorResponse("Mã coupon đã hết lượt sử dụng");
+                return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code has expired.");
             }
         }
 
@@ -86,14 +90,14 @@ public class OrderService : IOrderService
             subtotal += (item.Quantity ?? 1) * item.Product.Price;
         }
 
-        decimal shippingFee = 30000;
+        decimal shippingFee = 5000;
 
         if (coupon != null)
         {
             if (coupon.MinOrderValue.HasValue && subtotal < coupon.MinOrderValue.Value)
             {
                 return ApiResponse<CheckoutResponse>.ErrorResponse(
-                    $"Đơn hàng tối thiểu {coupon.MinOrderValue.Value:N0}đ để sử dụng coupon");
+                    $"Minimum order value {coupon.MinOrderValue.Value:N0}đ to use the coupon");
             }
 
             var discountType = await _orderRepo.GetCouponDiscountTypeAsync(coupon.CouponId);
@@ -165,10 +169,15 @@ public class OrderService : IOrderService
             }).ToList();
             await _orderRepo.CreateOrderItemsAsync(orderItems);
 
-            // 8d. Decrement stock
+            // 8d. Decrement stock (check rows affected to prevent overselling)
             foreach (var ci in cart.CartItems)
             {
-                await _orderRepo.DecrementStockAsync(ci.ProductId, ci.Quantity ?? 1);
+                var rowsAffected = await _orderRepo.DecrementStockAsync(ci.ProductId, ci.Quantity ?? 1);
+                if (rowsAffected == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"The product '{ci.Product.Name}' is out of stock.");
+                }
             }
 
             // 8e. Increment coupon used count
@@ -189,13 +198,19 @@ public class OrderService : IOrderService
             {
                 payment.PaymentReference = "STEM" + orderNumber.Substring(3);
                 payment.ExpiredAt = DateTime.Now.AddMinutes(30);
+
+                // Generate QR Code URL from SePay config
+                var sepayConfig = _configuration.GetSection("SePay");
+                var accountNumber = sepayConfig["AccountNumber"];
+                var bankName = sepayConfig["BankName"];
+                var qrBaseUrl = sepayConfig["QrBaseUrl"] ?? "https://qr.sepay.vn/img";
+
+                payment.QrCodeUrl = $"{qrBaseUrl}?bank={bankName}&acc={accountNumber}" +
+                                    $"&template=compact&amount={totalAmount:F0}&des={payment.PaymentReference}";
             }
 
-            await _orderRepo.CreatePaymentAsync(payment);
-
-            // 8g. Set payment enums via raw SQL
-            await _orderRepo.SetPaymentMethodByOrderIdAsync(order.OrderId, paymentMethod.ToString());
-            await _orderRepo.SetPaymentStatusByOrderIdAsync(order.OrderId, PaymentStatusEnum.PENDING.ToString());
+            // CreatePaymentAsync giờ INSERT kèm luôn payment_method và status (PostgreSQL enum)
+            await _orderRepo.CreatePaymentAsync(payment, paymentMethod.ToString(), PaymentStatusEnum.PENDING.ToString());
 
             // 8h. Clear cart
             await _cartRepo.ClearCartAsync(cart.CartId);
@@ -215,16 +230,16 @@ public class OrderService : IOrderService
                 QrCodeUrl = payment.QrCodeUrl,
                 PaymentExpiredAt = payment.ExpiredAt,
                 Message = paymentMethod == PaymentMethodEnum.COD
-                    ? "Đặt hàng thành công. Thanh toán khi nhận hàng."
-                    : "Đặt hàng thành công. Vui lòng chuyển khoản theo thông tin bên dưới."
+                    ? "Order successful. Payment upon delivery."
+                    : "Order successful. Please transfer payment using the information below."
             };
 
-            return ApiResponse<CheckoutResponse>.SuccessResponse(response, "Đặt hàng thành công");
+            return ApiResponse<CheckoutResponse>.SuccessResponse(response, "Order placed successfully.");
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            return ApiResponse<CheckoutResponse>.ErrorResponse($"Lỗi khi đặt hàng: {ex.Message}");
+            return ApiResponse<CheckoutResponse>.ErrorResponse($"Order error: {ex.Message}");
         }
     }
 
@@ -254,12 +269,12 @@ public class OrderService : IOrderService
         var order = await _orderRepo.GetOrderByIdAsync(orderId);
         if (order == null)
         {
-            return ApiResponse<OrderDetailResponse>.ErrorResponse("Đơn hàng không tồn tại");
+            return ApiResponse<OrderDetailResponse>.ErrorResponse("The order does not exist.");
         }
 
         if (!isAdmin && order.UserId != userId)
         {
-            return ApiResponse<OrderDetailResponse>.ErrorResponse("Unauthorized: Bạn không có quyền xem đơn hàng này");
+            return ApiResponse<OrderDetailResponse>.ErrorResponse("Unauthorized: You do not have permission to view this order.");
         }
 
         var detail = await MapToOrderDetail(order);
@@ -274,12 +289,19 @@ public class OrderService : IOrderService
         var order = await _orderRepo.GetOrderByIdAsync(orderId);
         if (order == null)
         {
-            return ApiResponse<OrderDetailResponse>.ErrorResponse("Đơn hàng không tồn tại");
+            return ApiResponse<OrderDetailResponse>.ErrorResponse("The order does not exist.");
         }
 
         if (!Enum.TryParse<OrderStatusEnum>(request.Status, true, out var newStatus))
         {
-            return ApiResponse<OrderDetailResponse>.ErrorResponse("Status không hợp lệ");
+            return ApiResponse<OrderDetailResponse>.ErrorResponse("Invalid status");
+        }
+
+        // Block CANCELLED via this endpoint — must use CancelOrder endpoint instead
+        if (newStatus == OrderStatusEnum.CANCELLED)
+        {
+            return ApiResponse<OrderDetailResponse>.ErrorResponse(
+                "This order cannot be canceled.");
         }
 
         var currentStatus = await _orderRepo.GetOrderStatusAsync(orderId);
@@ -302,7 +324,7 @@ public class OrderService : IOrderService
             case OrderStatusEnum.SHIPPED:
                 if (string.IsNullOrEmpty(request.TrackingNumber))
                 {
-                    return ApiResponse<OrderDetailResponse>.ErrorResponse("Tracking number là bắt buộc khi chuyển sang SHIPPED");
+                    return ApiResponse<OrderDetailResponse>.ErrorResponse("Tracking number is required when switching to SHIPPED.");
                 }
                 order.ShippedAt = DateTime.Now;
                 order.ShippedBy = adminUserId;
@@ -334,7 +356,7 @@ public class OrderService : IOrderService
         // Reload and return
         order = await _orderRepo.GetOrderByIdAsync(orderId);
         var detail = await MapToOrderDetail(order!);
-        return ApiResponse<OrderDetailResponse>.SuccessResponse(detail, "Cập nhật trạng thái thành công");
+        return ApiResponse<OrderDetailResponse>.SuccessResponse(detail, "Status update successful");
     }
 
     // ==================== CANCEL ORDER ====================
@@ -345,18 +367,18 @@ public class OrderService : IOrderService
         var order = await _orderRepo.GetOrderByIdAsync(orderId);
         if (order == null)
         {
-            return ApiResponse<object>.ErrorResponse("Đơn hàng không tồn tại");
+            return ApiResponse<object>.ErrorResponse("The order does not exist.");
         }
 
         if (!isAdmin && order.UserId != userId)
         {
-            return ApiResponse<object>.ErrorResponse("Unauthorized: Bạn không có quyền hủy đơn hàng này");
+            return ApiResponse<object>.ErrorResponse("Unauthorized: You do not have permission to view this order.");
         }
 
         var currentStatus = await _orderRepo.GetOrderStatusAsync(orderId);
         if (currentStatus != OrderStatusEnum.PENDING.ToString())
         {
-            return ApiResponse<object>.ErrorResponse("Chỉ có thể hủy đơn hàng ở trạng thái PENDING");
+            return ApiResponse<object>.ErrorResponse("Orders can only be canceled if they are in the PENDING status.");
         }
 
         using var transaction = await _context.Database.BeginTransactionAsync();
@@ -386,12 +408,12 @@ public class OrderService : IOrderService
             }
 
             await transaction.CommitAsync();
-            return ApiResponse<object>.SuccessResponse(null!, "Hủy đơn hàng thành công");
+            return ApiResponse<object>.SuccessResponse(null!, "Order cancelled successfully.");
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            return ApiResponse<object>.ErrorResponse($"Lỗi khi hủy đơn: {ex.Message}");
+            return ApiResponse<object>.ErrorResponse($"Error when canceling order: {ex.Message}");
         }
     }
 
@@ -405,10 +427,9 @@ public class OrderService : IOrderService
             ("PENDING", OrderStatusEnum.CONFIRMED) => null,
             ("CONFIRMED", OrderStatusEnum.SHIPPED) => null,
             ("SHIPPED", OrderStatusEnum.DELIVERED) => null,
-            ("PENDING", OrderStatusEnum.CANCELLED) => null,
-            ("CANCELLED", _) => "Đơn hàng đã bị hủy, không thể thay đổi trạng thái",
-            ("DELIVERED", _) => "Đơn hàng đã giao thành công, không thể thay đổi trạng thái",
-            _ => $"Không thể chuyển từ {currentStatus} sang {newStatus}"
+            ("CANCELLED", _) => "The order has been cancelled and its status cannot be changed.",
+            ("DELIVERED", _) => "The order has been successfully delivered and its status cannot be changed.",
+            _ => $"Cannot switch from {currentStatus} to {newStatus}"
         };
     }
 

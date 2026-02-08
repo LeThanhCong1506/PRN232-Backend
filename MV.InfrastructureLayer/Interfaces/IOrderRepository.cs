@@ -8,7 +8,7 @@ public interface IOrderRepository
     // Create
     Task<OrderHeader> CreateOrderAsync(OrderHeader orderHeader);
     Task CreateOrderItemsAsync(List<OrderItem> items);
-    Task<Payment> CreatePaymentAsync(Payment payment);
+    Task<Payment> CreatePaymentAsync(Payment payment, string paymentMethod = "COD", string status = "PENDING");
 
     // Read
     Task<OrderHeader?> GetOrderByIdAsync(int orderId);
@@ -21,7 +21,7 @@ public interface IOrderRepository
     Task UpdatePaymentAsync(Payment payment);
 
     // Stock
-    Task DecrementStockAsync(int productId, int quantity);
+    Task<int> DecrementStockAsync(int productId, int quantity);
     Task IncrementStockAsync(int productId, int quantity);
 
     // Coupon

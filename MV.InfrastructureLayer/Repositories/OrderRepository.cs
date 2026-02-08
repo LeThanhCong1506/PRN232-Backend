@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using MV.DomainLayer.DTOs.Order.Request;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
@@ -31,10 +32,75 @@ public class OrderRepository : IOrderRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task<Payment> CreatePaymentAsync(Payment payment)
+    public async Task<Payment> CreatePaymentAsync(Payment payment, string paymentMethod = "COD", string status = "PENDING")
     {
-        _context.Payments.Add(payment);
-        await _context.SaveChangesAsync();
+        // INSERT bằng raw SQL vì cột payment_method và status là PostgreSQL enum
+        // EF Core không scaffold được enum type → không có property trên entity
+        // Dùng NpgsqlParameter để handle NULL values đúng cách
+        var conn = _context.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+
+        try
+        {
+            using var cmd = conn.CreateCommand();
+
+            // Enlist trong transaction hiện tại (nếu có)
+            var currentTransaction = _context.Database.CurrentTransaction;
+            if (currentTransaction != null)
+            {
+                cmd.Transaction = currentTransaction.GetDbTransaction();
+            }
+
+            cmd.CommandText = @"
+                INSERT INTO payment (
+                    order_id, amount, payment_date, created_at,
+                    transaction_id, bank_code, bank_account, gateway_response,
+                    expired_at, payment_reference, updated_at,
+                    received_amount, qr_code_url, qr_code_data,
+                    retry_count, notes, verified_by, verified_at,
+                    payment_method, status
+                ) VALUES (
+                    @order_id, @amount, @payment_date, @created_at,
+                    @transaction_id, @bank_code, @bank_account, @gateway_response,
+                    @expired_at, @payment_reference, @updated_at,
+                    @received_amount, @qr_code_url, @qr_code_data,
+                    @retry_count, @notes, @verified_by, @verified_at,
+                    @payment_method::payment_method_enum, @status::payment_status_enum
+                ) RETURNING payment_id";
+
+            cmd.Parameters.Add(new NpgsqlParameter("@order_id", payment.OrderId));
+            cmd.Parameters.Add(new NpgsqlParameter("@amount", payment.Amount));
+            cmd.Parameters.Add(new NpgsqlParameter("@payment_date", (object?)payment.PaymentDate ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@created_at", (object?)payment.CreatedAt ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@transaction_id", (object?)payment.TransactionId ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@bank_code", (object?)payment.BankCode ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@bank_account", (object?)payment.BankAccount ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@gateway_response", (object?)payment.GatewayResponse ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@expired_at", (object?)payment.ExpiredAt ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@payment_reference", (object?)payment.PaymentReference ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@updated_at", (object?)payment.UpdatedAt ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@received_amount", (object?)payment.ReceivedAmount ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@qr_code_url", (object?)payment.QrCodeUrl ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@qr_code_data", (object?)payment.QrCodeData ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@retry_count", (object?)payment.RetryCount ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@notes", (object?)payment.Notes ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@verified_by", (object?)payment.VerifiedBy ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@verified_at", (object?)payment.VerifiedAt ?? DBNull.Value));
+            cmd.Parameters.Add(new NpgsqlParameter("@payment_method", paymentMethod));
+            cmd.Parameters.Add(new NpgsqlParameter("@status", status));
+
+            var result = await cmd.ExecuteScalarAsync();
+            if (result != null)
+            {
+                payment.PaymentId = Convert.ToInt32(result);
+            }
+        }
+        finally
+        {
+            // Không đóng connection vì đang trong transaction do EF Core quản lý
+        }
+
         return payment;
     }
 
@@ -115,11 +181,12 @@ public class OrderRepository : IOrderRepository
 
     // ==================== STOCK ====================
 
-    public async Task DecrementStockAsync(int productId, int quantity)
+    public async Task<int> DecrementStockAsync(int productId, int quantity)
     {
-        await _context.Database.ExecuteSqlRawAsync(
+        var rowsAffected = await _context.Database.ExecuteSqlRawAsync(
             "UPDATE product SET stock_quantity = stock_quantity - {0} WHERE product_id = {1} AND stock_quantity >= {0}",
             quantity, productId);
+        return rowsAffected;
     }
 
     public async Task IncrementStockAsync(int productId, int quantity)
