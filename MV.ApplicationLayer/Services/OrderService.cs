@@ -90,7 +90,7 @@ public class OrderService : IOrderService
             subtotal += (item.Quantity ?? 1) * item.Product.Price;
         }
 
-        decimal shippingFee = 5000;
+        decimal shippingFee = 5000; // Phí ship
 
         if (coupon != null)
         {
@@ -194,17 +194,18 @@ public class OrderService : IOrderService
                 CreatedAt = DateTime.Now
             };
 
+            string? checkoutUrl = null;
             if (paymentMethod == PaymentMethodEnum.SEPAY)
             {
                 payment.PaymentReference = "STEM" + orderNumber.Substring(3);
                 payment.ExpiredAt = DateTime.Now.AddMinutes(30);
 
-                // Generate QR Code URL from SePay config
                 var sepayConfig = _configuration.GetSection("SePay");
+
+                // Generate QR Code URL (hiển thị QR trực tiếp trên frontend)
                 var accountNumber = sepayConfig["AccountNumber"];
                 var bankName = sepayConfig["BankName"];
                 var qrBaseUrl = sepayConfig["QrBaseUrl"] ?? "https://qr.sepay.vn/img";
-
                 payment.QrCodeUrl = $"{qrBaseUrl}?bank={bankName}&acc={accountNumber}" +
                                     $"&template=compact&amount={totalAmount:F0}&des={payment.PaymentReference}";
             }
@@ -217,7 +218,23 @@ public class OrderService : IOrderService
 
             await transaction.CommitAsync();
 
-            // 9. Return response
+            // 9. Generate checkout URL (trỏ về endpoint backend sẽ auto-POST form đến SePay)
+            if (paymentMethod == PaymentMethodEnum.SEPAY)
+            {
+                var sepayConfig = _configuration.GetSection("SePay");
+                var merchantId = sepayConfig["MerchantId"];
+                var secretKey = sepayConfig["SecretKey"];
+
+                if (!string.IsNullOrEmpty(merchantId) && merchantId != "YOUR_MERCHANT_ID_HERE"
+                    && !string.IsNullOrEmpty(secretKey) && secretKey != "YOUR_SECRET_KEY_HERE")
+                {
+                    // URL đến endpoint GET /api/Payment/{orderId}/checkout
+                    // Endpoint này sẽ render HTML form auto-submit POST đến SePay
+                    checkoutUrl = $"/api/Payment/{order.OrderId}/checkout";
+                }
+            }
+
+            // 10. Return response
             var response = new CheckoutResponse
             {
                 OrderId = order.OrderId,
@@ -228,10 +245,11 @@ public class OrderService : IOrderService
                 PaymentStatus = PaymentStatusEnum.PENDING.ToString(),
                 PaymentReference = payment.PaymentReference,
                 QrCodeUrl = payment.QrCodeUrl,
+                CheckoutUrl = checkoutUrl,
                 PaymentExpiredAt = payment.ExpiredAt,
                 Message = paymentMethod == PaymentMethodEnum.COD
                     ? "Order successful. Payment upon delivery."
-                    : "Order successful. Please transfer payment using the information below."
+                    : "Order successful. Redirect to checkoutUrl to complete payment."
             };
 
             return ApiResponse<CheckoutResponse>.SuccessResponse(response, "Order placed successfully.");

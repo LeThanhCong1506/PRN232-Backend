@@ -10,6 +10,7 @@ public class CheckoutResponse
     public string PaymentStatus { get; set; } = null!;
     public string? PaymentReference { get; set; }
     public string? QrCodeUrl { get; set; }
+    public string? CheckoutUrl { get; set; }
     public DateTime? PaymentExpiredAt { get; set; }
     public string Message { get; set; } = null!;
 }
