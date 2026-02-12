@@ -15,14 +15,6 @@ public class SepayRepository : ISepayRepository
         _context = context;
     }
 
-    // ==================== SEPAY CONFIG ====================
-
-    public async Task<SepayConfig?> GetActiveSepayConfigAsync()
-    {
-        return await _context.SepayConfigs
-            .FirstOrDefaultAsync(c => c.IsActive == true);
-    }
-
     // ==================== SEPAY TRANSACTION ====================
 
     public async Task<SepayTransaction> CreateTransactionAsync(SepayTransaction transaction)

@@ -231,6 +231,95 @@ public class PaymentController : ControllerBase
         return Content(html, "text/html");
     }
 
+    // ==================== SEPAY CALLBACK ENDPOINTS ====================
+    // SePay Payment Gateway sẽ redirect user về các URL này sau khi thanh toán
+
+    /// <summary>
+    /// SePay redirect về đây khi thanh toán thành công.
+    /// Tự động cập nhật Payment → COMPLETED, Order → CONFIRMED.
+    /// Sau đó redirect user về frontend.
+    /// </summary>
+    [HttpGet("callback/success")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "SePay Success Callback - Xử lý khi thanh toán thành công")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public async Task<IActionResult> SepaySuccessCallback(
+        [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber)
+    {
+        var frontendSuccessUrl = _configuration["Frontend:PaymentSuccessUrl"]
+            ?? "http://localhost:3000/payment/success";
+
+        if (string.IsNullOrEmpty(orderInvoiceNumber))
+        {
+            return Redirect($"{frontendSuccessUrl}?status=error&message=missing_order_number");
+        }
+
+        // Xử lý cập nhật status
+        var result = await _paymentService.ProcessSuccessCallbackAsync(orderInvoiceNumber);
+
+        if (result.Success)
+        {
+            var data = result.Data;
+            return Redirect($"{frontendSuccessUrl}?status=success&orderId={data?.OrderId}&orderNumber={orderInvoiceNumber}");
+        }
+        else
+        {
+            // Nếu đã COMPLETED trước đó (idempotent) → vẫn redirect success
+            if (result.Message.Contains("đã hoàn tất"))
+            {
+                return Redirect($"{frontendSuccessUrl}?status=success&orderNumber={orderInvoiceNumber}&note=already_completed");
+            }
+            return Redirect($"{frontendSuccessUrl}?status=error&orderNumber={orderInvoiceNumber}&message={Uri.EscapeDataString(result.Message)}");
+        }
+    }
+
+    /// <summary>
+    /// SePay redirect về đây khi thanh toán lỗi.
+    /// </summary>
+    [HttpGet("callback/error")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "SePay Error Callback - Xử lý khi thanh toán lỗi")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public IActionResult SepayErrorCallback(
+        [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber,
+        [FromQuery(Name = "error_code")] string? errorCode,
+        [FromQuery(Name = "error_message")] string? errorMessage)
+    {
+        var frontendErrorUrl = _configuration["Frontend:PaymentErrorUrl"]
+            ?? "http://localhost:3000/payment/error";
+
+        var queryParams = new List<string> { "status=error" };
+        if (!string.IsNullOrEmpty(orderInvoiceNumber))
+            queryParams.Add($"orderNumber={orderInvoiceNumber}");
+        if (!string.IsNullOrEmpty(errorCode))
+            queryParams.Add($"errorCode={Uri.EscapeDataString(errorCode)}");
+        if (!string.IsNullOrEmpty(errorMessage))
+            queryParams.Add($"errorMessage={Uri.EscapeDataString(errorMessage)}");
+
+        return Redirect($"{frontendErrorUrl}?{string.Join("&", queryParams)}");
+    }
+
+    /// <summary>
+    /// SePay redirect về đây khi user hủy thanh toán.
+    /// </summary>
+    [HttpGet("callback/cancel")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "SePay Cancel Callback - Xử lý khi hủy thanh toán")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public IActionResult SepayCancelCallback(
+        [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber)
+    {
+        var frontendCancelUrl = _configuration["Frontend:PaymentCancelUrl"]
+            ?? "http://localhost:3000/payment/cancel";
+
+        if (!string.IsNullOrEmpty(orderInvoiceNumber))
+        {
+            return Redirect($"{frontendCancelUrl}?orderNumber={orderInvoiceNumber}");
+        }
+
+        return Redirect(frontendCancelUrl);
+    }
+
     // ==================== PRIVATE HELPERS ====================
 
     private int? GetCurrentUserId()

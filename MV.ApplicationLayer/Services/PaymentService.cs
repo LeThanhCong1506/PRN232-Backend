@@ -313,6 +313,120 @@ public class PaymentService : IPaymentService
         }
     }
 
+    // ==================== PROCESS SUCCESS CALLBACK ====================
+
+    public async Task<ApiResponse<PaymentStatusResponse>> ProcessSuccessCallbackAsync(string orderInvoiceNumber)
+    {
+        _logger.LogInformation("SePay success callback received: OrderInvoiceNumber={OrderNumber}", orderInvoiceNumber);
+
+        try
+        {
+            // 1. Tìm order theo OrderNumber (chính là order_invoice_number gửi lên SePay)
+            var order = await _orderRepo.GetOrderByOrderNumberAsync(orderInvoiceNumber);
+            if (order == null)
+            {
+                _logger.LogWarning("Success callback: Order not found for OrderNumber={OrderNumber}", orderInvoiceNumber);
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Đơn hàng không tồn tại");
+            }
+
+            var payment = order.Payment;
+            if (payment == null)
+            {
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Không tìm thấy thông tin thanh toán");
+            }
+
+            // 2. Kiểm tra payment method phải là SEPAY
+            var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(order.OrderId);
+            if (paymentMethod != PaymentMethodEnum.SEPAY.ToString())
+            {
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Đơn hàng không sử dụng phương thức SEPAY");
+            }
+
+            // 3. Kiểm tra nếu đã COMPLETED thì trả về luôn (idempotent)
+            var currentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(order.OrderId);
+            if (currentStatus == PaymentStatusEnum.COMPLETED.ToString())
+            {
+                _logger.LogInformation("Success callback: Payment already completed for OrderId={OrderId}", order.OrderId);
+                return ApiResponse<PaymentStatusResponse>.SuccessResponse(new PaymentStatusResponse
+                {
+                    OrderId = order.OrderId,
+                    OrderNumber = order.OrderNumber,
+                    PaymentMethod = paymentMethod,
+                    PaymentStatus = PaymentStatusEnum.COMPLETED.ToString(),
+                    Amount = payment.Amount,
+                    ReceivedAmount = payment.ReceivedAmount,
+                    IsPaid = true,
+                    RemainingSeconds = 0
+                }, "Thanh toán đã hoàn tất trước đó");
+            }
+
+            // 4. Chỉ xử lý nếu đang PENDING
+            if (currentStatus != PaymentStatusEnum.PENDING.ToString())
+            {
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse(
+                    $"Không thể xác nhận thanh toán ở trạng thái {currentStatus}");
+            }
+
+            // 5. Cập nhật payment status → COMPLETED, order status → CONFIRMED
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // Update payment record
+                payment.PaymentDate = DateTime.Now;
+                payment.ReceivedAmount = payment.Amount; // SePay đã xác nhận thanh toán thành công
+                payment.UpdatedAt = DateTime.Now;
+                payment.Notes = "Xác nhận tự động từ SePay success callback";
+                await _orderRepo.UpdatePaymentAsync(payment);
+
+                // Set payment status to COMPLETED
+                await _orderRepo.SetPaymentStatusByOrderIdAsync(order.OrderId, PaymentStatusEnum.COMPLETED.ToString());
+
+                // Auto-confirm order if still PENDING
+                var orderStatus = await _orderRepo.GetOrderStatusAsync(order.OrderId);
+                if (orderStatus == OrderStatusEnum.PENDING.ToString())
+                {
+                    await _orderRepo.SetOrderStatusAsync(order.OrderId, OrderStatusEnum.CONFIRMED.ToString());
+                    order.ConfirmedAt = DateTime.Now;
+                    order.UpdatedAt = DateTime.Now;
+                    await _orderRepo.UpdateOrderAsync(order);
+                }
+
+                await transaction.CommitAsync();
+
+                _logger.LogInformation(
+                    "Success callback: Payment completed for OrderId={OrderId}, OrderNumber={OrderNumber}",
+                    order.OrderId, order.OrderNumber);
+
+                return ApiResponse<PaymentStatusResponse>.SuccessResponse(new PaymentStatusResponse
+                {
+                    OrderId = order.OrderId,
+                    OrderNumber = order.OrderNumber,
+                    PaymentMethod = PaymentMethodEnum.SEPAY.ToString(),
+                    PaymentStatus = PaymentStatusEnum.COMPLETED.ToString(),
+                    Amount = payment.Amount,
+                    ReceivedAmount = payment.ReceivedAmount,
+                    QrCodeUrl = payment.QrCodeUrl,
+                    PaymentReference = payment.PaymentReference,
+                    ExpiredAt = payment.ExpiredAt,
+                    IsPaid = true,
+                    RemainingSeconds = 0
+                }, "Thanh toán thành công");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error processing success callback for OrderId={OrderId}", order.OrderId);
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse(
+                    $"Lỗi khi xử lý callback: {ex.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in ProcessSuccessCallbackAsync: OrderNumber={OrderNumber}", orderInvoiceNumber);
+            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Lỗi hệ thống khi xử lý callback");
+        }
+    }
+
     // ==================== EXPIRE OVERDUE PAYMENTS ====================
 
     public async Task ExpireOverduePaymentsAsync()

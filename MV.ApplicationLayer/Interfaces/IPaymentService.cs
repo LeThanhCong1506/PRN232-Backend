@@ -22,6 +22,12 @@ public interface IPaymentService
     Task<ApiResponse<PaymentStatusResponse>> VerifyPaymentManuallyAsync(int orderId, int adminUserId);
 
     /// <summary>
+    /// Xử lý callback khi SePay redirect về sau thanh toán thành công.
+    /// Cập nhật Payment status → COMPLETED, Order status → CONFIRMED.
+    /// </summary>
+    Task<ApiResponse<PaymentStatusResponse>> ProcessSuccessCallbackAsync(string orderInvoiceNumber);
+
+    /// <summary>
     /// Xử lý các payment SEPAY hết hạn - gọi từ background service
     /// </summary>
     Task ExpireOverduePaymentsAsync();

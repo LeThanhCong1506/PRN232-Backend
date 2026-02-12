@@ -116,6 +116,16 @@ public class OrderRepository : IOrderRepository
             .FirstOrDefaultAsync(o => o.OrderId == orderId);
     }
 
+    public async Task<OrderHeader?> GetOrderByOrderNumberAsync(string orderNumber)
+    {
+        return await _context.OrderHeaders
+            .Include(o => o.OrderItems)
+            .Include(o => o.Payment)
+            .Include(o => o.Coupon)
+            .Include(o => o.User)
+            .FirstOrDefaultAsync(o => o.OrderNumber == orderNumber);
+    }
+
     public async Task<(List<OrderHeader> Items, int TotalCount)> GetOrdersByUserIdAsync(
         int userId, OrderFilterRequest filter)
     {
@@ -306,13 +316,6 @@ public class OrderRepository : IOrderRepository
         {
             await conn.CloseAsync();
         }
-    }
-
-    public async Task SetPaymentMethodByOrderIdAsync(int orderId, string method)
-    {
-        await _context.Database.ExecuteSqlRawAsync(
-            "UPDATE payment SET payment_method = {0}::payment_method_enum WHERE order_id = {1}",
-            method, orderId);
     }
 
     public async Task SetPaymentStatusByOrderIdAsync(int orderId, string status)

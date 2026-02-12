@@ -4,9 +4,6 @@ namespace MV.InfrastructureLayer.Interfaces;
 
 public interface ISepayRepository
 {
-    // SepayConfig
-    Task<SepayConfig?> GetActiveSepayConfigAsync();
-
     // SepayTransaction
     Task<SepayTransaction> CreateTransactionAsync(SepayTransaction transaction);
     Task<bool> TransactionExistsBySepayIdAsync(string sepayId);

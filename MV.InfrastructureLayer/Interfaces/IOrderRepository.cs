@@ -12,6 +12,7 @@ public interface IOrderRepository
 
     // Read
     Task<OrderHeader?> GetOrderByIdAsync(int orderId);
+    Task<OrderHeader?> GetOrderByOrderNumberAsync(string orderNumber);
     Task<(List<OrderHeader> Items, int TotalCount)> GetOrdersByUserIdAsync(int userId, OrderFilterRequest filter);
     Task<(List<OrderHeader> Items, int TotalCount)> GetAllOrdersAsync(OrderFilterRequest filter);
     Task<int> GetTodayOrderCountAsync();
@@ -35,7 +36,6 @@ public interface IOrderRepository
     Task<Dictionary<int, string>> GetOrderStatusesBatchAsync(List<int> orderIds);
     Task<string?> GetPaymentMethodByOrderIdAsync(int orderId);
     Task<string?> GetPaymentStatusByOrderIdAsync(int orderId);
-    Task SetPaymentMethodByOrderIdAsync(int orderId, string method);
     Task SetPaymentStatusByOrderIdAsync(int orderId, string status);
     Task<Dictionary<int, (string? Method, string? Status)>> GetPaymentEnumsBatchAsync(List<int> orderIds);
     Task<string?> GetCouponDiscountTypeAsync(int couponId);
