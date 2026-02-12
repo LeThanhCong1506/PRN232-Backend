@@ -124,6 +124,8 @@ public class PaymentController : ControllerBase
     /// Redirect đến trang thanh toán SePay.
     /// Endpoint này render HTML form ẩn rồi auto-submit POST đến SePay Payment Gateway.
     /// Frontend chỉ cần mở URL này (window.location hoặc window.open).
+    /// FE truyền successUrl, errorUrl, cancelUrl qua query params để linh hoạt thay đổi.
+    /// Ví dụ: /api/Payment/30/checkout?successUrl=http://localhost:3000/payment/success&amp;errorUrl=...&amp;cancelUrl=...
     /// </summary>
     [HttpGet("{orderId}/checkout")]
     [AllowAnonymous]
@@ -131,7 +133,11 @@ public class PaymentController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> RedirectToSepayCheckout(int orderId)
+    public async Task<IActionResult> RedirectToSepayCheckout(
+        int orderId,
+        [FromQuery] string? successUrl,
+        [FromQuery] string? errorUrl,
+        [FromQuery] string? cancelUrl)
     {
         var order = await _orderRepo.GetOrderByIdAsync(orderId);
         if (order == null)
@@ -159,13 +165,23 @@ public class PaymentController : ControllerBase
         var sepayConfig = _configuration.GetSection("SePay");
         var merchantId = sepayConfig["MerchantId"];
         var secretKey = sepayConfig["SecretKey"];
-        var checkoutUrl = sepayConfig["CheckoutUrl"] ?? "https://pay-sandbox.sepay.vn/v1/checkout/init";
-        var successUrl = sepayConfig["SuccessUrl"] ?? "http://localhost:3000/payment/success";
-        var errorUrl = sepayConfig["ErrorUrl"] ?? "http://localhost:3000/payment/error";
-        var cancelUrl = sepayConfig["CancelUrl"] ?? "http://localhost:3000/payment/cancel";
+        var checkoutBaseUrl = sepayConfig["CheckoutUrl"] ?? "https://pay-sandbox.sepay.vn/v1/checkout/init";
 
         if (string.IsNullOrEmpty(merchantId) || string.IsNullOrEmpty(secretKey))
             return BadRequest("SePay Payment Gateway chưa được cấu hình (MerchantId/SecretKey)");
+
+        // Success URL: luôn trỏ về backend callback/success để cập nhật DB status
+        // Nếu FE truyền successUrl → backend sẽ redirect về đó sau khi xử lý xong
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var backendSuccessUrl = $"{baseUrl}/api/Payment/callback/success";
+        if (!string.IsNullOrEmpty(successUrl))
+        {
+            backendSuccessUrl += $"?redirectUrl={Uri.EscapeDataString(successUrl)}";
+        }
+
+        // Error và Cancel: SePay redirect thẳng về FE (không cần backend xử lý gì)
+        var finalErrorUrl = errorUrl ?? "http://localhost:3000/payment/error";
+        var finalCancelUrl = cancelUrl ?? "http://localhost:3000/payment/cancel";
 
         var orderAmountStr = payment.Amount.ToString("F0");
         var orderDesc = $"Thanh toan don hang {order.OrderNumber}";
@@ -183,9 +199,9 @@ public class PaymentController : ControllerBase
             $"currency=VND",
             $"order_invoice_number={order.OrderNumber}",
             $"order_description={orderDesc}",
-            $"success_url={successUrl}",
-            $"error_url={errorUrl}",
-            $"cancel_url={cancelUrl}"
+            $"success_url={backendSuccessUrl}",
+            $"error_url={finalErrorUrl}",
+            $"cancel_url={finalCancelUrl}"
         };
         var dataToSign = string.Join(",", signedParts);
 
@@ -212,16 +228,16 @@ public class PaymentController : ControllerBase
         <div class='spinner'></div>
         <p>Đang chuyển đến trang thanh toán SePay...</p>
     </div>
-    <form id='sepayForm' method='POST' action='{checkoutUrl}'>
+    <form id='sepayForm' method='POST' action='{checkoutBaseUrl}'>
         <input type='hidden' name='merchant' value='{merchantId}' />
         <input type='hidden' name='operation' value='PURCHASE' />
         <input type='hidden' name='order_amount' value='{orderAmountStr}' />
         <input type='hidden' name='currency' value='VND' />
         <input type='hidden' name='order_invoice_number' value='{order.OrderNumber}' />
         <input type='hidden' name='order_description' value='{System.Net.WebUtility.HtmlEncode(orderDesc)}' />
-        <input type='hidden' name='success_url' value='{successUrl}' />
-        <input type='hidden' name='error_url' value='{errorUrl}' />
-        <input type='hidden' name='cancel_url' value='{cancelUrl}' />
+        <input type='hidden' name='success_url' value='{System.Net.WebUtility.HtmlEncode(backendSuccessUrl)}' />
+        <input type='hidden' name='error_url' value='{System.Net.WebUtility.HtmlEncode(finalErrorUrl)}' />
+        <input type='hidden' name='cancel_url' value='{System.Net.WebUtility.HtmlEncode(finalCancelUrl)}' />
         <input type='hidden' name='signature' value='{signature}' />
     </form>
     <script>document.getElementById('sepayForm').submit();</script>
@@ -231,93 +247,52 @@ public class PaymentController : ControllerBase
         return Content(html, "text/html");
     }
 
-    // ==================== SEPAY CALLBACK ENDPOINTS ====================
-    // SePay Payment Gateway sẽ redirect user về các URL này sau khi thanh toán
+    // ==================== SEPAY SUCCESS CALLBACK ====================
 
     /// <summary>
     /// SePay redirect về đây khi thanh toán thành công.
     /// Tự động cập nhật Payment → COMPLETED, Order → CONFIRMED.
-    /// Sau đó redirect user về frontend.
+    /// Nếu có redirectUrl → redirect user về frontend, không thì trả JSON.
     /// </summary>
     [HttpGet("callback/success")]
     [AllowAnonymous]
     [SwaggerOperation(Summary = "SePay Success Callback - Xử lý khi thanh toán thành công")]
-    [ProducesResponseType(StatusCodes.Status302Found)]
     public async Task<IActionResult> SepaySuccessCallback(
-        [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber)
+        [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber,
+        [FromQuery] string? redirectUrl)
     {
-        var frontendSuccessUrl = _configuration["Frontend:PaymentSuccessUrl"]
-            ?? "http://localhost:3000/payment/success";
-
         if (string.IsNullOrEmpty(orderInvoiceNumber))
         {
-            return Redirect($"{frontendSuccessUrl}?status=error&message=missing_order_number");
+            if (!string.IsNullOrEmpty(redirectUrl))
+                return Redirect($"{redirectUrl}?status=error&message=missing_order_number");
+            return BadRequest(ApiResponse<object>.ErrorResponse("Thiếu order_invoice_number"));
         }
 
         // Xử lý cập nhật status
         var result = await _paymentService.ProcessSuccessCallbackAsync(orderInvoiceNumber);
 
-        if (result.Success)
+        // Nếu FE có truyền redirectUrl → redirect về FE sau khi cập nhật DB
+        if (!string.IsNullOrEmpty(redirectUrl))
         {
-            var data = result.Data;
-            return Redirect($"{frontendSuccessUrl}?status=success&orderId={data?.OrderId}&orderNumber={orderInvoiceNumber}");
-        }
-        else
-        {
-            // Nếu đã COMPLETED trước đó (idempotent) → vẫn redirect success
-            if (result.Message.Contains("đã hoàn tất"))
+            if (result.Success)
             {
-                return Redirect($"{frontendSuccessUrl}?status=success&orderNumber={orderInvoiceNumber}&note=already_completed");
+                var data = result.Data;
+                return Redirect($"{redirectUrl}?status=success&orderId={data?.OrderId}&orderNumber={orderInvoiceNumber}");
             }
-            return Redirect($"{frontendSuccessUrl}?status=error&orderNumber={orderInvoiceNumber}&message={Uri.EscapeDataString(result.Message)}");
-        }
-    }
+            else
+            {
+                if (result.Message.Contains("đã hoàn tất"))
+                    return Redirect($"{redirectUrl}?status=success&orderNumber={orderInvoiceNumber}&note=already_completed");
 
-    /// <summary>
-    /// SePay redirect về đây khi thanh toán lỗi.
-    /// </summary>
-    [HttpGet("callback/error")]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "SePay Error Callback - Xử lý khi thanh toán lỗi")]
-    [ProducesResponseType(StatusCodes.Status302Found)]
-    public IActionResult SepayErrorCallback(
-        [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber,
-        [FromQuery(Name = "error_code")] string? errorCode,
-        [FromQuery(Name = "error_message")] string? errorMessage)
-    {
-        var frontendErrorUrl = _configuration["Frontend:PaymentErrorUrl"]
-            ?? "http://localhost:3000/payment/error";
-
-        var queryParams = new List<string> { "status=error" };
-        if (!string.IsNullOrEmpty(orderInvoiceNumber))
-            queryParams.Add($"orderNumber={orderInvoiceNumber}");
-        if (!string.IsNullOrEmpty(errorCode))
-            queryParams.Add($"errorCode={Uri.EscapeDataString(errorCode)}");
-        if (!string.IsNullOrEmpty(errorMessage))
-            queryParams.Add($"errorMessage={Uri.EscapeDataString(errorMessage)}");
-
-        return Redirect($"{frontendErrorUrl}?{string.Join("&", queryParams)}");
-    }
-
-    /// <summary>
-    /// SePay redirect về đây khi user hủy thanh toán.
-    /// </summary>
-    [HttpGet("callback/cancel")]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "SePay Cancel Callback - Xử lý khi hủy thanh toán")]
-    [ProducesResponseType(StatusCodes.Status302Found)]
-    public IActionResult SepayCancelCallback(
-        [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber)
-    {
-        var frontendCancelUrl = _configuration["Frontend:PaymentCancelUrl"]
-            ?? "http://localhost:3000/payment/cancel";
-
-        if (!string.IsNullOrEmpty(orderInvoiceNumber))
-        {
-            return Redirect($"{frontendCancelUrl}?orderNumber={orderInvoiceNumber}");
+                return Redirect($"{redirectUrl}?status=error&orderNumber={orderInvoiceNumber}&message={Uri.EscapeDataString(result.Message)}");
+            }
         }
 
-        return Redirect(frontendCancelUrl);
+        // Không có redirectUrl → trả JSON
+        if (result.Success)
+            return Ok(result);
+
+        return BadRequest(result);
     }
 
     // ==================== PRIVATE HELPERS ====================
