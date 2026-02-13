@@ -170,14 +170,16 @@ public class PaymentController : ControllerBase
         if (string.IsNullOrEmpty(merchantId) || string.IsNullOrEmpty(secretKey))
             return BadRequest("SePay Payment Gateway chưa được cấu hình (MerchantId/SecretKey)");
 
-        // Success URL: luôn trỏ về backend callback/success để cập nhật DB status
-        // Nếu FE truyền successUrl → backend sẽ redirect về đó sau khi xử lý xong
+        // Success URL: trỏ về backend callback/success để cập nhật DB status
+        // SePay redirect về success_url NGUYÊN BẢN (không thêm query params)
+        // Nên mình phải tự gắn order_invoice_number vào URL trước khi gửi cho SePay
         var baseUrl = $"{Request.Scheme}://{Request.Host}";
-        var backendSuccessUrl = $"{baseUrl}/api/Payment/callback/success";
+        var successParams = $"order_invoice_number={Uri.EscapeDataString(order.OrderNumber)}";
         if (!string.IsNullOrEmpty(successUrl))
         {
-            backendSuccessUrl += $"?redirectUrl={Uri.EscapeDataString(successUrl)}";
+            successParams += $"&redirectUrl={Uri.EscapeDataString(successUrl)}";
         }
+        var backendSuccessUrl = $"{baseUrl}/api/Payment/callback/success?{successParams}";
 
         // Error và Cancel: SePay redirect thẳng về FE (không cần backend xử lý gì)
         var finalErrorUrl = errorUrl ?? "http://localhost:3000/payment/error";
