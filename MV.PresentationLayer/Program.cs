@@ -135,6 +135,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageService, ProductImageService>();
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
+            builder.Services.AddScoped<ICheckoutService, CheckoutService>();
 
             // Background service: auto-expire overdue SEPAY payments every 60 seconds
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
