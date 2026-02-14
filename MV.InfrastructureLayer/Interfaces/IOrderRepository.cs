@@ -39,4 +39,7 @@ public interface IOrderRepository
     Task SetPaymentStatusByOrderIdAsync(int orderId, string status);
     Task<Dictionary<int, (string? Method, string? Status)>> GetPaymentEnumsBatchAsync(List<int> orderIds);
     Task<string?> GetCouponDiscountTypeAsync(int couponId);
+
+    // Polling: lấy danh sách order PENDING + SEPAY (chưa hết hạn)
+    Task<List<OrderHeader>> GetPendingSepayOrdersAsync();
 }

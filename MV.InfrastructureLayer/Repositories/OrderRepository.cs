@@ -371,6 +371,45 @@ public class OrderRepository : IOrderRepository
         }
     }
 
+    // ==================== POLLING: GET PENDING SEPAY ORDERS ====================
+
+    public async Task<List<OrderHeader>> GetPendingSepayOrdersAsync()
+    {
+        // Lấy danh sách order có payment PENDING + SEPAY + chưa hết hạn
+        // Dùng raw SQL vì payment_method và status là PostgreSQL enum
+        var conn = _context.Database.GetDbConnection();
+        await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT p.order_id
+                FROM payment p
+                WHERE p.status = 'PENDING'::payment_status_enum
+                  AND p.payment_method = 'SEPAY'::payment_method_enum
+                  AND (p.expired_at IS NULL OR p.expired_at > NOW())";
+
+            var orderIds = new List<int>();
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                orderIds.Add(reader.GetInt32(0));
+            }
+
+            if (orderIds.Count == 0)
+                return new List<OrderHeader>();
+
+            return await _context.OrderHeaders
+                .Include(o => o.Payment)
+                .Where(o => orderIds.Contains(o.OrderId))
+                .ToListAsync();
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
+    }
+
     // ==================== PRIVATE HELPERS ====================
 
     private static IQueryable<OrderHeader> ApplyBaseFilters(

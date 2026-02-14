@@ -49,7 +49,7 @@ public class CheckoutService : ICheckoutService
             bool isAvailable = true;
 
             // Check stock based on product type
-            if (product.ProductType == ProductTypeEnum.KIT)
+            if (product.ProductType == ProductTypeEnum.KIT.ToString())
             {
                 // For KIT: Calculate available stock from components
                 var components = await _bundleRepository.GetBundleComponentsAsync(product.ProductId);
