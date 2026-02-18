@@ -50,7 +50,7 @@ public class CategoryService : ICategoryService
 
             if (category == null)
             {
-                return ApiResponse<CategoryDetailResponse>.ErrorResponse($"Category with ID {id} not found");
+                return ApiResponse<CategoryDetailResponse>.ErrorResponse($"Category with ID {id} not found.");
             }
 
             var categoryDetail = new CategoryDetailResponse
@@ -64,11 +64,11 @@ public class CategoryService : ICategoryService
                 MaxPrice = category.Products.Any() ? category.Products.Max(p => p.Price) : null
             };
 
-            return ApiResponse<CategoryDetailResponse>.SuccessResponse(categoryDetail, "Category details retrieved successfully");
+            return ApiResponse<CategoryDetailResponse>.SuccessResponse(categoryDetail, "Category details retrieved successfully.");
         }
         catch (Exception ex)
         {
-            return ApiResponse<CategoryDetailResponse>.ErrorResponse($"Error retrieving category: {ex.Message}");
+            return ApiResponse<CategoryDetailResponse>.ErrorResponse($"Error retrieving category: {ex.Message}.");
         }
     }
 
@@ -80,7 +80,7 @@ public class CategoryService : ICategoryService
             var nameExists = await _categoryRepository.CategoryNameExistsAsync(request.Name);
             if (nameExists)
             {
-                return ApiResponse<CategoryResponse>.ErrorResponse($"Category with name '{request.Name}' already exists");
+                return ApiResponse<CategoryResponse>.ErrorResponse($"Category with name '{request.Name}' already exists.");
             }
 
             var category = new Category
@@ -97,11 +97,11 @@ public class CategoryService : ICategoryService
                 ProductCount = 0
             };
 
-            return ApiResponse<CategoryResponse>.SuccessResponse(categoryResponse, "Category created successfully");
+            return ApiResponse<CategoryResponse>.SuccessResponse(categoryResponse, "Category created successfully.");
         }
         catch (Exception ex)
         {
-            return ApiResponse<CategoryResponse>.ErrorResponse($"Error creating category: {ex.Message}");
+            return ApiResponse<CategoryResponse>.ErrorResponse($"Error creating category: {ex.Message}.");
         }
     }
 
@@ -113,14 +113,14 @@ public class CategoryService : ICategoryService
             var category = await _categoryRepository.GetCategoryByIdAsync(id);
             if (category == null)
             {
-                return ApiResponse<CategoryResponse>.ErrorResponse($"Category with ID {id} not found");
+                return ApiResponse<CategoryResponse>.ErrorResponse($"Category with ID {id} not found.");
             }
 
             // Check if new name already exists (excluding current category)
             var nameExists = await _categoryRepository.CategoryNameExistsAsync(request.Name, id);
             if (nameExists)
             {
-                return ApiResponse<CategoryResponse>.ErrorResponse($"Category with name '{request.Name}' already exists");
+                return ApiResponse<CategoryResponse>.ErrorResponse($"Category with name '{request.Name}' already exists.");
             }
 
             category.Name = request.Name;
@@ -134,11 +134,11 @@ public class CategoryService : ICategoryService
                 ProductCount = category.Products.Count
             };
 
-            return ApiResponse<CategoryResponse>.SuccessResponse(categoryResponse, "Category updated successfully");
+            return ApiResponse<CategoryResponse>.SuccessResponse(categoryResponse, "Category updated successfully.");
         }
         catch (Exception ex)
         {
-            return ApiResponse<CategoryResponse>.ErrorResponse($"Error updating category: {ex.Message}");
+            return ApiResponse<CategoryResponse>.ErrorResponse($"Error updating category: {ex.Message}.");
         }
     }
 
@@ -149,18 +149,18 @@ public class CategoryService : ICategoryService
             var category = await _categoryRepository.GetCategoryWithDetailsAsync(id);
             if (category == null)
             {
-                return ApiResponse<bool>.ErrorResponse($"Category with ID {id} not found");
+                return ApiResponse<bool>.ErrorResponse($"Category with ID {id} not found.");
             }
 
             // Check if category has products
             if (category.Products.Any())
             {
-                return ApiResponse<bool>.ErrorResponse($"Cannot delete category. It has {category.Products.Count} associated product(s)");
+                return ApiResponse<bool>.ErrorResponse($"Cannot delete category. It has {category.Products.Count} associated product(s).");
             }
 
             await _categoryRepository.DeleteCategoryAsync(id);
 
-            return ApiResponse<bool>.SuccessResponse(true, "Category deleted successfully");
+            return ApiResponse<bool>.SuccessResponse(true, "Category deleted successfully.");
         }
         catch (Exception ex)
         {

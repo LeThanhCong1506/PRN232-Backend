@@ -46,7 +46,7 @@ public class SepayPollingBackgroundService : BackgroundService
 
         if (string.IsNullOrEmpty(apiToken))
         {
-            _logger.LogWarning("SePay ApiToken chưa được cấu hình. SepayPollingService không hoạt động.");
+            _logger.LogWarning("SePay ApiToken is not configured. SepayPollingService is not working.");
             return;
         }
 
@@ -87,7 +87,7 @@ public class SepayPollingBackgroundService : BackgroundService
         var response = await _httpClient.GetAsync(url, ct);
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogWarning("SePay API trả về HTTP {StatusCode}", response.StatusCode);
+            _logger.LogWarning("The SePay API returns HTTP {StatusCode}.", response.StatusCode);
             return;
         }
 

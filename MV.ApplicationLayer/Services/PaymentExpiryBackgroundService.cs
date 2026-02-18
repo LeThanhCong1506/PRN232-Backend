@@ -7,7 +7,7 @@ namespace MV.ApplicationLayer.Services;
 
 /// <summary>
 /// Background service chạy mỗi 60 giây để kiểm tra và xử lý các payment SEPAY hết hạn.
-/// Khi payment hết hạn → Payment EXPIRED, Order CANCELLED, Stock restored, Coupon restored.
+/// Khi payment hết hạn → Payment EXPIRED, Order CANCELLED, Stock restored, Coupon restored. (Hoàn lại số lượng, cũng như khuyến mãi)
 /// </summary>
 public class PaymentExpiryBackgroundService : BackgroundService
 {

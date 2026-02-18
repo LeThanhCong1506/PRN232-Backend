@@ -182,19 +182,19 @@ public class PaymentService : IPaymentService
         var order = await _orderRepo.GetOrderByIdAsync(orderId);
         if (order == null)
         {
-            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Đơn hàng không tồn tại");
+            return ApiResponse<PaymentStatusResponse>.ErrorResponse("The order does not exist.");
         }
 
         if (!isAdmin && order.UserId != userId)
         {
             return ApiResponse<PaymentStatusResponse>.ErrorResponse(
-                "Unauthorized: Bạn không có quyền xem đơn hàng này");
+                "Unauthorized: You do not have permission to view this order.");
         }
 
         var payment = order.Payment;
         if (payment == null)
         {
-            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Không tìm thấy thông tin thanh toán");
+            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Payment information not found.");
         }
 
         var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId) ?? "COD";
@@ -233,13 +233,13 @@ public class PaymentService : IPaymentService
         var order = await _orderRepo.GetOrderByIdAsync(orderId);
         if (order == null)
         {
-            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Đơn hàng không tồn tại");
+            return ApiResponse<PaymentStatusResponse>.ErrorResponse("The order does not exist.");
         }
 
         var payment = order.Payment;
         if (payment == null)
         {
-            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Không tìm thấy thông tin thanh toán");
+            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Payment information not found.");
         }
 
         // Check payment method must be SEPAY
@@ -247,7 +247,7 @@ public class PaymentService : IPaymentService
         if (paymentMethod != PaymentMethodEnum.SEPAY.ToString())
         {
             return ApiResponse<PaymentStatusResponse>.ErrorResponse(
-                "Chỉ có thể xác nhận thủ công cho đơn hàng thanh toán SEPAY");
+                "Manual confirmation is only possible for orders paid via SEPAY.");
         }
 
         // Check payment status must be PENDING
@@ -255,7 +255,7 @@ public class PaymentService : IPaymentService
         if (currentStatus != PaymentStatusEnum.PENDING.ToString())
         {
             return ApiResponse<PaymentStatusResponse>.ErrorResponse(
-                $"Không thể xác nhận thanh toán ở trạng thái {currentStatus}");
+                $"Payment cannot be confirmed in this status {currentStatus}.");
         }
 
         using var transaction = await _context.Database.BeginTransactionAsync();
@@ -303,13 +303,13 @@ public class PaymentService : IPaymentService
             };
 
             return ApiResponse<PaymentStatusResponse>.SuccessResponse(
-                response, "Xác nhận thanh toán thành công");
+                response, "Payment confirmed.");
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
             return ApiResponse<PaymentStatusResponse>.ErrorResponse(
-                $"Lỗi khi xác nhận thanh toán: {ex.Message}");
+                $"Error confirming payment: {ex.Message}");
         }
     }
 
@@ -326,20 +326,20 @@ public class PaymentService : IPaymentService
             if (order == null)
             {
                 _logger.LogWarning("Success callback: Order not found for OrderNumber={OrderNumber}", orderInvoiceNumber);
-                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Đơn hàng không tồn tại");
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse("The order does not exist.");
             }
 
             var payment = order.Payment;
             if (payment == null)
             {
-                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Không tìm thấy thông tin thanh toán");
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Payment information not found.");
             }
 
             // 2. Kiểm tra payment method phải là SEPAY
             var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(order.OrderId);
             if (paymentMethod != PaymentMethodEnum.SEPAY.ToString())
             {
-                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Đơn hàng không sử dụng phương thức SEPAY");
+                return ApiResponse<PaymentStatusResponse>.ErrorResponse("Orders not using the SEPAY payment method.");
             }
 
             // 3. Kiểm tra nếu đã COMPLETED thì trả về luôn (idempotent)
@@ -364,7 +364,7 @@ public class PaymentService : IPaymentService
             if (currentStatus != PaymentStatusEnum.PENDING.ToString())
             {
                 return ApiResponse<PaymentStatusResponse>.ErrorResponse(
-                    $"Không thể xác nhận thanh toán ở trạng thái {currentStatus}");
+                    $"Payment cannot be confirmed in this status {currentStatus}.");
             }
 
             // 5. Cập nhật payment status → COMPLETED, order status → CONFIRMED
@@ -375,7 +375,7 @@ public class PaymentService : IPaymentService
                 payment.PaymentDate = DateTime.Now;
                 payment.ReceivedAmount = payment.Amount; // SePay đã xác nhận thanh toán thành công
                 payment.UpdatedAt = DateTime.Now;
-                payment.Notes = "Xác nhận tự động từ SePay success callback";
+                payment.Notes = "Automatic confirmation from SePay success callback.";
                 await _orderRepo.UpdatePaymentAsync(payment);
 
                 // Set payment status to COMPLETED
@@ -410,7 +410,7 @@ public class PaymentService : IPaymentService
                     ExpiredAt = payment.ExpiredAt,
                     IsPaid = true,
                     RemainingSeconds = 0
-                }, "Thanh toán thành công");
+                }, "Payment successful.");
             }
             catch (Exception ex)
             {
@@ -423,7 +423,7 @@ public class PaymentService : IPaymentService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error in ProcessSuccessCallbackAsync: OrderNumber={OrderNumber}", orderInvoiceNumber);
-            return ApiResponse<PaymentStatusResponse>.ErrorResponse("Lỗi hệ thống khi xử lý callback");
+            return ApiResponse<PaymentStatusResponse>.ErrorResponse("System error when processing callbacks.");
         }
     }
 

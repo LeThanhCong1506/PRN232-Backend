@@ -1,10 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
-using MV.DomainLayer.DTOs.RequestModels;
-using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.DTOs.Product.Request;
 using MV.DomainLayer.DTOs.ProductBundle.Request;
+using MV.DomainLayer.DTOs.RequestModels;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace MV.PresentationLayer.Controllers

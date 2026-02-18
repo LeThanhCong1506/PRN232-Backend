@@ -1,21 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace MV.DomainLayer.DTOs.Login.Request
 {
     public class UpdateUserDto
     {
-        [Required]
-        [EmailAddress(ErrorMessage = "Email không hợp lệ")]
-        public string Email { get; set; } = null;
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid email address")]
+        // Ensures a standard format like name@domain.com
+        [RegularExpression(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", ErrorMessage = "Please enter a valid email format")]
+        public string Email { get; set; } = null!;
 
-        [Required]
-        [StringLength(10, MinimumLength = 10, ErrorMessage = "Số điện thoại phải đúng 10 chữ số")]
-        [RegularExpression(@"^\d{10}$", ErrorMessage = "Số điện thoại chỉ được chứa số")]
+        [Required(ErrorMessage = "Phone number is required")]
+        // Updated for Vietnamese mobile standards: 10 digits starting with 03, 05, 07, 08, 09
+        [RegularExpression(@"^(03|05|07|08|09)\d{8}$", ErrorMessage = "Phone number must be a valid 10-digit Vietnamese mobile number")]
         public string? Phone { get; set; }
 
         public string? Address { get; set; }
