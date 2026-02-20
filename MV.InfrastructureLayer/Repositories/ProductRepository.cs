@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using MV.DomainLayer.DTOs.Admin.Product.Request;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
@@ -20,12 +21,12 @@ namespace MV.InfrastructureLayer.Repositories
         {
             var query = _context.Products
                 .AsNoTracking()
+                .Where(p => !p.IsDeleted)
                 .Include(p => p.Brand)
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)
                 .AsQueryable();
 
-            // 1. Filter
             if (!string.IsNullOrEmpty(filter.SearchTerm))
             {
                 var term = filter.SearchTerm.ToLower();
@@ -47,10 +48,8 @@ namespace MV.InfrastructureLayer.Repositories
             if (filter.MaxPrice.HasValue)
                 query = query.Where(p => p.Price <= filter.MaxPrice.Value);
 
-            // 2. Count Total (Trước khi phân trang)
             var totalCount = await query.CountAsync();
 
-            // 3. Paging
             var items = await query
                 .OrderByDescending(p => p.CreatedAt)
                 .Skip((filter.PageNumber - 1) * filter.PageSize)
@@ -58,6 +57,56 @@ namespace MV.InfrastructureLayer.Repositories
                 .ToListAsync();
 
             return (items, totalCount);
+        }
+
+        public async Task<(List<Product> Items, int TotalCount)> GetAdminPagedProductsAsync(AdminProductFilter filter)
+        {
+            var query = _context.Products
+                .AsNoTracking()
+                .Include(p => p.Brand)
+                .Include(p => p.Categories)
+                .Include(p => p.ProductImages)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(filter.Search))
+            {
+                var term = filter.Search.ToLower();
+                query = query.Where(p => p.Name.ToLower().Contains(term) ||
+                                         p.Sku.ToLower().Contains(term));
+            }
+
+            if (filter.BrandId.HasValue)
+                query = query.Where(p => p.BrandId == filter.BrandId.Value);
+
+            if (filter.CategoryId.HasValue)
+                query = query.Where(p => p.Categories.Any(c => c.CategoryId == filter.CategoryId.Value));
+
+            if (!string.IsNullOrEmpty(filter.ProductType))
+                query = query.Where(p => p.ProductType == filter.ProductType);
+
+            if (filter.LowStock == true)
+                query = query.Where(p => (p.StockQuantity ?? 0) < 10);
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(p => p.StockQuantity ?? 0)
+                .Skip((filter.PageNumber - 1) * filter.PageSize)
+                .Take(filter.PageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task SoftDeleteAsync(int productId)
+        {
+            var product = await _context.Products.FindAsync(productId);
+            if (product != null)
+            {
+                product.IsActive = false;
+                product.IsDeleted = true;
+                await _context.SaveChangesAsync();
+            }
         }
 
         public async Task<Product> GetProductByIdAsync(int productId)
@@ -144,12 +193,12 @@ namespace MV.InfrastructureLayer.Repositories
         public async Task<bool> SkuExistsAsync(string sku, int? excludeProductId = null)
         {
             var query = _context.Products.Where(p => p.Sku.ToLower() == sku.ToLower());
-            
+
             if (excludeProductId.HasValue)
             {
                 query = query.Where(p => p.ProductId != excludeProductId.Value);
             }
-            
+
             return await query.AnyAsync();
         }
 

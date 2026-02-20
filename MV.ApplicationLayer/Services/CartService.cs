@@ -157,7 +157,7 @@ namespace MV.ApplicationLayer.Services
                 return new ApiResponse<object>
                 {
                     Success = true,
-                    Message = "Cart item removed.,
+                    Message = "Cart item removed.",
                     Data = null
                 };
             }

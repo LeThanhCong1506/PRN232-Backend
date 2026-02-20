@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Order.Request;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
@@ -408,6 +409,250 @@ public class OrderRepository : IOrderRepository
         {
             await conn.CloseAsync();
         }
+    }
+
+    // ==================== ADMIN ORDER MANAGEMENT ====================
+
+    public async Task<(List<OrderHeader> Items, int TotalCount)> GetAdminOrdersAsync(AdminOrderFilter filter)
+    {
+        // Build base query with raw SQL for enum filtering
+        var conditions = new List<string> { "1=1" };
+        var parameters = new List<NpgsqlParameter>();
+        var paramIndex = 0;
+
+        if (!string.IsNullOrEmpty(filter.Search))
+        {
+            conditions.Add($"(oh.order_number ILIKE @p{paramIndex} OR oh.customer_name ILIKE @p{paramIndex} OR oh.customer_phone ILIKE @p{paramIndex} OR oh.customer_email ILIKE @p{paramIndex})");
+            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", $"%{filter.Search}%"));
+            paramIndex++;
+        }
+
+        if (!string.IsNullOrEmpty(filter.Status))
+        {
+            conditions.Add($"oh.status = @p{paramIndex}::order_status_enum");
+            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.Status));
+            paramIndex++;
+        }
+
+        if (!string.IsNullOrEmpty(filter.PaymentMethod))
+        {
+            conditions.Add($"p.payment_method = @p{paramIndex}::payment_method_enum");
+            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.PaymentMethod));
+            paramIndex++;
+        }
+
+        if (!string.IsNullOrEmpty(filter.PaymentStatus))
+        {
+            conditions.Add($"p.status = @p{paramIndex}::payment_status_enum");
+            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.PaymentStatus));
+            paramIndex++;
+        }
+
+        if (filter.DateFrom.HasValue)
+        {
+            conditions.Add($"oh.created_at >= @p{paramIndex}");
+            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.DateFrom.Value));
+            paramIndex++;
+        }
+
+        if (filter.DateTo.HasValue)
+        {
+            conditions.Add($"oh.created_at <= @p{paramIndex}");
+            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.DateTo.Value));
+            paramIndex++;
+        }
+
+        var whereClause = string.Join(" AND ", conditions);
+
+        var conn = _context.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+        try
+        {
+            // Count query
+            using var countCmd = conn.CreateCommand();
+            countCmd.CommandText = $@"
+                SELECT COUNT(DISTINCT oh.order_id)
+                FROM order_header oh
+                LEFT JOIN payment p ON p.order_id = oh.order_id
+                WHERE {whereClause}";
+            foreach (var param in parameters)
+                countCmd.Parameters.Add(new NpgsqlParameter(param.ParameterName, param.Value));
+            var totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
+
+            // IDs query with pagination
+            using var idsCmd = conn.CreateCommand();
+            idsCmd.CommandText = $@"
+                SELECT DISTINCT oh.order_id
+                FROM order_header oh
+                LEFT JOIN payment p ON p.order_id = oh.order_id
+                WHERE {whereClause}
+                ORDER BY oh.order_id DESC
+                OFFSET @offset LIMIT @limit";
+            foreach (var param in parameters)
+                idsCmd.Parameters.Add(new NpgsqlParameter(param.ParameterName, param.Value));
+            idsCmd.Parameters.Add(new NpgsqlParameter("@offset", (filter.PageNumber - 1) * filter.PageSize));
+            idsCmd.Parameters.Add(new NpgsqlParameter("@limit", filter.PageSize));
+
+            var orderIds = new List<int>();
+            using var reader = await idsCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                orderIds.Add(reader.GetInt32(0));
+
+            if (orderIds.Count == 0)
+                return (new List<OrderHeader>(), totalCount);
+
+            var items = await _context.OrderHeaders
+                .AsNoTracking()
+                .Include(o => o.OrderItems)
+                .Include(o => o.Payment)
+                .Include(o => o.User)
+                .Where(o => orderIds.Contains(o.OrderId))
+                .OrderByDescending(o => o.CreatedAt)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
+    }
+
+    public async Task<Dictionary<string, int>> GetOrderStatusCountsAsync()
+    {
+        var result = new Dictionary<string, int>();
+        var conn = _context.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT status::text, COUNT(*) FROM order_header GROUP BY status";
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var status = reader.IsDBNull(0) ? "UNKNOWN" : reader.GetString(0);
+                var count = reader.GetInt64(1);
+                result[status] = (int)count;
+            }
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
+        return result;
+    }
+
+    public async Task<decimal> GetDeliveredRevenueAsync(DateTime from, DateTime to)
+    {
+        var conn = _context.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COALESCE(SUM(total_amount), 0)
+                FROM order_header
+                WHERE status = 'DELIVERED'::order_status_enum
+                  AND delivered_at >= @from AND delivered_at <= @to";
+            cmd.Parameters.Add(new NpgsqlParameter("@from", from));
+            cmd.Parameters.Add(new NpgsqlParameter("@to", to));
+            var result = await cmd.ExecuteScalarAsync();
+            return result != null ? Convert.ToDecimal(result) : 0;
+        }
+        finally
+        {
+            await conn.CloseAsync();
+        }
+    }
+
+    public async Task<List<OrderHeader>> GetRecentOrdersAsync(int count)
+    {
+        return await _context.OrderHeaders
+            .AsNoTracking()
+            .Include(o => o.Payment)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(count)
+            .ToListAsync();
+    }
+
+    public async Task SetProductInstanceStatusByOrderItemIdsAsync(List<int> orderItemIds, string status)
+    {
+        if (!orderItemIds.Any()) return;
+
+        var conn = _context.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            var currentTransaction = _context.Database.CurrentTransaction;
+            if (currentTransaction != null)
+                cmd.Transaction = currentTransaction.GetDbTransaction();
+
+            cmd.CommandText = @"
+                UPDATE product_instance
+                SET status = @status::instance_status_enum
+                WHERE order_item_id = ANY(@ids)";
+            cmd.Parameters.Add(new NpgsqlParameter("@status", status));
+            cmd.Parameters.Add(new NpgsqlParameter("@ids", orderItemIds.ToArray()));
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            // Don't close - may be in a transaction
+        }
+    }
+
+    public async Task CreateWarrantiesForDeliveredOrderAsync(int orderId)
+    {
+        var order = await _context.OrderHeaders
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Product)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null) return;
+
+        // Find all product instances linked to this order's items
+        var orderItemIds = order.OrderItems.Select(oi => oi.OrderItemId).ToList();
+        var instances = await _context.ProductInstances
+            .Include(pi => pi.Product)
+            .Where(pi => pi.OrderItemId.HasValue && orderItemIds.Contains(pi.OrderItemId.Value))
+            .ToListAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        foreach (var instance in instances)
+        {
+            if (instance.Product.WarrantyPolicyId == null) continue;
+
+            // Check if warranty already exists for this serial
+            var existingWarranty = await _context.Warranties
+                .AnyAsync(w => w.SerialNumber == instance.SerialNumber);
+            if (existingWarranty) continue;
+
+            var policy = await _context.WarrantyPolicies
+                .FirstOrDefaultAsync(wp => wp.PolicyId == instance.Product.WarrantyPolicyId.Value);
+            if (policy == null) continue;
+
+            var warranty = new Warranty
+            {
+                SerialNumber = instance.SerialNumber,
+                WarrantyPolicyId = policy.PolicyId,
+                StartDate = today,
+                EndDate = today.AddMonths(policy.DurationMonths),
+                IsActive = true,
+                ActivationDate = DateTime.UtcNow,
+                Notes = $"Auto-created on delivery of order #{order.OrderNumber}",
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.Warranties.Add(warranty);
+        }
+
+        await _context.SaveChangesAsync();
     }
 
     // ==================== PRIVATE HELPERS ====================

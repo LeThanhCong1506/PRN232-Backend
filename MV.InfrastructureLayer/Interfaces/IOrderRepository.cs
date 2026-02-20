@@ -1,3 +1,4 @@
+using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Order.Request;
 using MV.DomainLayer.Entities;
 
@@ -42,4 +43,12 @@ public interface IOrderRepository
 
     // Polling: lấy danh sách order PENDING + SEPAY (chưa hết hạn)
     Task<List<OrderHeader>> GetPendingSepayOrdersAsync();
+
+    // Admin Order Management
+    Task<(List<OrderHeader> Items, int TotalCount)> GetAdminOrdersAsync(AdminOrderFilter filter);
+    Task<Dictionary<string, int>> GetOrderStatusCountsAsync();
+    Task<decimal> GetDeliveredRevenueAsync(DateTime from, DateTime to);
+    Task<List<OrderHeader>> GetRecentOrdersAsync(int count);
+    Task SetProductInstanceStatusByOrderItemIdsAsync(List<int> orderItemIds, string status);
+    Task CreateWarrantiesForDeliveredOrderAsync(int orderId);
 }

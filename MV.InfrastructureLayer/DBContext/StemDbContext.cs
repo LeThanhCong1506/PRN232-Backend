@@ -489,6 +489,12 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.HasSerialTracking)
                 .HasDefaultValue(false)
                 .HasColumnName("has_serial_tracking");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasColumnName("is_active");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValue(false)
+                .HasColumnName("is_deleted");
             entity.Property(e => e.Name)
                 .HasMaxLength(255)
                 .HasColumnName("name");
@@ -574,6 +580,9 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.ImageUrl)
                 .HasMaxLength(255)
                 .HasColumnName("image_url");
+            entity.Property(e => e.IsPrimary)
+                .HasDefaultValue(false)
+                .HasColumnName("is_primary");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
 
             entity.HasOne(d => d.Product).WithMany(p => p.ProductImages)

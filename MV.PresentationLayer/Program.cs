@@ -136,6 +136,8 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
             builder.Services.AddScoped<ICheckoutService, CheckoutService>();
+            builder.Services.AddScoped<IAdminProductService, AdminProductService>();
+            builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
 
             // Background service: auto-expire overdue SEPAY payments every 60 seconds
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
@@ -171,6 +173,8 @@ namespace MV.PresentationLayer
             }
 
             app.UseHttpsRedirection();
+
+            app.UseStaticFiles();
 
             // Enable CORS - must be before Authentication/Authorization
             app.UseCors("AllowFrontend");
