@@ -31,11 +31,11 @@ public class CheckoutService : ICheckoutService
     {
         // 1. Get cart
         var cart = await _cartRepository.GetCartByUserIdAsync(userId);
-        
+
         // 2. Check empty cart
         if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
         {
-            return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Cart is empty");
+            return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Cart is empty.");
         }
 
         // 3. Validate stock for each item and collect errors
@@ -49,11 +49,11 @@ public class CheckoutService : ICheckoutService
             bool isAvailable = true;
 
             // Check stock based on product type
-            if (product.ProductType == ProductTypeEnum.KIT)
+            if (product.ProductType == ProductTypeEnum.KIT.ToString())
             {
                 // For KIT: Calculate available stock from components
                 var components = await _bundleRepository.GetBundleComponentsAsync(product.ProductId);
-                
+
                 if (components.Any())
                 {
                     int minKits = int.MaxValue;
@@ -62,7 +62,7 @@ public class CheckoutService : ICheckoutService
                         int componentStock = component.ChildProduct.StockQuantity ?? 0;
                         int requiredQty = component.Quantity ?? 1;
                         int possibleKits = componentStock / requiredQty;
-                        
+
                         if (possibleKits < minKits)
                         {
                             minKits = possibleKits;
@@ -126,7 +126,7 @@ public class CheckoutService : ICheckoutService
             return new ApiResponse<ValidateCheckoutResponse>
             {
                 Success = false,
-                Message = "Some items are out of stock or insufficient quantity",
+                Message = "Some items are out of stock or insufficient quantity.",
                 Data = errorResponse
             };
         }
@@ -135,7 +135,7 @@ public class CheckoutService : ICheckoutService
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null)
         {
-            return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("User not found");
+            return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("User not found.");
         }
 
         var missingFields = new List<string>();
@@ -151,7 +151,7 @@ public class CheckoutService : ICheckoutService
         if (missingFields.Any())
         {
             return ApiResponse<ValidateCheckoutResponse>.ErrorResponse(
-                "Please update your shipping information before checkout",
+                "Please update your shipping information before checkout.",
                 missingFields
             );
         }
@@ -171,7 +171,7 @@ public class CheckoutService : ICheckoutService
         if (!string.IsNullOrWhiteSpace(request.CouponCode))
         {
             var coupon = await _couponRepository.GetCouponByCodeAsync(request.CouponCode);
-            
+
             if (coupon != null)
             {
                 var now = DateTime.UtcNow;
@@ -195,13 +195,13 @@ public class CheckoutService : ICheckoutService
                 // Check min order value
                 if (isValid && coupon.MinOrderValue.HasValue && subtotal < coupon.MinOrderValue.Value)
                 {
-                    return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon minimum order value not met");
+                    return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon minimum order value not met.");
                 }
 
                 if (isValid)
                 {
                     discount = coupon.DiscountValue;
-                    
+
                     // Ensure discount doesn't exceed subtotal
                     if (discount > subtotal)
                     {
@@ -214,12 +214,12 @@ public class CheckoutService : ICheckoutService
                 }
                 else
                 {
-                    return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon is invalid or expired");
+                    return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon is invalid or expired.");
                 }
             }
             else
             {
-                return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon is invalid or expired");
+                return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon is invalid or expired.");
             }
         }
 
@@ -251,10 +251,10 @@ public class CheckoutService : ICheckoutService
     public async Task<ApiResponse<ShippingInfoResponse>> GetShippingInfoAsync(int userId)
     {
         var user = await _userRepository.GetByIdAsync(userId);
-        
+
         if (user == null)
         {
-            return ApiResponse<ShippingInfoResponse>.ErrorResponse("User not found");
+            return ApiResponse<ShippingInfoResponse>.ErrorResponse("User not found.");
         }
 
         var response = new ShippingInfoResponse
@@ -268,7 +268,7 @@ public class CheckoutService : ICheckoutService
         // Add message if info is incomplete
         if (string.IsNullOrWhiteSpace(user.Phone) || string.IsNullOrWhiteSpace(user.Address))
         {
-            return ApiResponse<ShippingInfoResponse>.SuccessResponse(response, "Please complete your shipping information");
+            return ApiResponse<ShippingInfoResponse>.SuccessResponse(response, "Please complete your shipping information.");
         }
 
         return ApiResponse<ShippingInfoResponse>.SuccessResponse(response);
@@ -282,14 +282,14 @@ public class CheckoutService : ICheckoutService
             {
                 Code = "COD",
                 Name = "Cash on Delivery",
-                Description = "Thanh toán khi nhận hàng",
+                Description = "Payment upon delivery.",
                 IsActive = true
             },
             new PaymentMethodDto
             {
                 Code = "BANK_TRANSFER",
                 Name = "Bank Transfer",
-                Description = "Chuyển khoản ngân hàng",
+                Description = "Bank transfer.",
                 IsActive = true
             }
         };

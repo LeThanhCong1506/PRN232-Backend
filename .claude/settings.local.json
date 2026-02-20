@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(tree:*)",
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(dir:*)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)",
+      "Bash(git log:*)",
+      "WebFetch(domain:docs.sepay.vn)",
+      "WebFetch(domain:developer.sepay.vn)"
     ]
   }
 }

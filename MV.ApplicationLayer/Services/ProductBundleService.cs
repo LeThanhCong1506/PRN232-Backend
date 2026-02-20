@@ -25,12 +25,12 @@ public class ProductBundleService : IProductBundleService
         var parentProduct = await _productRepository.GetByIdAsync(kitProductId);
         if (parentProduct == null)
         {
-            return ApiResponse<IEnumerable<ProductBundleResponse>>.ErrorResponse($"Product with ID {kitProductId} not found");
+            return ApiResponse<IEnumerable<ProductBundleResponse>>.ErrorResponse($"Product with ID {kitProductId} not found.");
         }
 
-        if (parentProduct.ProductType != ProductTypeEnum.KIT)
+        if (parentProduct.ProductType != ProductTypeEnum.KIT.ToString())
         {
-            return ApiResponse<IEnumerable<ProductBundleResponse>>.ErrorResponse($"Product {kitProductId} is not a KIT");
+            return ApiResponse<IEnumerable<ProductBundleResponse>>.ErrorResponse($"Product {kitProductId} is not a KIT.");
         }
 
         var bundles = await _bundleRepository.GetBundleComponentsAsync(kitProductId);
@@ -45,37 +45,37 @@ public class ProductBundleService : IProductBundleService
         var parentProduct = await _productRepository.GetByIdAsync(kitProductId);
         if (parentProduct == null)
         {
-            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product with ID {kitProductId} not found");
+            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product with ID {kitProductId} not found.");
         }
 
-        if (parentProduct.ProductType != ProductTypeEnum.KIT)
+        if (parentProduct.ProductType != ProductTypeEnum.KIT.ToString())
         {
-            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product {kitProductId} is not a KIT. Only KIT products can have components");
+            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product {kitProductId} is not a KIT. Only KIT products can have components.");
         }
 
         // Validate child product exists
         var childProduct = await _productRepository.GetByIdAsync(request.ChildProductId);
         if (childProduct == null)
         {
-            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Child product with ID {request.ChildProductId} not found");
+            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Child product with ID {request.ChildProductId} not found.");
         }
 
         // Validate child product is not a KIT (không cho phép KIT trong KIT)
-        if (childProduct.ProductType == ProductTypeEnum.KIT)
+        if (childProduct.ProductType == ProductTypeEnum.KIT.ToString())
         {
-            return ApiResponse<ProductBundleResponse>.ErrorResponse("Cannot add a KIT as a component of another KIT");
+            return ApiResponse<ProductBundleResponse>.ErrorResponse("Cannot add a KIT as a component of another KIT.");
         }
 
         // Validate not already in bundle
         if (await _bundleRepository.ExistsInBundleAsync(kitProductId, request.ChildProductId))
         {
-            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product {request.ChildProductId} is already in this bundle");
+            return ApiResponse<ProductBundleResponse>.ErrorResponse($"Product {request.ChildProductId} is already in this bundle.");
         }
 
         // Validate not adding itself
         if (kitProductId == request.ChildProductId)
         {
-            return ApiResponse<ProductBundleResponse>.ErrorResponse("Cannot add a product to itself");
+            return ApiResponse<ProductBundleResponse>.ErrorResponse("Cannot add a product to itself.");
         }
 
         var bundle = new ProductBundle
@@ -89,7 +89,7 @@ public class ProductBundleService : IProductBundleService
         var result = await _bundleRepository.GetBundleItemAsync(kitProductId, request.ChildProductId);
         var response = MapToResponse(result!);
 
-        return ApiResponse<ProductBundleResponse>.SuccessResponse(response, "Product added to bundle successfully");
+        return ApiResponse<ProductBundleResponse>.SuccessResponse(response, "Product added to bundle successfully.");
     }
 
     public async Task<ApiResponse<bool>> RemoveProductFromBundleAsync(int kitProductId, int childProductId)
@@ -98,11 +98,11 @@ public class ProductBundleService : IProductBundleService
 
         if (bundle == null)
         {
-            return ApiResponse<bool>.ErrorResponse($"Product {childProductId} not found in bundle {kitProductId}");
+            return ApiResponse<bool>.ErrorResponse($"Product {childProductId} not found in bundle {kitProductId}.");
         }
 
         await _bundleRepository.RemoveFromBundleAsync(bundle.BundleId);
-        return ApiResponse<bool>.SuccessResponse(true, "Product removed from bundle successfully");
+        return ApiResponse<bool>.SuccessResponse(true, "Product removed from bundle successfully.");
     }
 
     public async Task<ApiResponse<int>> GetAvailableKitStockAsync(int kitProductId)
@@ -111,12 +111,12 @@ public class ProductBundleService : IProductBundleService
         var parentProduct = await _productRepository.GetByIdAsync(kitProductId);
         if (parentProduct == null)
         {
-            return ApiResponse<int>.ErrorResponse($"Product with ID {kitProductId} not found");
+            return ApiResponse<int>.ErrorResponse($"Product with ID {kitProductId} not found.");
         }
 
-        if (parentProduct.ProductType != ProductTypeEnum.KIT)
+        if (parentProduct.ProductType != ProductTypeEnum.KIT.ToString())
         {
-            return ApiResponse<int>.ErrorResponse($"Product {kitProductId} is not a KIT");
+            return ApiResponse<int>.ErrorResponse($"Product {kitProductId} is not a KIT.");
         }
 
         // Get all components
@@ -124,7 +124,7 @@ public class ProductBundleService : IProductBundleService
 
         if (!components.Any())
         {
-            return ApiResponse<int>.SuccessResponse(0, "KIT has no components defined");
+            return ApiResponse<int>.SuccessResponse(0, "KIT has no components defined.");
         }
 
         // Calculate max kits can be made from available stock
@@ -141,7 +141,7 @@ public class ProductBundleService : IProductBundleService
             }
         }
 
-        return ApiResponse<int>.SuccessResponse(maxKits, $"Can make {maxKits} kits from current stock");
+        return ApiResponse<int>.SuccessResponse(maxKits, $"Can make {maxKits} kits from current stock.");
     }
 
     private ProductBundleResponse MapToResponse(ProductBundle bundle)

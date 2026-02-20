@@ -51,7 +51,7 @@ public class BrandService : IBrandService
 
             if (brand == null)
             {
-                return ApiResponse<BrandDetailResponse>.ErrorResponse($"Brand with ID {id} not found");
+                return ApiResponse<BrandDetailResponse>.ErrorResponse($"Brand with ID {id} not found.");
             }
 
             var brandDetail = new BrandDetailResponse
@@ -66,7 +66,7 @@ public class BrandService : IBrandService
                 MaxPrice = brand.Products.Any() ? brand.Products.Max(p => p.Price) : null
             };
 
-            return ApiResponse<BrandDetailResponse>.SuccessResponse(brandDetail, "Brand details retrieved successfully");
+            return ApiResponse<BrandDetailResponse>.SuccessResponse(brandDetail, "Brand details retrieved successfully.");
         }
         catch (Exception ex)
         {
@@ -82,7 +82,7 @@ public class BrandService : IBrandService
             var nameExists = await _brandRepository.BrandNameExistsAsync(request.Name);
             if (nameExists)
             {
-                return ApiResponse<BrandResponse>.ErrorResponse($"Brand with name '{request.Name}' already exists");
+                return ApiResponse<BrandResponse>.ErrorResponse($"Brand with name '{request.Name}' already exists.");
             }
 
             var brand = new Brand
@@ -101,7 +101,7 @@ public class BrandService : IBrandService
                 ProductCount = 0
             };
 
-            return ApiResponse<BrandResponse>.SuccessResponse(brandResponse, "Brand created successfully");
+            return ApiResponse<BrandResponse>.SuccessResponse(brandResponse, "Brand created successfully.");
         }
         catch (Exception ex)
         {
@@ -117,14 +117,14 @@ public class BrandService : IBrandService
             var brand = await _brandRepository.GetBrandByIdAsync(id);
             if (brand == null)
             {
-                return ApiResponse<BrandResponse>.ErrorResponse($"Brand with ID {id} not found");
+                return ApiResponse<BrandResponse>.ErrorResponse($"Brand with ID {id} not found.");
             }
 
             // Check if new name already exists (excluding current brand)
             var nameExists = await _brandRepository.BrandNameExistsAsync(request.Name, id);
             if (nameExists)
             {
-                return ApiResponse<BrandResponse>.ErrorResponse($"Brand with name '{request.Name}' already exists");
+                return ApiResponse<BrandResponse>.ErrorResponse($"Brand with name '{request.Name}' already exists.");
             }
 
             brand.Name = request.Name;
@@ -140,7 +140,7 @@ public class BrandService : IBrandService
                 ProductCount = brand.Products.Count
             };
 
-            return ApiResponse<BrandResponse>.SuccessResponse(brandResponse, "Brand updated successfully");
+            return ApiResponse<BrandResponse>.SuccessResponse(brandResponse, "Brand updated successfully.");
         }
         catch (Exception ex)
         {
@@ -155,18 +155,18 @@ public class BrandService : IBrandService
             var brand = await _brandRepository.GetBrandWithDetailsAsync(id);
             if (brand == null)
             {
-                return ApiResponse<bool>.ErrorResponse($"Brand with ID {id} not found");
+                return ApiResponse<bool>.ErrorResponse($"Brand with ID {id} not found.");
             }
 
             // Check if brand has products
             if (brand.Products.Any())
             {
-                return ApiResponse<bool>.ErrorResponse($"Cannot delete brand. It has {brand.Products.Count} associated product(s)");
+                return ApiResponse<bool>.ErrorResponse($"Cannot delete brand. It has {brand.Products.Count} associated product(s).");
             }
 
             await _brandRepository.DeleteBrandAsync(id);
 
-            return ApiResponse<bool>.SuccessResponse(true, "Brand deleted successfully");
+            return ApiResponse<bool>.SuccessResponse(true, "Brand deleted successfully.");
         }
         catch (Exception ex)
         {

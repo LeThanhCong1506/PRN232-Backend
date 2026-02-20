@@ -22,7 +22,7 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
         var response = MapToResponse(warranty);
@@ -35,7 +35,7 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found.");
         }
 
         var response = MapToResponse(warranty);
@@ -75,13 +75,13 @@ public class WarrantyService : IWarrantyService
         // Validate serial number exists
         if (await _warrantyRepository.SerialNumberExistsAsync(request.SerialNumber))
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty for serial number {request.SerialNumber} already exists");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty for serial number {request.SerialNumber} already exists.");
         }
 
         // Validate dates
         if (request.EndDate <= request.StartDate)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse("End date must be after start date");
+            return ApiResponse<WarrantyResponse>.ErrorResponse("End date must be after start date.");
         }
 
         var warranty = new Warranty
@@ -99,7 +99,7 @@ public class WarrantyService : IWarrantyService
         var result = await _warrantyRepository.GetByIdAsync(created.WarrantyId);
         var response = MapToResponse(result!);
 
-        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty created successfully");
+        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty created successfully.");
     }
 
     public async Task<ApiResponse<WarrantyResponse>> UpdateAsync(int id, UpdateWarrantyRequest request)
@@ -108,7 +108,7 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
         warranty.EndDate = request.EndDate;
@@ -120,7 +120,7 @@ public class WarrantyService : IWarrantyService
         var updated = await _warrantyRepository.GetByIdAsync(id);
         var response = MapToResponse(updated!);
 
-        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty updated successfully");
+        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty updated successfully.");
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
@@ -129,11 +129,11 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<bool>.ErrorResponse($"Warranty with ID {id} not found");
+            return ApiResponse<bool>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
         await _warrantyRepository.DeleteAsync(id);
-        return ApiResponse<bool>.SuccessResponse(true, "Warranty deleted successfully");
+        return ApiResponse<bool>.SuccessResponse(true, "Warranty deleted successfully.");
     }
 
     public async Task<ApiResponse<WarrantyResponse>> ActivateWarrantyAsync(string serialNumber)
@@ -142,12 +142,12 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found.");
         }
 
         if (warranty.IsActive == true)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse("Warranty is already activated");
+            return ApiResponse<WarrantyResponse>.ErrorResponse("Warranty is already activated.");
         }
 
         warranty.IsActive = true;
@@ -158,7 +158,7 @@ public class WarrantyService : IWarrantyService
         var updated = await _warrantyRepository.GetBySerialNumberAsync(serialNumber);
         var response = MapToResponse(updated!);
 
-        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty activated successfully");
+        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty activated successfully.");
     }
 
     private WarrantyResponse MapToResponse(Warranty warranty)

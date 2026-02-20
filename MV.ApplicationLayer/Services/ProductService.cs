@@ -91,13 +91,13 @@ namespace MV.ApplicationLayer.Services
 
             if (product == null)
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found.");
             }
 
             var response = MapToDetailResponse(product);
 
             // Nếu product là KIT, load bundle components
-            if (product.ProductType == ProductTypeEnum.KIT)
+            if (product.ProductType == ProductTypeEnum.KIT.ToString())
             {
                 var bundles = await _bundleRepository.GetBundleComponentsAsync(productId);
                 response.BundleComponents = bundles.Select(b => new ProductDetailResponse.BundleComponentInfo
@@ -111,7 +111,7 @@ namespace MV.ApplicationLayer.Services
                 }).ToList();
             }
 
-            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product retrieved successfully");
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product retrieved successfully.");
         }
 
         public async Task<ApiResponse<ProductDetailResponse>> CreateAsync(CreateProductRequest request)
@@ -119,13 +119,13 @@ namespace MV.ApplicationLayer.Services
             // Validation: SKU unique
             if (await _productRepository.SkuExistsAsync(request.Sku))
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists.");
             }
 
             // Validation: Brand exists
             if (!await _brandRepository.ExistsAsync(request.BrandId))
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
             }
 
             // Validation: WarrantyPolicy exists (if provided)
@@ -141,7 +141,7 @@ namespace MV.ApplicationLayer.Services
                 {
                     if (!await _categoryRepository.ExistsAsync(categoryId))
                     {
-                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Category with ID {categoryId} not found");
+                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Category with ID {categoryId} not found.");
                     }
                 }
             }
@@ -152,7 +152,7 @@ namespace MV.ApplicationLayer.Services
                 Name = request.Name,
                 Sku = request.Sku,
                 Description = request.Description,
-                ProductType = request.ProductType,
+                ProductType = request.ProductType.ToString(),
                 Price = request.Price,
                 StockQuantity = request.HasSerialTracking ? 0 : request.StockQuantity,
                 BrandId = request.BrandId,
@@ -172,7 +172,7 @@ namespace MV.ApplicationLayer.Services
             var detail = await _productRepository.GetDetailByIdAsync(createdProduct.ProductId);
             var response = MapToDetailResponse(detail!);
 
-            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product created successfully");
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product created successfully.");
         }
 
         public async Task<ApiResponse<ProductDetailResponse>> CreateKitAsync(CreateKitRequest request)
@@ -180,13 +180,13 @@ namespace MV.ApplicationLayer.Services
             // Validation: SKU unique
             if (await _productRepository.SkuExistsAsync(request.Sku))
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists.");
             }
 
             // Validation: Brand exists
             if (!await _brandRepository.ExistsAsync(request.BrandId))
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
             }
 
             // Validation: All component products exist and are not KITs
@@ -196,10 +196,10 @@ namespace MV.ApplicationLayer.Services
                 
                 if (childProduct == null)
                 {
-                    return ApiResponse<ProductDetailResponse>.ErrorResponse($"Component product with ID {component.ProductId} not found");
+                    return ApiResponse<ProductDetailResponse>.ErrorResponse($"Component product with ID {component.ProductId} not found.");
                 }
 
-                if (childProduct.ProductType == ProductTypeEnum.KIT)
+                if (childProduct.ProductType == ProductTypeEnum.KIT.ToString())
                 {
                     return ApiResponse<ProductDetailResponse>.ErrorResponse($"Cannot add KIT product '{childProduct.Name}' as a component. Only MODULE and COMPONENT types are allowed.");
                 }
@@ -212,7 +212,7 @@ namespace MV.ApplicationLayer.Services
                 {
                     if (!await _categoryRepository.ExistsAsync(categoryId))
                     {
-                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Category with ID {categoryId} not found");
+                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Category with ID {categoryId} not found.");
                     }
                 }
             }
@@ -235,7 +235,7 @@ namespace MV.ApplicationLayer.Services
                 Name = request.Name,
                 Sku = request.Sku,
                 Description = request.Description,
-                ProductType = ProductTypeEnum.KIT,
+                ProductType = ProductTypeEnum.KIT.ToString(),
                 Price = request.Price,
                 StockQuantity = 0, // KIT stock is calculated from components
                 BrandId = request.BrandId,
@@ -270,7 +270,7 @@ namespace MV.ApplicationLayer.Services
             var detail = await _productRepository.GetDetailByIdAsync(createdProduct.ProductId);
             var response = MapToDetailResponse(detail!);
 
-            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "KIT created successfully with all components");
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "KIT created successfully with all components.");
         }
 
         public async Task<ApiResponse<ProductDetailResponse>> UpdateAsync(int productId, UpdateProductRequest request)
@@ -279,26 +279,26 @@ namespace MV.ApplicationLayer.Services
 
             if (product == null)
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found.");
             }
 
             // Validation: SKU unique (exclude current product)
             if (await _productRepository.SkuExistsAsync(request.Sku, productId))
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists.");
             }
 
             // Validation: Brand exists
             if (!await _brandRepository.ExistsAsync(request.BrandId))
             {
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found");
+                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
             }
 
             // Update product
             product.Name = request.Name;
             product.Sku = request.Sku;
             product.Description = request.Description;
-            product.ProductType = request.ProductType;
+            product.ProductType = request.ProductType.ToString();
             product.Price = request.Price;
             product.StockQuantity = request.StockQuantity;
             product.BrandId = request.BrandId;
@@ -323,54 +323,54 @@ namespace MV.ApplicationLayer.Services
             var detail = await _productRepository.GetDetailByIdAsync(productId);
             var response = MapToDetailResponse(detail!);
 
-            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product updated successfully");
+            return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product updated successfully.");
         }
 
         public async Task<ApiResponse<bool>> DeleteAsync(int productId)
         {
             if (!await _productRepository.ExistsAsync(productId))
             {
-                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found");
+                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
             }
 
             // Check if product has orders
             if (await _productRepository.HasOrdersAsync(productId))
             {
-                return ApiResponse<bool>.ErrorResponse("Cannot delete product that has been ordered");
+                return ApiResponse<bool>.ErrorResponse("Cannot delete product that has been ordered.");
             }
 
             await _productRepository.DeleteAsync(productId);
-            return ApiResponse<bool>.SuccessResponse(true, "Product deleted successfully");
+            return ApiResponse<bool>.SuccessResponse(true, "Product deleted successfully.");
         }
 
         public async Task<ApiResponse<bool>> AddCategoriesToProductAsync(int productId, List<int> categoryIds)
         {
             if (!await _productRepository.ExistsAsync(productId))
             {
-                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found");
+                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
             }
 
             foreach (var categoryId in categoryIds)
             {
                 if (!await _categoryRepository.ExistsAsync(categoryId))
                 {
-                    return ApiResponse<bool>.ErrorResponse($"Category with ID {categoryId} not found");
+                    return ApiResponse<bool>.ErrorResponse($"Category with ID {categoryId} not found.");
                 }
             }
 
             await _productRepository.AddCategoriesToProductAsync(productId, categoryIds);
-            return ApiResponse<bool>.SuccessResponse(true, "Categories added successfully");
+            return ApiResponse<bool>.SuccessResponse(true, "Categories added successfully.");
         }
 
         public async Task<ApiResponse<bool>> RemoveCategoryFromProductAsync(int productId, int categoryId)
         {
             if (!await _productRepository.ExistsAsync(productId))
             {
-                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found");
+                return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
             }
 
             await _productRepository.RemoveCategoryFromProductAsync(productId, categoryId);
-            return ApiResponse<bool>.SuccessResponse(true, "Category removed successfully");
+            return ApiResponse<bool>.SuccessResponse(true, "Category removed successfully.");
         }
 
         private ProductDetailResponse MapToDetailResponse(Product product)
@@ -381,7 +381,7 @@ namespace MV.ApplicationLayer.Services
                 Sku = product.Sku,
                 Name = product.Name,
                 Description = product.Description,
-                ProductType = product.ProductType,
+                ProductType = Enum.Parse<ProductTypeEnum>(product.ProductType),
                 Price = product.Price,
                 StockQuantity = product.StockQuantity ?? 0,
                 AvailableQuantity = product.StockQuantity ?? 0, // Will calculate based on ProductInstances later

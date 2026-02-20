@@ -3,10 +3,6 @@ using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace MV.ApplicationLayer.Services
 {
@@ -80,7 +76,7 @@ namespace MV.ApplicationLayer.Services
             var product = await _productRepository.GetProductByIdAsync(request.ProductId);
             if (product == null)
             {
-                return ApiResponse<object>.ErrorResponse("Product not found");
+                return ApiResponse<object>.ErrorResponse("Product not found.");
             }
 
             int currentStock = product.StockQuantity ?? 0;
@@ -91,7 +87,7 @@ namespace MV.ApplicationLayer.Services
                 return new ApiResponse<object>
                 {
                     Success = false,
-                    Message = "Product out of stock",
+                    Message = "Product out of stock.",
                     Data = new { availableQuantity = 0 }
                 };
             }
@@ -139,7 +135,7 @@ namespace MV.ApplicationLayer.Services
             return new ApiResponse<object>
             {
                 Success = true,
-                Message = "Product added to cart",
+                Message = "Product added to cart.",
                 Data = responseData
             };
         }
@@ -150,9 +146,9 @@ namespace MV.ApplicationLayer.Services
             var cartItem = await _cartRepository.GetCartItemByIdAsync(cartItemId);
 
             // 2. Validate cơ bản
-            if (cartItem == null) return ApiResponse<object>.ErrorResponse("Cart item not found");
-            if (cartItem.Cart.UserId != userId) return ApiResponse<object>.ErrorResponse("Unauthorized access to this cart item");
-            if (quantity < 0) return ApiResponse<object>.ErrorResponse("Quantity cannot be negative");
+            if (cartItem == null) return ApiResponse<object>.ErrorResponse("Cart item not found.");
+            if (cartItem.Cart.UserId != userId) return ApiResponse<object>.ErrorResponse("Unauthorized access to this cart item.");
+            if (quantity < 0) return ApiResponse<object>.ErrorResponse("Quantity cannot be negative.");
 
             // 3. Nếu quantity = 0 -> Xóa cart item
             if (quantity == 0)
@@ -161,7 +157,7 @@ namespace MV.ApplicationLayer.Services
                 return new ApiResponse<object>
                 {
                     Success = true,
-                    Message = "Cart item removed",
+                    Message = "Cart item removed.,
                     Data = null
                 };
             }
@@ -178,7 +174,7 @@ namespace MV.ApplicationLayer.Services
                 return new ApiResponse<object>
                 {
                     Success = false,
-                    Message = "Requested quantity exceeds available stock",
+                    Message = "Requested quantity exceeds available stock.",
                     Data = errorData
                 };
             }
@@ -212,14 +208,14 @@ namespace MV.ApplicationLayer.Services
             // 2. Validate tồn tại
             if (cartItem == null)
             {
-                return ApiResponse<object>.ErrorResponse("Cart item not found");
+                return ApiResponse<object>.ErrorResponse("Cart item not found.");
             }
 
             // 3. Validate quyền sở hữu (Security Check)
             // Chỉ cho phép xóa nếu CartItem này thuộc về User đang đăng nhập
             if (cartItem.Cart.UserId != userId)
             {
-                return ApiResponse<object>.ErrorResponse("Unauthorized access to this cart item");
+                return ApiResponse<object>.ErrorResponse("Unauthorized access to this cart item.");
             }
 
             // 4. Xóa
@@ -229,7 +225,7 @@ namespace MV.ApplicationLayer.Services
             return new ApiResponse<object>
             {
                 Success = true,
-                Message = "Cart item removed",
+                Message = "Cart item removed.",
                 Data = null // Không cần trả về data gì thêm
             };
         }
@@ -245,7 +241,7 @@ namespace MV.ApplicationLayer.Services
                 return new ApiResponse<object>
                 {
                     Success = true,
-                    Message = "Cart cleared",
+                    Message = "Cart cleared.",
                     Data = null
                 };
             }
@@ -257,7 +253,7 @@ namespace MV.ApplicationLayer.Services
             return new ApiResponse<object>
             {
                 Success = true,
-                Message = "Cart cleared",
+                Message = "Cart cleared.",
                 Data = null
             };
         }
@@ -270,14 +266,14 @@ namespace MV.ApplicationLayer.Services
             // 2. Check coupon tồn tại
             if (coupon == null)
             {
-                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid");
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");
             }
 
             // 3. Check thời gian hiệu lực (start_date <= NOW <= end_date)
             var now = DateTime.UtcNow;
             if (now < coupon.StartDate || now > coupon.EndDate)
             {
-                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid");
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");
             }
 
             // 4. Check usage_limit > used_count (nếu có giới hạn)
@@ -285,7 +281,7 @@ namespace MV.ApplicationLayer.Services
             {
                 if (coupon.UsedCount >= coupon.UsageLimit)
                 {
-                    return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid");
+                    return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");
                 }
             }
 
@@ -293,7 +289,7 @@ namespace MV.ApplicationLayer.Services
             var cart = await _cartRepository.GetCartByUserIdAsync(userId);
             if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
             {
-                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Cart is empty");
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Cart is empty.");
             }
 
             decimal cartSubtotal = cart.CartItems.Sum(ci => (ci.Quantity ?? 0) * ci.Product.Price);
@@ -304,7 +300,7 @@ namespace MV.ApplicationLayer.Services
                 return new ApiResponse<ValidateCouponResponseDto>
                 {
                     Success = false,
-                    Message = "Minimum order value not met",
+                    Message = "Minimum order value not met.",
                     Data = new ValidateCouponResponseDto
                     {
                         CartSubtotal = cartSubtotal,
@@ -333,10 +329,10 @@ namespace MV.ApplicationLayer.Services
                 CalculatedDiscount = calculatedDiscount,
                 CartSubtotal = cartSubtotal,
                 NewTotal = newTotal,
-                Message = $"Coupon applied: {coupon.DiscountValue:N0} VND off"
+                Message = $"Coupon applied: {coupon.DiscountValue:N0} VND off."
             };
 
-            return ApiResponse<ValidateCouponResponseDto>.SuccessResponse(responseData, "Coupon applied successfully");
+            return ApiResponse<ValidateCouponResponseDto>.SuccessResponse(responseData, "Coupon applied successfully.");
         }
     }
 }

@@ -120,10 +120,12 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
             builder.Services.AddScoped<IProductBundleRepository, ProductBundleRepository>();
             builder.Services.AddScoped<IWarrantyRepository, WarrantyRepository>();
-
-
+            builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+            builder.Services.AddScoped<ISepayRepository, SepayRepository>();
 
             builder.Services.AddScoped<IRoleService, RoleService>();
+            builder.Services.AddScoped<IOrderService, OrderService>();
+            builder.Services.AddScoped<IPaymentService, PaymentService>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICartService, CartService>();
@@ -134,6 +136,12 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
             builder.Services.AddScoped<ICheckoutService, CheckoutService>();
+
+            // Background service: auto-expire overdue SEPAY payments every 60 seconds
+            builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
+
+            // Background service: polling SePay API mỗi 15s kiểm tra giao dịch mới → tự cập nhật COMPLETED
+            builder.Services.AddHostedService<SepayPollingBackgroundService>();
 
             // Register DbContext with connection string from appsettings
             builder.Services.AddDbContext<StemDbContext>(options =>

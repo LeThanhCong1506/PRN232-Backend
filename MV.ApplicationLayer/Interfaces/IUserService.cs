@@ -1,10 +1,5 @@
-﻿using MV.DomainLayer.DTO;
-using MV.DomainLayer.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Response;
 
 namespace MV.ApplicationLayer.Interfaces
 {

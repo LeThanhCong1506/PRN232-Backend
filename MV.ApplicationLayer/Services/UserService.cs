@@ -1,13 +1,10 @@
 ﻿using MV.ApplicationLayer.Interfaces;
-using MV.DomainLayer.DTO;
+using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Response;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace MV.ApplicationLayer.Services
 {
@@ -25,13 +22,13 @@ namespace MV.ApplicationLayer.Services
         public async Task<string> CreateAsync(CreateUserDto dto)
         {
             if (await _repo.ExistsUsernameAsync(dto.Username))
-                return "Username đã tồn tại";
+                return "The username already exists.";
 
             if (await _repo.ExistsEmailAsync(dto.Email))
-                return "Email đã tồn tại";
+                return "The email already exists.";
 
             if (await _repo.ExistsPhoneAsync(dto.Phone!))
-                return "Số điện thoại đã tồn tại";
+                return "The phone number already exists.";
 
             var user = new User
             {
