@@ -21,7 +21,7 @@ namespace MV.InfrastructureLayer.Repositories
         {
             var query = _context.Products
                 .AsNoTracking()
-                .Where(p => !p.IsDeleted)
+                .Where(p => p.IsDeleted != true)
                 .Include(p => p.Brand)
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)

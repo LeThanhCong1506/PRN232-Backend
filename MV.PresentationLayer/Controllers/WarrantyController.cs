@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Warranty.Request;
 using Swashbuckle.AspNetCore.Annotations;
+using System.Security.Claims;
 
 namespace MV.PresentationLayer.Controllers;
 
@@ -18,6 +19,24 @@ public class WarrantyController : ControllerBase
     public WarrantyController(IWarrantyService warrantyService)
     {
         _warrantyService = warrantyService;
+    }
+
+    /// <summary>
+    /// Lấy danh sách bảo hành của customer đang đăng nhập
+    /// </summary>
+    [HttpGet("/api/warranties")]
+    [Authorize]
+    [SwaggerOperation(Summary = "Get my warranties (Customer)")]
+    public async Task<IActionResult> GetMyWarranties()
+    {
+        var userId = GetUserId();
+        if (userId == 0)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _warrantyService.GetMyWarrantiesAsync(userId);
+        return Ok(result);
     }
 
     /// <summary>
@@ -108,7 +127,7 @@ public class WarrantyController : ControllerBase
     /// Tạo bảo hành mới (Admin only)
     /// </summary>
     [HttpPost]
-    // [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [SwaggerOperation(Summary = "Create new warranty")]
     public async Task<IActionResult> Create([FromBody] CreateWarrantyRequest request)
     {
@@ -131,7 +150,7 @@ public class WarrantyController : ControllerBase
     /// Cập nhật thông tin bảo hành (Admin only)
     /// </summary>
     [HttpPut("{id}")]
-    // [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [SwaggerOperation(Summary = "Update warranty")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateWarrantyRequest request)
     {
@@ -154,7 +173,7 @@ public class WarrantyController : ControllerBase
     /// Xóa bảo hành (Admin only)
     /// </summary>
     [HttpDelete("{id}")]
-    // [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [SwaggerOperation(Summary = "Delete warranty")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -166,5 +185,11 @@ public class WarrantyController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    private int GetUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+        return userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId) ? userId : 0;
     }
 }

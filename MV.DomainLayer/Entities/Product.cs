@@ -25,11 +25,11 @@ public partial class Product
 
     public bool? HasSerialTracking { get; set; }
 
-    public bool IsActive { get; set; } = true;
-
-    public bool IsDeleted { get; set; } = false;
-
     public DateTime? CreatedAt { get; set; }
+
+    public bool? IsActive { get; set; }
+
+    public bool? IsDeleted { get; set; }
 
     public virtual Brand Brand { get; set; } = null!;
 

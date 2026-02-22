@@ -260,10 +260,10 @@ public class AdminOrderService : IAdminOrderService
         var monthlyRevenue = await _orderRepo.GetDeliveredRevenueAsync(monthStart, monthEnd);
 
         // Product stats
-        var totalProducts = await _context.Products.CountAsync(p => !p.IsDeleted);
-        var activeProducts = await _context.Products.CountAsync(p => p.IsActive && !p.IsDeleted);
-        var lowStockProducts = await _context.Products.CountAsync(p => !p.IsDeleted && (p.StockQuantity ?? 0) < 10 && (p.StockQuantity ?? 0) > 0);
-        var outOfStockProducts = await _context.Products.CountAsync(p => !p.IsDeleted && (p.StockQuantity ?? 0) == 0);
+        var totalProducts = await _context.Products.CountAsync(p => p.IsDeleted != true);
+        var activeProducts = await _context.Products.CountAsync(p => p.IsActive == true && p.IsDeleted != true);
+        var lowStockProducts = await _context.Products.CountAsync(p => p.IsDeleted != true && (p.StockQuantity ?? 0) < 10 && (p.StockQuantity ?? 0) > 0);
+        var outOfStockProducts = await _context.Products.CountAsync(p => p.IsDeleted != true && (p.StockQuantity ?? 0) == 0);
 
         // Customer stats (role_id for Customer - typically 2, but let's query by role_name)
         var customerRoleId = await _context.Roles.Where(r => r.RoleName == "Customer").Select(r => r.RoleId).FirstOrDefaultAsync();

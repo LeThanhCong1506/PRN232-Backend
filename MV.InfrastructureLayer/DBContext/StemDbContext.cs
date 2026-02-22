@@ -402,9 +402,6 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.Amount)
                 .HasPrecision(12, 2)
                 .HasColumnName("amount");
-            entity.Property(e => e.BankAccount)
-                .HasMaxLength(50)
-                .HasColumnName("bank_account");
             entity.Property(e => e.BankCode)
                 .HasMaxLength(50)
                 .HasColumnName("bank_code");
@@ -426,7 +423,6 @@ public partial class StemDbContext : DbContext
                 .HasMaxLength(100)
                 .HasComment("Mã tham chiếu thanh toán - nội dung chuyển khoản")
                 .HasColumnName("payment_reference");
-            entity.Property(e => e.QrCodeData).HasColumnName("qr_code_data");
             entity.Property(e => e.QrCodeUrl)
                 .HasMaxLength(500)
                 .HasComment("URL QR code thanh toán")
@@ -1168,14 +1164,28 @@ public partial class StemDbContext : DbContext
 
             entity.ToTable("warranty_claim");
 
+            entity.HasIndex(e => e.UserId, "idx_warranty_claim_user");
+
+            entity.HasIndex(e => e.WarrantyId, "idx_warranty_claim_warranty");
+
             entity.Property(e => e.ClaimId).HasColumnName("claim_id");
             entity.Property(e => e.ClaimDate).HasColumnName("claim_date");
+            entity.Property(e => e.ContactPhone)
+                .HasMaxLength(20)
+                .HasComment("SĐT liên hệ khách hàng khi gửi yêu cầu bảo hành")
+                .HasColumnName("contact_phone");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("created_at");
             entity.Property(e => e.IssueDescription).HasColumnName("issue_description");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasColumnName("status");
             entity.Property(e => e.Resolution).HasColumnName("resolution");
+            entity.Property(e => e.ResolutionNote)
+                .HasComment("Ghi chú xử lý từ admin/staff khi resolve claim")
+                .HasColumnName("resolution_note");
             entity.Property(e => e.ResolvedDate).HasColumnName("resolved_date");
             entity.Property(e => e.UserId).HasColumnName("user_id");
             entity.Property(e => e.WarrantyId).HasColumnName("warranty_id");

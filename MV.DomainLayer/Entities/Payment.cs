@@ -19,8 +19,6 @@ public partial class Payment
 
     public string? BankCode { get; set; }
 
-    public string? BankAccount { get; set; }
-
     public string? GatewayResponse { get; set; }
 
     /// <summary>
@@ -44,8 +42,6 @@ public partial class Payment
     /// URL QR code thanh toán
     /// </summary>
     public string? QrCodeUrl { get; set; }
-
-    public string? QrCodeData { get; set; }
 
     /// <summary>
     /// Số lần thanh toán thất bại

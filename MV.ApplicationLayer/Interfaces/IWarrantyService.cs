@@ -16,4 +16,5 @@ public interface IWarrantyService
     Task<ApiResponse<WarrantyResponse>> UpdateAsync(int id, UpdateWarrantyRequest request);
     Task<ApiResponse<bool>> DeleteAsync(int id);
     Task<ApiResponse<WarrantyResponse>> ActivateWarrantyAsync(string serialNumber);
+    Task<ApiResponse<IEnumerable<MyWarrantyResponse>>> GetMyWarrantiesAsync(int userId);
 }
