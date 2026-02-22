@@ -127,7 +127,7 @@ public class WarrantyController : ControllerBase
     /// Tạo bảo hành mới (Admin only)
     /// </summary>
     [HttpPost]
-    // [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [SwaggerOperation(Summary = "Create new warranty")]
     public async Task<IActionResult> Create([FromBody] CreateWarrantyRequest request)
     {
@@ -150,7 +150,7 @@ public class WarrantyController : ControllerBase
     /// Cập nhật thông tin bảo hành (Admin only)
     /// </summary>
     [HttpPut("{id}")]
-    // [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [SwaggerOperation(Summary = "Update warranty")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateWarrantyRequest request)
     {
@@ -173,7 +173,7 @@ public class WarrantyController : ControllerBase
     /// Xóa bảo hành (Admin only)
     /// </summary>
     [HttpDelete("{id}")]
-    // [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [SwaggerOperation(Summary = "Delete warranty")]
     public async Task<IActionResult> Delete(int id)
     {

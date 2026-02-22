@@ -1179,6 +1179,9 @@ public partial class StemDbContext : DbContext
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("created_at");
             entity.Property(e => e.IssueDescription).HasColumnName("issue_description");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasColumnName("status");
             entity.Property(e => e.Resolution).HasColumnName("resolution");
             entity.Property(e => e.ResolutionNote)
                 .HasComment("Ghi chú xử lý từ admin/staff khi resolve claim")

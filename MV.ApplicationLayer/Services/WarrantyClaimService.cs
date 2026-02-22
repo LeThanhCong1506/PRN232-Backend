@@ -56,7 +56,7 @@ public class WarrantyClaimService : IWarrantyClaimService
             ClaimDate = today,
             IssueDescription = request.IssueDescription,
             ContactPhone = request.ContactPhone,
-            Resolution = "SUBMITTED",
+            Status = "SUBMITTED",
             CreatedAt = DateTime.Now
         };
 
@@ -83,7 +83,7 @@ public class WarrantyClaimService : IWarrantyClaimService
         var items = claims.Select(c => new AdminWarrantyClaimResponse
         {
             ClaimId = c.ClaimId,
-            Status = c.Resolution ?? "SUBMITTED",
+            Status = c.Status ?? "SUBMITTED",
             Customer = new ClaimCustomerInfo
             {
                 UserId = c.UserId,
@@ -130,7 +130,7 @@ public class WarrantyClaimService : IWarrantyClaimService
         }
 
         // Cập nhật claim
-        claim.Resolution = request.Resolution;
+        claim.Status = request.Resolution;
         claim.ResolutionNote = request.ResolutionNote;
         claim.ResolvedDate = DateOnly.FromDateTime(DateTime.Today);
 
@@ -159,7 +159,7 @@ public class WarrantyClaimService : IWarrantyClaimService
         var response = new ResolveWarrantyClaimResponse
         {
             ClaimId = claim.ClaimId,
-            Status = claim.Resolution!,
+            Status = claim.Status!,
             ResolutionNote = claim.ResolutionNote,
             ResolvedDate = claim.ResolvedDate ?? DateOnly.FromDateTime(DateTime.Today)
         };

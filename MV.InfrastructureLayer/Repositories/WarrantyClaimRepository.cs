@@ -48,7 +48,7 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
 
         if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(c => c.Resolution == status);
+            query = query.Where(c => c.Status == status);
         }
 
         return await query
@@ -64,7 +64,7 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
 
         if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(c => c.Resolution == status);
+            query = query.Where(c => c.Status == status);
         }
 
         return await query.CountAsync();

@@ -15,6 +15,8 @@ public partial class WarrantyClaim
 
     public string IssueDescription { get; set; } = null!;
 
+    public string? Status { get; set; }
+
     public string? Resolution { get; set; }
 
     public DateOnly? ResolvedDate { get; set; }

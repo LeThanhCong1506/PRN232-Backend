@@ -159,7 +159,8 @@ namespace MV.PresentationLayer
                             "product_type_enum",
                             schemaName: null,
                             nameTranslator: new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
-                    }));
+                    })
+                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)));
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
