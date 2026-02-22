@@ -14,4 +14,5 @@ public interface IWarrantyRepository
     Task UpdateAsync(Warranty warranty);
     Task DeleteAsync(int id);
     Task<bool> SerialNumberExistsAsync(string serialNumber, int? excludeId = null);
+    Task<IEnumerable<Warranty>> GetWarrantiesByUserIdAsync(int userId);
 }

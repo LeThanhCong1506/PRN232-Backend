@@ -161,6 +161,50 @@ public class WarrantyService : IWarrantyService
         return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty activated successfully.");
     }
 
+    public async Task<ApiResponse<IEnumerable<MyWarrantyResponse>>> GetMyWarrantiesAsync(int userId)
+    {
+        var warranties = await _warrantyRepository.GetWarrantiesByUserIdAsync(userId);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        var response = warranties.Select(w =>
+        {
+            var monthsRemaining = ((w.EndDate.Year - today.Year) * 12) + (w.EndDate.Month - today.Month);
+            if (monthsRemaining < 0) monthsRemaining = 0;
+
+            string status;
+            if (w.IsActive == true && w.EndDate >= today)
+                status = "ACTIVE";
+            else if (w.EndDate < today)
+                status = "EXPIRED";
+            else
+                status = "VOID";
+
+            // Lấy ảnh primary, nếu không có thì lấy ảnh đầu tiên
+            var primaryImage = w.SerialNumberNavigation?.Product?.ProductImages
+                ?.FirstOrDefault(img => img.IsPrimary == true)?.ImageUrl
+                ?? w.SerialNumberNavigation?.Product?.ProductImages?.FirstOrDefault()?.ImageUrl;
+
+            return new MyWarrantyResponse
+            {
+                WarrantyId = w.WarrantyId,
+                Product = new MyWarrantyProductInfo
+                {
+                    ProductId = w.SerialNumberNavigation.Product.ProductId,
+                    Name = w.SerialNumberNavigation.Product.Name,
+                    Image = primaryImage
+                },
+                SerialNumber = w.SerialNumber,
+                PurchaseDate = w.StartDate,
+                ExpiryDate = w.EndDate,
+                MonthsRemaining = monthsRemaining,
+                Status = status,
+                PolicyName = w.WarrantyPolicy.PolicyName
+            };
+        });
+
+        return ApiResponse<IEnumerable<MyWarrantyResponse>>.SuccessResponse(response);
+    }
+
     private WarrantyResponse MapToResponse(Warranty warranty)
     {
         return new WarrantyResponse

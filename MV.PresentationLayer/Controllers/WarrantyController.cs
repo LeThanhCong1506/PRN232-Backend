@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Warranty.Request;
 using Swashbuckle.AspNetCore.Annotations;
+using System.Security.Claims;
 
 namespace MV.PresentationLayer.Controllers;
 
@@ -18,6 +19,24 @@ public class WarrantyController : ControllerBase
     public WarrantyController(IWarrantyService warrantyService)
     {
         _warrantyService = warrantyService;
+    }
+
+    /// <summary>
+    /// Lấy danh sách bảo hành của customer đang đăng nhập
+    /// </summary>
+    [HttpGet("/api/warranties")]
+    [Authorize]
+    [SwaggerOperation(Summary = "Get my warranties (Customer)")]
+    public async Task<IActionResult> GetMyWarranties()
+    {
+        var userId = GetUserId();
+        if (userId == 0)
+        {
+            return Unauthorized();
+        }
+
+        var result = await _warrantyService.GetMyWarrantiesAsync(userId);
+        return Ok(result);
     }
 
     /// <summary>
@@ -166,5 +185,11 @@ public class WarrantyController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    private int GetUserId()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+        return userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId) ? userId : 0;
     }
 }

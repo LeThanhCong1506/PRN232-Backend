@@ -109,4 +109,20 @@ public class WarrantyRepository : IWarrantyRepository
         }
         return await _context.Warranties.AnyAsync(w => w.SerialNumber == serialNumber);
     }
+
+    public async Task<IEnumerable<Warranty>> GetWarrantiesByUserIdAsync(int userId)
+    {
+        return await _context.Warranties
+            .Include(w => w.WarrantyPolicy)
+            .Include(w => w.SerialNumberNavigation)
+                .ThenInclude(pi => pi.Product)
+                    .ThenInclude(p => p.ProductImages)
+            .Include(w => w.SerialNumberNavigation)
+                .ThenInclude(pi => pi.OrderItem!)
+                    .ThenInclude(oi => oi.Order)
+            .Where(w => w.SerialNumberNavigation.OrderItem != null
+                     && w.SerialNumberNavigation.OrderItem.Order.UserId == userId)
+            .OrderByDescending(w => w.CreatedAt)
+            .ToListAsync();
+    }
 }
