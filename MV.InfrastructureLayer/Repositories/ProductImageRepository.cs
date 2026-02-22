@@ -53,7 +53,7 @@ public class ProductImageRepository : IProductImageRepository
     public async Task ClearPrimaryByProductIdAsync(int productId)
     {
         var images = await _context.ProductImages
-            .Where(pi => pi.ProductId == productId && pi.IsPrimary)
+            .Where(pi => pi.ProductId == productId && pi.IsPrimary == true)
             .ToListAsync();
 
         foreach (var img in images)

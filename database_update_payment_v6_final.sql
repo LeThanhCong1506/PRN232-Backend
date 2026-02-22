@@ -89,6 +89,18 @@ BEGIN
     END IF;
 END $$;
 
+-- ============================================
+-- PHẦN 0: CẬP NHẬT BẢNG PRODUCT
+
+-- PRODUCT
+ALTER TABLE PRODUCT ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE PRODUCT ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+
+-- PRODUCT_IMAGE
+ALTER TABLE PRODUCT_IMAGE ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT FALSE;
+
+-- ============================================
+
 
 -- ============================================
 -- PHẦN 3: CẬP NHẬT BẢNG USER
@@ -178,7 +190,6 @@ ALTER TABLE ORDER_ITEM ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CUR
 -- 6a. Transaction tracking
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(100);
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS bank_code VARCHAR(50);
-ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS bank_account VARCHAR(50);
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS gateway_response TEXT;
 
 -- 6b. SePay specific fields
@@ -189,13 +200,16 @@ ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURREN
 -- 6c. QR Code & extra tracking
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS received_amount NUMERIC(12, 2);
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS qr_code_url VARCHAR(500);
-ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS qr_code_data TEXT;
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- 6d. Manual verification by admin
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS verified_by INTEGER;
 ALTER TABLE PAYMENT ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP;
+
+-- 6e. Cleanup: xóa các cột không sử dụng (luôn NULL)
+ALTER TABLE PAYMENT DROP COLUMN IF EXISTS bank_account;
+ALTER TABLE PAYMENT DROP COLUMN IF EXISTS qr_code_data;
 
 DO $$
 BEGIN
@@ -519,7 +533,27 @@ COMMENT ON COLUMN COUPON.discount_type IS 'FIXED_AMOUNT hoặc PERCENTAGE';
 
 
 -- ============================================
--- PHẦN 16: KIỂM TRA KẾT QUẢ
+-- PHẦN 16: CẬP NHẬT BẢNG WARRANTY_CLAIM
+-- (Cho Sprint 4.3: BE-4.3.2, BE-4.3.3, BE-4.3.4)
+-- ============================================
+
+-- 16a. Thêm cột SĐT liên hệ khi gửi claim
+ALTER TABLE WARRANTY_CLAIM ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(20);
+
+-- 16b. Thêm ghi chú xử lý từ admin
+ALTER TABLE WARRANTY_CLAIM ADD COLUMN IF NOT EXISTS resolution_note TEXT;
+
+-- 16c. Index cho việc lọc claim theo status (admin dashboard)
+CREATE INDEX IF NOT EXISTS idx_warranty_claim_status ON WARRANTY_CLAIM(status);
+CREATE INDEX IF NOT EXISTS idx_warranty_claim_user ON WARRANTY_CLAIM(user_id);
+CREATE INDEX IF NOT EXISTS idx_warranty_claim_warranty ON WARRANTY_CLAIM(warranty_id);
+
+COMMENT ON COLUMN WARRANTY_CLAIM.contact_phone IS 'SĐT liên hệ khách hàng khi gửi yêu cầu bảo hành';
+COMMENT ON COLUMN WARRANTY_CLAIM.resolution_note IS 'Ghi chú xử lý từ admin/staff khi resolve claim';
+
+
+-- ============================================
+-- PHẦN 17: KIỂM TRA KẾT QUẢ
 -- ============================================
 
 SELECT '========================================' AS separator;
@@ -532,6 +566,9 @@ SELECT enum_range(NULL::payment_method_enum) AS payment_methods;
 
 SELECT 'payment_status_enum values:' AS check_name;
 SELECT enum_range(NULL::payment_status_enum) AS payment_statuses;
+
+SELECT 'claim_status_enum values:' AS check_name;
+SELECT enum_range(NULL::claim_status_enum) AS claim_statuses;
 
 -- Kiểm tra bảng ORDER_HEADER
 SELECT 'ORDER_HEADER columns:' AS check_name;
@@ -550,6 +587,12 @@ SELECT 'ORDER_ITEM columns:' AS check_name;
 SELECT column_name, data_type, is_nullable
 FROM information_schema.columns
 WHERE table_name = 'order_item' ORDER BY ordinal_position;
+
+-- Kiểm tra bảng WARRANTY_CLAIM
+SELECT 'WARRANTY_CLAIM columns:' AS check_name;
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'warranty_claim' ORDER BY ordinal_position;
 
 -- Kiểm tra bảng SEPAY
 SELECT 'SEPAY tables:' AS check_name;
@@ -570,3 +613,4 @@ ORDER BY table_name;
 SELECT '========================================' AS separator;
 SELECT 'HOÀN TẤT CẬP NHẬT THÀNH CÔNG!' AS status;
 SELECT '========================================' AS separator;
+

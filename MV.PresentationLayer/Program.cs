@@ -120,6 +120,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
             builder.Services.AddScoped<IProductBundleRepository, ProductBundleRepository>();
             builder.Services.AddScoped<IWarrantyRepository, WarrantyRepository>();
+            builder.Services.AddScoped<IWarrantyClaimRepository, WarrantyClaimRepository>();
             builder.Services.AddScoped<IOrderRepository, OrderRepository>();
             builder.Services.AddScoped<ISepayRepository, SepayRepository>();
             builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
@@ -136,6 +137,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageService, ProductImageService>();
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
+            builder.Services.AddScoped<IWarrantyClaimService, WarrantyClaimService>();
             builder.Services.AddScoped<ICheckoutService, CheckoutService>();
             builder.Services.AddScoped<IAdminProductService, AdminProductService>();
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();

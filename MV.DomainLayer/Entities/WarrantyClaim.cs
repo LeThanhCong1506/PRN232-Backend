@@ -21,6 +21,16 @@ public partial class WarrantyClaim
 
     public DateTime? CreatedAt { get; set; }
 
+    /// <summary>
+    /// SĐT liên hệ khách hàng khi gửi yêu cầu bảo hành
+    /// </summary>
+    public string? ContactPhone { get; set; }
+
+    /// <summary>
+    /// Ghi chú xử lý từ admin/staff khi resolve claim
+    /// </summary>
+    public string? ResolutionNote { get; set; }
+
     public virtual User User { get; set; } = null!;
 
     public virtual Warranty Warranty { get; set; } = null!;

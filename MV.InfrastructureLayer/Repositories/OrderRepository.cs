@@ -56,16 +56,16 @@ public class OrderRepository : IOrderRepository
             cmd.CommandText = @"
                 INSERT INTO payment (
                     order_id, amount, payment_date, created_at,
-                    transaction_id, bank_code, bank_account, gateway_response,
+                    transaction_id, bank_code, gateway_response,
                     expired_at, payment_reference, updated_at,
-                    received_amount, qr_code_url, qr_code_data,
+                    received_amount, qr_code_url,
                     retry_count, notes, verified_by, verified_at,
                     payment_method, status
                 ) VALUES (
                     @order_id, @amount, @payment_date, @created_at,
-                    @transaction_id, @bank_code, @bank_account, @gateway_response,
+                    @transaction_id, @bank_code, @gateway_response,
                     @expired_at, @payment_reference, @updated_at,
-                    @received_amount, @qr_code_url, @qr_code_data,
+                    @received_amount, @qr_code_url,
                     @retry_count, @notes, @verified_by, @verified_at,
                     @payment_method::payment_method_enum, @status::payment_status_enum
                 ) RETURNING payment_id";
@@ -76,14 +76,12 @@ public class OrderRepository : IOrderRepository
             cmd.Parameters.Add(new NpgsqlParameter("@created_at", (object?)payment.CreatedAt ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@transaction_id", (object?)payment.TransactionId ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@bank_code", (object?)payment.BankCode ?? DBNull.Value));
-            cmd.Parameters.Add(new NpgsqlParameter("@bank_account", (object?)payment.BankAccount ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@gateway_response", (object?)payment.GatewayResponse ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@expired_at", (object?)payment.ExpiredAt ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@payment_reference", (object?)payment.PaymentReference ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@updated_at", (object?)payment.UpdatedAt ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@received_amount", (object?)payment.ReceivedAmount ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@qr_code_url", (object?)payment.QrCodeUrl ?? DBNull.Value));
-            cmd.Parameters.Add(new NpgsqlParameter("@qr_code_data", (object?)payment.QrCodeData ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@retry_count", (object?)payment.RetryCount ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@notes", (object?)payment.Notes ?? DBNull.Value));
             cmd.Parameters.Add(new NpgsqlParameter("@verified_by", (object?)payment.VerifiedBy ?? DBNull.Value));

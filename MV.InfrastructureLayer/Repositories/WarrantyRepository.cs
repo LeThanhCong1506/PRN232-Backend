@@ -20,6 +20,9 @@ public class WarrantyRepository : IWarrantyRepository
             .Include(w => w.WarrantyPolicy)
             .Include(w => w.SerialNumberNavigation)
                 .ThenInclude(pi => pi.Product)
+            .Include(w => w.SerialNumberNavigation)
+                .ThenInclude(pi => pi.OrderItem!)
+                    .ThenInclude(oi => oi.Order)
             .FirstOrDefaultAsync(w => w.WarrantyId == id);
     }
 

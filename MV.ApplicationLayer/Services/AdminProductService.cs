@@ -50,11 +50,11 @@ public class AdminProductService : IAdminProductService
             ProductType = p.ProductType,
             Price = p.Price,
             StockQuantity = p.StockQuantity ?? 0,
-            IsActive = p.IsActive,
+            IsActive = p.IsActive == true,
             BrandName = p.Brand?.Name,
             Categories = p.Categories.Select(c => c.Name).ToList(),
             PrimaryImage = p.ProductImages
-                .Where(i => i.IsPrimary)
+                .Where(i => i.IsPrimary == true)
                 .Select(i => i.ImageUrl)
                 .FirstOrDefault()
                 ?? p.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
@@ -183,7 +183,7 @@ public class AdminProductService : IAdminProductService
         Directory.CreateDirectory(uploadDir);
 
         var existingImages = await _imageRepo.GetByProductIdAsync(productId);
-        var hasExistingPrimary = existingImages.Any(i => i.IsPrimary);
+        var hasExistingPrimary = existingImages.Any(i => i.IsPrimary == true);
 
         var uploadedImages = new List<AdminProductImageResponse>();
 
@@ -222,7 +222,7 @@ public class AdminProductService : IAdminProductService
             {
                 ImageId = saved.ImageId,
                 ImageUrl = saved.ImageUrl,
-                IsPrimary = saved.IsPrimary
+                IsPrimary = saved.IsPrimary == true
             });
         }
 
@@ -244,7 +244,7 @@ public class AdminProductService : IAdminProductService
         if (File.Exists(filePath))
             File.Delete(filePath);
 
-        var wasPrimary = image.IsPrimary;
+        var wasPrimary = image.IsPrimary == true;
         await _imageRepo.DeleteAsync(imageId);
 
         // If deleted image was primary, set next image as primary
