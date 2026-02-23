@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MV.DomainLayer.DTO
+namespace MV.DomainLayer.DTOs.Login.Response
 {
     public class LoginDto
     {

@@ -1,7 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
-using MV.DomainLayer.DTO;
+using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Response;
 
 namespace MV.PresentationLayer.Controllers
 {
@@ -20,11 +21,19 @@ namespace MV.PresentationLayer.Controllers
         public async Task<IActionResult> Register(CreateUserDto dto)
         {
             var result = await _service.CreateAsync(dto);
-
-            if (result != "OK")
+            if (result == "OK")
+                return Ok("Tạo tài khoản thành công");
+            else
                 return BadRequest(result);
-
-            return Ok("Tạo tài khoản thành công");
+            //try
+            //{
+            //    await _service.CreateAsync(dto);
+            //    return Ok("Tạo tài khoản thành công");
+            //}
+            //catch (Exception ex)
+            //{
+            //    return BadRequest(ex.Message);
+            //}
         }
 
         [HttpPost("login")]
@@ -47,7 +56,7 @@ namespace MV.PresentationLayer.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public async Task<IActionResult> GetById(int id)
         {
             var user = await _service.GetByIdAsync(id);
@@ -55,6 +64,25 @@ namespace MV.PresentationLayer.Controllers
                 return NotFound("User không tồn tại");
 
             return Ok(user);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateUserDto dto)
+        {
+            var result = await _service.UpdateAsync(id, dto);
+            if (result == true)
+                return Ok("Update thành công");
+            else
+                return BadRequest(result);
+            //try
+            //{
+            //    await _service.UpdateAsync(id, dto);
+            //    return Ok("Update thành công");
+            //}
+            //catch (Exception ex)
+            //{
+            //    return BadRequest(ex.Message);
+            //}
         }
     }
 }

@@ -13,5 +13,7 @@ public partial class ProductImage
 
     public DateTime? CreatedAt { get; set; }
 
+    public bool? IsPrimary { get; set; }
+
     public virtual Product Product { get; set; } = null!;
 }

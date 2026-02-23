@@ -123,10 +123,14 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageRepository, ProductImageRepository>();
             builder.Services.AddScoped<IProductBundleRepository, ProductBundleRepository>();
             builder.Services.AddScoped<IWarrantyRepository, WarrantyRepository>();
-
-
+            builder.Services.AddScoped<IWarrantyClaimRepository, WarrantyClaimRepository>();
+            builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+            builder.Services.AddScoped<ISepayRepository, SepayRepository>();
+            builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
 
             builder.Services.AddScoped<IRoleService, RoleService>();
+            builder.Services.AddScoped<IOrderService, OrderService>();
+            builder.Services.AddScoped<IPaymentService, PaymentService>();
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<ICartService, CartService>();
@@ -136,6 +140,17 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductImageService, ProductImageService>();
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
+            builder.Services.AddScoped<IWarrantyClaimService, WarrantyClaimService>();
+            builder.Services.AddScoped<ICheckoutService, CheckoutService>();
+            builder.Services.AddScoped<IAdminProductService, AdminProductService>();
+            builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
+            builder.Services.AddScoped<IReviewService, ReviewService>();
+
+            // Background service: auto-expire overdue SEPAY payments every 60 seconds
+            builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
+
+            // Background service: polling SePay API mỗi 15s kiểm tra giao dịch mới → tự cập nhật COMPLETED
+            builder.Services.AddHostedService<SepayPollingBackgroundService>();
 
             // Register DbContext with connection string from appsettings
             // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
@@ -149,7 +164,7 @@ namespace MV.PresentationLayer
                             schemaName: null,
                             nameTranslator: new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
                     })
-                .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning)));
+                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)));
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
@@ -167,6 +182,8 @@ namespace MV.PresentationLayer
             }
 
             app.UseHttpsRedirection();
+
+            app.UseStaticFiles();
 
             // Enable CORS - must be before Authentication/Authorization
             app.UseCors("AllowFrontend");

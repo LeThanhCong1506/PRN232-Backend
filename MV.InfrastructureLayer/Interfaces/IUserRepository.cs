@@ -16,5 +16,6 @@ namespace MV.InfrastructureLayer.Interfaces
         Task<User?> GetByEmailAsync(string email);
         Task<List<User>> GetAllAsync();
         Task<User?> GetByIdAsync(int id);
+        Task<bool> UpdateAsync(User user);
     }
 }

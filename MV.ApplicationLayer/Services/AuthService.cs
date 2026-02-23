@@ -31,7 +31,7 @@ public class AuthService : IAuthService
         var emailExists = await _context.Users.AnyAsync(u => u.Email == request.Email);
         if (emailExists)
         {
-            errors.Add("Email already exists");
+            errors.Add("Email already exists.");
         }
 
         // Check username uniqueness
@@ -43,14 +43,14 @@ public class AuthService : IAuthService
 
         if (errors.Count > 0)
         {
-            return ApiResponse<AuthResponseDto>.ErrorResponse("Validation failed", errors);
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Validation failed.", errors);
         }
 
         // Get Customer role (role_id = 2)
         var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Customer");
         if (customerRole == null)
         {
-            return ApiResponse<AuthResponseDto>.ErrorResponse("Customer role not found");
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Customer role not found.");
         }
 
         // Create new user
@@ -81,7 +81,7 @@ public class AuthService : IAuthService
             Token = token
         };
 
-        return ApiResponse<AuthResponseDto>.SuccessResponse(response, "Registration successful");
+        return ApiResponse<AuthResponseDto>.SuccessResponse(response, "Registration successful.");
     }
 
     public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginRequestDto request)
@@ -93,19 +93,19 @@ public class AuthService : IAuthService
 
         if (user == null)
         {
-            return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password");
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password.");
         }
 
         // Verify password
         if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
-            return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password");
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Invalid email or password.");
         }
 
         // Check if user is active
         if (user.IsActive != true)
         {
-            return ApiResponse<AuthResponseDto>.ErrorResponse("Account is deactivated");
+            return ApiResponse<AuthResponseDto>.ErrorResponse("Account is deactivated.");
         }
 
         // Generate JWT token
@@ -124,7 +124,7 @@ public class AuthService : IAuthService
             ExpiresIn = expiryHours * 3600
         };
 
-        return ApiResponse<AuthResponseDto>.SuccessResponse(response, "Login successful");
+        return ApiResponse<AuthResponseDto>.SuccessResponse(response, "Login successful.");
     }
 
     public async Task<ApiResponse<UserProfileResponseDto>> GetProfileAsync(int userId)
@@ -135,7 +135,7 @@ public class AuthService : IAuthService
 
         if (user == null)
         {
-            return ApiResponse<UserProfileResponseDto>.ErrorResponse("User not found");
+            return ApiResponse<UserProfileResponseDto>.ErrorResponse("User not found.");
         }
 
         var response = new UserProfileResponseDto
@@ -156,7 +156,7 @@ public class AuthService : IAuthService
     private string GenerateJwtToken(User user, string roleName)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured.");
         var issuer = jwtSettings["Issuer"];
         var audience = jwtSettings["Audience"];
         var expiryHours = _configuration.GetValue<int>("JwtSettings:ExpiryHours", 1);

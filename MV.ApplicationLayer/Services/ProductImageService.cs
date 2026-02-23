@@ -25,7 +25,7 @@ public class ProductImageService : IProductImageService
         // Validate product exists
         if (!await _productRepository.ExistsAsync(productId))
         {
-            return ApiResponse<ProductImageResponse>.ErrorResponse($"Product with ID {productId} not found");
+            return ApiResponse<ProductImageResponse>.ErrorResponse($"Product with ID {productId} not found.");
         }
 
         var productImage = new ProductImage
@@ -44,25 +44,25 @@ public class ProductImageService : IProductImageService
             CreatedAt = created.CreatedAt
         };
 
-        return ApiResponse<ProductImageResponse>.SuccessResponse(response, "Image added successfully");
+        return ApiResponse<ProductImageResponse>.SuccessResponse(response, "Image added successfully.");
     }
 
     public async Task<ApiResponse<bool>> DeleteImageAsync(int imageId)
     {
         if (!await _imageRepository.ExistsAsync(imageId))
         {
-            return ApiResponse<bool>.ErrorResponse($"Image with ID {imageId} not found");
+            return ApiResponse<bool>.ErrorResponse($"Image with ID {imageId} not found.");
         }
 
         await _imageRepository.DeleteAsync(imageId);
-        return ApiResponse<bool>.SuccessResponse(true, "Image deleted successfully");
+        return ApiResponse<bool>.SuccessResponse(true, "Image deleted successfully.");
     }
 
     public async Task<ApiResponse<List<ProductImageResponse>>> GetImagesByProductIdAsync(int productId)
     {
         if (!await _productRepository.ExistsAsync(productId))
         {
-            return ApiResponse<List<ProductImageResponse>>.ErrorResponse($"Product with ID {productId} not found");
+            return ApiResponse<List<ProductImageResponse>>.ErrorResponse($"Product with ID {productId} not found.");
         }
 
         var images = await _imageRepository.GetByProductIdAsync(productId);
@@ -75,6 +75,6 @@ public class ProductImageService : IProductImageService
             CreatedAt = img.CreatedAt
         }).ToList();
 
-        return ApiResponse<List<ProductImageResponse>>.SuccessResponse(response, "Images retrieved successfully");
+        return ApiResponse<List<ProductImageResponse>>.SuccessResponse(response, "Images retrieved successfully.");
     }
 }

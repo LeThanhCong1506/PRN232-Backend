@@ -1,13 +1,10 @@
 ﻿using MV.ApplicationLayer.Interfaces;
-using MV.DomainLayer.DTO;
+using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Response;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace MV.ApplicationLayer.Services
 {
@@ -25,10 +22,13 @@ namespace MV.ApplicationLayer.Services
         public async Task<string> CreateAsync(CreateUserDto dto)
         {
             if (await _repo.ExistsUsernameAsync(dto.Username))
-                return "Username đã tồn tại";
+                return "The username already exists.";
 
             if (await _repo.ExistsEmailAsync(dto.Email))
-                return "Email đã tồn tại";
+                return "The email already exists.";
+
+            if (await _repo.ExistsPhoneAsync(dto.Phone!))
+                return "The phone number already exists.";
 
             var user = new User
             {
@@ -81,6 +81,8 @@ namespace MV.ApplicationLayer.Services
                 Username = u.Username,
                 Email = u.Email,
                 RoleName = u.Role.RoleName,
+                Phone = u.Phone,
+                Address = u.Address,
                 IsActive = u.IsActive,
                 CreatedAt = u.CreatedAt
             }).ToList();
@@ -97,9 +99,22 @@ namespace MV.ApplicationLayer.Services
                 Username = user.Username,
                 Email = user.Email,
                 RoleName = user.Role.RoleName,
+                Phone = user.Phone,
+                Address = user.Address,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt
             };
+        }
+
+        public async Task<bool> UpdateAsync(int id, UpdateUserDto dto)
+        {
+            var user = await _repo.GetByIdAsync(id);
+            if (user == null) return false;
+            user.Email = dto.Email;
+            user.Phone = dto.Phone;
+            user.Address = dto.Address;
+            await _repo.UpdateAsync(user);
+            return true;
         }
     }
 }

@@ -9,4 +9,6 @@ public interface IProductImageRepository
     Task<List<ProductImage>> GetByProductIdAsync(int productId);
     Task<ProductImage?> GetByIdAsync(int imageId);
     Task<bool> ExistsAsync(int imageId);
+    Task ClearPrimaryByProductIdAsync(int productId);
+    Task SetPrimaryAsync(int imageId);
 }

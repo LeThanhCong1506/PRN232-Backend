@@ -22,7 +22,7 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
         var response = MapToResponse(warranty);
@@ -35,7 +35,7 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found.");
         }
 
         var response = MapToResponse(warranty);
@@ -75,13 +75,13 @@ public class WarrantyService : IWarrantyService
         // Validate serial number exists
         if (await _warrantyRepository.SerialNumberExistsAsync(request.SerialNumber))
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty for serial number {request.SerialNumber} already exists");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty for serial number {request.SerialNumber} already exists.");
         }
 
         // Validate dates
         if (request.EndDate <= request.StartDate)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse("End date must be after start date");
+            return ApiResponse<WarrantyResponse>.ErrorResponse("End date must be after start date.");
         }
 
         var warranty = new Warranty
@@ -99,7 +99,7 @@ public class WarrantyService : IWarrantyService
         var result = await _warrantyRepository.GetByIdAsync(created.WarrantyId);
         var response = MapToResponse(result!);
 
-        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty created successfully");
+        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty created successfully.");
     }
 
     public async Task<ApiResponse<WarrantyResponse>> UpdateAsync(int id, UpdateWarrantyRequest request)
@@ -108,7 +108,7 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
         warranty.EndDate = request.EndDate;
@@ -120,7 +120,7 @@ public class WarrantyService : IWarrantyService
         var updated = await _warrantyRepository.GetByIdAsync(id);
         var response = MapToResponse(updated!);
 
-        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty updated successfully");
+        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty updated successfully.");
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
@@ -129,11 +129,11 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<bool>.ErrorResponse($"Warranty with ID {id} not found");
+            return ApiResponse<bool>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
         await _warrantyRepository.DeleteAsync(id);
-        return ApiResponse<bool>.SuccessResponse(true, "Warranty deleted successfully");
+        return ApiResponse<bool>.SuccessResponse(true, "Warranty deleted successfully.");
     }
 
     public async Task<ApiResponse<WarrantyResponse>> ActivateWarrantyAsync(string serialNumber)
@@ -142,12 +142,12 @@ public class WarrantyService : IWarrantyService
 
         if (warranty == null)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found");
+            return ApiResponse<WarrantyResponse>.ErrorResponse($"Warranty with serial number {serialNumber} not found.");
         }
 
         if (warranty.IsActive == true)
         {
-            return ApiResponse<WarrantyResponse>.ErrorResponse("Warranty is already activated");
+            return ApiResponse<WarrantyResponse>.ErrorResponse("Warranty is already activated.");
         }
 
         warranty.IsActive = true;
@@ -158,7 +158,51 @@ public class WarrantyService : IWarrantyService
         var updated = await _warrantyRepository.GetBySerialNumberAsync(serialNumber);
         var response = MapToResponse(updated!);
 
-        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty activated successfully");
+        return ApiResponse<WarrantyResponse>.SuccessResponse(response, "Warranty activated successfully.");
+    }
+
+    public async Task<ApiResponse<IEnumerable<MyWarrantyResponse>>> GetMyWarrantiesAsync(int userId)
+    {
+        var warranties = await _warrantyRepository.GetWarrantiesByUserIdAsync(userId);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        var response = warranties.Select(w =>
+        {
+            var monthsRemaining = ((w.EndDate.Year - today.Year) * 12) + (w.EndDate.Month - today.Month);
+            if (monthsRemaining < 0) monthsRemaining = 0;
+
+            string status;
+            if (w.IsActive == true && w.EndDate >= today)
+                status = "ACTIVE";
+            else if (w.EndDate < today)
+                status = "EXPIRED";
+            else
+                status = "VOID";
+
+            // Lấy ảnh primary, nếu không có thì lấy ảnh đầu tiên
+            var primaryImage = w.SerialNumberNavigation?.Product?.ProductImages
+                ?.FirstOrDefault(img => img.IsPrimary == true)?.ImageUrl
+                ?? w.SerialNumberNavigation?.Product?.ProductImages?.FirstOrDefault()?.ImageUrl;
+
+            return new MyWarrantyResponse
+            {
+                WarrantyId = w.WarrantyId,
+                Product = new MyWarrantyProductInfo
+                {
+                    ProductId = w.SerialNumberNavigation.Product.ProductId,
+                    Name = w.SerialNumberNavigation.Product.Name,
+                    Image = primaryImage
+                },
+                SerialNumber = w.SerialNumber,
+                PurchaseDate = w.StartDate,
+                ExpiryDate = w.EndDate,
+                MonthsRemaining = monthsRemaining,
+                Status = status,
+                PolicyName = w.WarrantyPolicy.PolicyName
+            };
+        });
+
+        return ApiResponse<IEnumerable<MyWarrantyResponse>>.SuccessResponse(response);
     }
 
     private WarrantyResponse MapToResponse(Warranty warranty)

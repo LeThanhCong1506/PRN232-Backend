@@ -49,4 +49,28 @@ public class ProductImageRepository : IProductImageRepository
     {
         return await _context.ProductImages.AnyAsync(pi => pi.ImageId == imageId);
     }
+
+    public async Task ClearPrimaryByProductIdAsync(int productId)
+    {
+        var images = await _context.ProductImages
+            .Where(pi => pi.ProductId == productId && pi.IsPrimary == true)
+            .ToListAsync();
+
+        foreach (var img in images)
+        {
+            img.IsPrimary = false;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task SetPrimaryAsync(int imageId)
+    {
+        var image = await GetByIdAsync(imageId);
+        if (image != null)
+        {
+            image.IsPrimary = true;
+            await _context.SaveChangesAsync();
+        }
+    }
 }
