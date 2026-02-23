@@ -1,0 +1,469 @@
+﻿warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__userId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT c1.cart_id, c1.created_at, c1.user_id, s.cart_item_id, s.cart_id, s.created_at, s.product_id, s.quantity, s.product_id0, s.brand_id, s.created_at0, s.description, s.has_serial_tracking, s.name, s.price, s.product_type, s.sku, s.stock_quantity, s.warranty_policy_id, s.image_id, s.created_at1, s.image_url, s.product_id1
+      FROM (
+          SELECT c.cart_id, c.created_at, c.user_id
+          FROM cart AS c
+          WHERE c.user_id = @__userId_0
+          LIMIT 1
+      ) AS c1
+      LEFT JOIN (
+          SELECT c0.cart_item_id, c0.cart_id, c0.created_at, c0.product_id, c0.quantity, p.product_id AS product_id0, p.brand_id, p.created_at AS created_at0, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id, p0.image_id, p0.created_at AS created_at1, p0.image_url, p0.product_id AS product_id1
+          FROM cart_item AS c0
+          INNER JOIN product AS p ON c0.product_id = p.product_id
+          LEFT JOIN product_image AS p0 ON p.product_id = p0.product_id
+      ) AS s ON c1.cart_id = s.cart_id
+      ORDER BY c1.cart_id, s.cart_item_id, s.product_id0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (8ms) [Parameters=[@__productId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT s.product_id, s.brand_id, s.created_at, s.description, s.has_serial_tracking, s.name, s.price, s.product_type, s.sku, s.stock_quantity, s.warranty_policy_id, s.brand_id0, s.logo_url, s.name0, s.policy_id, s0.product_id, s0.category_id, s0.category_id0, s0.name, p1.image_id, p1.created_at, p1.image_url, p1.product_id, s.created_at0, s.description0, s.duration_months, s.is_active, s.policy_name, s.terms_and_conditions, s1.review_id, s1.comment, s1.created_at, s1.product_id, s1.rating, s1.user_id, s1.user_id0, s1.address, s1.created_at0, s1.email, s1.is_active, s1.password_hash, s1.phone, s1.role_id, s1.username
+      FROM (
+          SELECT p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id, b.brand_id AS brand_id0, b.logo_url, b.name AS name0, w.policy_id, w.created_at AS created_at0, w.description AS description0, w.duration_months, w.is_active, w.policy_name, w.terms_and_conditions
+          FROM product AS p
+          INNER JOIN brand AS b ON p.brand_id = b.brand_id
+          LEFT JOIN warranty_policy AS w ON p.warranty_policy_id = w.policy_id
+          WHERE p.product_id = @__productId_0
+          LIMIT 1
+      ) AS s
+      LEFT JOIN (
+          SELECT p0.product_id, p0.category_id, c.category_id AS category_id0, c.name
+          FROM product_category AS p0
+          INNER JOIN category AS c ON p0.category_id = c.category_id
+      ) AS s0 ON s.product_id = s0.product_id
+      LEFT JOIN product_image AS p1 ON s.product_id = p1.product_id
+      LEFT JOIN (
+          SELECT r.review_id, r.comment, r.created_at, r.product_id, r.rating, r.user_id, u.user_id AS user_id0, u.address, u.created_at AS created_at0, u.email, u.is_active, u.password_hash, u.phone, u.role_id, u.username
+          FROM review AS r
+          INNER JOIN "USER" AS u ON r.user_id = u.user_id
+      ) AS s1 ON s.product_id = s1.product_id
+      ORDER BY s.product_id, s.brand_id0, s.policy_id, s0.product_id, s0.category_id, s0.category_id0, p1.image_id, s1.review_id
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__parentProductId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p.bundle_id, p.child_product_id, p.created_at, p.parent_product_id, p.quantity, p0.product_id, p0.brand_id, p0.created_at, p0.description, p0.has_serial_tracking, p0.name, p0.price, p0.product_type, p0.sku, p0.stock_quantity, p0.warranty_policy_id, p1.product_id, p1.brand_id, p1.created_at, p1.description, p1.has_serial_tracking, p1.name, p1.price, p1.product_type, p1.sku, p1.stock_quantity, p1.warranty_policy_id
+      FROM product_bundle AS p
+      INNER JOIN product AS p0 ON p.parent_product_id = p0.product_id
+      INNER JOIN product AS p1 ON p.child_product_id = p1.product_id
+      WHERE p.parent_product_id = @__parentProductId_0
+      ORDER BY p.created_at
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[@__productId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT s.product_id, s.brand_id, s.created_at, s.description, s.has_serial_tracking, s.name, s.price, s.product_type, s.sku, s.stock_quantity, s.warranty_policy_id, s.brand_id0, s.logo_url, s.name0, s.policy_id, s0.product_id, s0.category_id, s0.category_id0, s0.name, p1.image_id, p1.created_at, p1.image_url, p1.product_id, s.created_at0, s.description0, s.duration_months, s.is_active, s.policy_name, s.terms_and_conditions, s1.review_id, s1.comment, s1.created_at, s1.product_id, s1.rating, s1.user_id, s1.user_id0, s1.address, s1.created_at0, s1.email, s1.is_active, s1.password_hash, s1.phone, s1.role_id, s1.username
+      FROM (
+          SELECT p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id, b.brand_id AS brand_id0, b.logo_url, b.name AS name0, w.policy_id, w.created_at AS created_at0, w.description AS description0, w.duration_months, w.is_active, w.policy_name, w.terms_and_conditions
+          FROM product AS p
+          INNER JOIN brand AS b ON p.brand_id = b.brand_id
+          LEFT JOIN warranty_policy AS w ON p.warranty_policy_id = w.policy_id
+          WHERE p.product_id = @__productId_0
+          LIMIT 1
+      ) AS s
+      LEFT JOIN (
+          SELECT p0.product_id, p0.category_id, c.category_id AS category_id0, c.name
+          FROM product_category AS p0
+          INNER JOIN category AS c ON p0.category_id = c.category_id
+      ) AS s0 ON s.product_id = s0.product_id
+      LEFT JOIN product_image AS p1 ON s.product_id = p1.product_id
+      LEFT JOIN (
+          SELECT r.review_id, r.comment, r.created_at, r.product_id, r.rating, r.user_id, u.user_id AS user_id0, u.address, u.created_at AS created_at0, u.email, u.is_active, u.password_hash, u.phone, u.role_id, u.username
+          FROM review AS r
+          INNER JOIN "USER" AS u ON r.user_id = u.user_id
+      ) AS s1 ON s.product_id = s1.product_id
+      ORDER BY s.product_id, s.brand_id0, s.policy_id, s0.product_id, s0.category_id, s0.category_id0, p1.image_id, s1.review_id
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__productId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id
+      FROM product AS p
+      WHERE p.product_id = @__productId_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__parentProductId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p.bundle_id, p.child_product_id, p.created_at, p.parent_product_id, p.quantity, p0.product_id, p0.brand_id, p0.created_at, p0.description, p0.has_serial_tracking, p0.name, p0.price, p0.product_type, p0.sku, p0.stock_quantity, p0.warranty_policy_id, p1.product_id, p1.brand_id, p1.created_at, p1.description, p1.has_serial_tracking, p1.name, p1.price, p1.product_type, p1.sku, p1.stock_quantity, p1.warranty_policy_id
+      FROM product_bundle AS p
+      INNER JOIN product AS p0 ON p.parent_product_id = p0.product_id
+      INNER JOIN product AS p1 ON p.child_product_id = p1.product_id
+      WHERE p.parent_product_id = @__parentProductId_0
+      ORDER BY p.created_at
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__parentProductId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p.bundle_id, p.child_product_id, p.created_at, p.parent_product_id, p.quantity, p0.product_id, p0.brand_id, p0.created_at, p0.description, p0.has_serial_tracking, p0.name, p0.price, p0.product_type, p0.sku, p0.stock_quantity, p0.warranty_policy_id, p1.product_id, p1.brand_id, p1.created_at, p1.description, p1.has_serial_tracking, p1.name, p1.price, p1.product_type, p1.sku, p1.stock_quantity, p1.warranty_policy_id
+      FROM product_bundle AS p
+      INNER JOIN product AS p0 ON p.parent_product_id = p0.product_id
+      INNER JOIN product AS p1 ON p.child_product_id = p1.product_id
+      WHERE p.parent_product_id = @__parentProductId_0
+      ORDER BY p.created_at
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id
+      FROM product AS p
+      WHERE p.product_id = @__p_0
+      LIMIT 1
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@__userId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT c1.cart_id, c1.created_at, c1.user_id, s.cart_item_id, s.cart_id, s.created_at, s.product_id, s.quantity, s.product_id0, s.brand_id, s.created_at0, s.description, s.has_serial_tracking, s.name, s.price, s.product_type, s.sku, s.stock_quantity, s.warranty_policy_id, s.image_id, s.created_at1, s.image_url, s.product_id1
+      FROM (
+          SELECT c.cart_id, c.created_at, c.user_id
+          FROM cart AS c
+          WHERE c.user_id = @__userId_0
+          LIMIT 1
+      ) AS c1
+      LEFT JOIN (
+          SELECT c0.cart_item_id, c0.cart_id, c0.created_at, c0.product_id, c0.quantity, p.product_id AS product_id0, p.brand_id, p.created_at AS created_at0, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id, p0.image_id, p0.created_at AS created_at1, p0.image_url, p0.product_id AS product_id1
+          FROM cart_item AS c0
+          INNER JOIN product AS p ON c0.product_id = p.product_id
+          LEFT JOIN product_image AS p0 ON p.product_id = p0.product_id
+      ) AS s ON c1.cart_id = s.cart_id
+      ORDER BY c1.cart_id, s.cart_item_id, s.product_id0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@__cartId_0='?' (DbType = Int32), @__productId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT c.cart_item_id, c.cart_id, c.created_at, c.product_id, c.quantity, p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id
+      FROM cart_item AS c
+      INNER JOIN product AS p ON c.product_id = p.product_id
+      WHERE c.cart_id = @__cartId_0 AND c.product_id = @__productId_1
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (20ms) [Parameters=[@p0='?' (DbType = Int32), @p1='?' (DbType = DateTime), @p2='?' (DbType = Int32), @p3='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      INSERT INTO cart_item (cart_id, created_at, product_id, quantity)
+      VALUES (@p0, @p1, @p2, @p3)
+      RETURNING cart_item_id;
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@__userId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT c1.cart_id, c1.created_at, c1.user_id, s.cart_item_id, s.cart_id, s.created_at, s.product_id, s.quantity, s.product_id0, s.brand_id, s.created_at0, s.description, s.has_serial_tracking, s.name, s.price, s.product_type, s.sku, s.stock_quantity, s.warranty_policy_id, s.image_id, s.created_at1, s.image_url, s.product_id1
+      FROM (
+          SELECT c.cart_id, c.created_at, c.user_id
+          FROM cart AS c
+          WHERE c.user_id = @__userId_0
+          LIMIT 1
+      ) AS c1
+      LEFT JOIN (
+          SELECT c0.cart_item_id, c0.cart_id, c0.created_at, c0.product_id, c0.quantity, p.product_id AS product_id0, p.brand_id, p.created_at AS created_at0, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id, p0.image_id, p0.created_at AS created_at1, p0.image_url, p0.product_id AS product_id1
+          FROM cart_item AS c0
+          INNER JOIN product AS p ON c0.product_id = p.product_id
+          LEFT JOIN product_image AS p0 ON p.product_id = p0.product_id
+      ) AS s ON c1.cart_id = s.cart_id
+      ORDER BY c1.cart_id, s.cart_item_id, s.product_id0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id
+      FROM product AS p
+      WHERE p.product_id = @__p_0
+      LIMIT 1
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[@__userId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT c1.cart_id, c1.created_at, c1.user_id, s.cart_item_id, s.cart_id, s.created_at, s.product_id, s.quantity, s.product_id0, s.brand_id, s.created_at0, s.description, s.has_serial_tracking, s.name, s.price, s.product_type, s.sku, s.stock_quantity, s.warranty_policy_id, s.image_id, s.created_at1, s.image_url, s.product_id1
+      FROM (
+          SELECT c.cart_id, c.created_at, c.user_id
+          FROM cart AS c
+          WHERE c.user_id = @__userId_0
+          LIMIT 1
+      ) AS c1
+      LEFT JOIN (
+          SELECT c0.cart_item_id, c0.cart_id, c0.created_at, c0.product_id, c0.quantity, p.product_id AS product_id0, p.brand_id, p.created_at AS created_at0, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id, p0.image_id, p0.created_at AS created_at1, p0.image_url, p0.product_id AS product_id1
+          FROM cart_item AS c0
+          INNER JOIN product AS p ON c0.product_id = p.product_id
+          LEFT JOIN product_image AS p0 ON p.product_id = p0.product_id
+      ) AS s ON c1.cart_id = s.cart_id
+      ORDER BY c1.cart_id, s.cart_item_id, s.product_id0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@__cartId_0='?' (DbType = Int32), @__productId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT c.cart_item_id, c.cart_id, c.created_at, c.product_id, c.quantity, p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id
+      FROM cart_item AS c
+      INNER JOIN product AS p ON c.product_id = p.product_id
+      WHERE c.cart_id = @__cartId_0 AND c.product_id = @__productId_1
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (15ms) [Parameters=[@p4='?' (DbType = Int32), @p0='?' (DbType = Int32), @p1='?' (DbType = DateTime), @p2='?' (DbType = Int32), @p3='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      UPDATE cart_item SET cart_id = @p0, created_at = @p1, product_id = @p2, quantity = @p3
+      WHERE cart_item_id = @p4;
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__userId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT c1.cart_id, c1.created_at, c1.user_id, s.cart_item_id, s.cart_id, s.created_at, s.product_id, s.quantity, s.product_id0, s.brand_id, s.created_at0, s.description, s.has_serial_tracking, s.name, s.price, s.product_type, s.sku, s.stock_quantity, s.warranty_policy_id, s.image_id, s.created_at1, s.image_url, s.product_id1
+      FROM (
+          SELECT c.cart_id, c.created_at, c.user_id
+          FROM cart AS c
+          WHERE c.user_id = @__userId_0
+          LIMIT 1
+      ) AS c1
+      LEFT JOIN (
+          SELECT c0.cart_item_id, c0.cart_id, c0.created_at, c0.product_id, c0.quantity, p.product_id AS product_id0, p.brand_id, p.created_at AS created_at0, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id, p0.image_id, p0.created_at AS created_at1, p0.image_url, p0.product_id AS product_id1
+          FROM cart_item AS c0
+          INNER JOIN product AS p ON c0.product_id = p.product_id
+          LEFT JOIN product_image AS p0 ON p.product_id = p0.product_id
+      ) AS s ON c1.cart_id = s.cart_id
+      ORDER BY c1.cart_id, s.cart_item_id, s.product_id0
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LQ", Request id "0HNJ57UHQV4LQ:00000004": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method158(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT count(*)::int
+      FROM product AS p
+warn: Microsoft.EntityFrameworkCore.Query[20504]
+      Compiling a query which loads related collections for more than one collection navigation, either via 'Include' or through projection, but no 'QuerySplittingBehavior' has been configured. By default, Entity Framework will use 'QuerySplittingBehavior.SingleQuery', which can potentially result in slow query performance. See https://go.microsoft.com/fwlink/?linkid=2134277 for more information. To identify the query that's triggering this warning call 'ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))'.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT b.brand_id AS "BrandId", b.name AS "Name", COALESCE(b.logo_url, 'https://www.nosm.ca/wp-content/uploads/2024/01/Photo-placeholder-1024x1024.jpg') AS "LogoUrl", (
+          SELECT count(*)::int
+          FROM product AS p
+          WHERE b.brand_id = p.brand_id) AS "ProductCount"
+      FROM brand AS b
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LQ", Request id "0HNJ57UHQV4LQ:00000005": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method326(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT c.category_id AS "CategoryId", c.name AS "Name", (
+          SELECT count(*)::int
+          FROM product_category AS p
+          INNER JOIN product AS p0 ON p.product_id = p0.product_id
+          WHERE c.category_id = p.category_id) AS "ProductCount"
+      FROM category AS c
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (4ms) [Parameters=[@__p_1='?' (DbType = Int32), @__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p0.product_id, p0.brand_id, p0.created_at, p0.description, p0.has_serial_tracking, p0.name, p0.price, p0.product_type, p0.sku, p0.stock_quantity, p0.warranty_policy_id, b.brand_id, b.logo_url, b.name, s.category_id, s.name, s.product_id, s.category_id0, p2.image_id, p2.created_at, p2.image_url, p2.product_id
+      FROM (
+          SELECT p.product_id, p.brand_id, p.created_at, p.description, p.has_serial_tracking, p.name, p.price, p.product_type, p.sku, p.stock_quantity, p.warranty_policy_id
+          FROM product AS p
+          ORDER BY p.created_at DESC
+          LIMIT @__p_1 OFFSET @__p_0
+      ) AS p0
+      INNER JOIN brand AS b ON p0.brand_id = b.brand_id
+      LEFT JOIN (
+          SELECT c.category_id, c.name, p1.product_id, p1.category_id AS category_id0
+          FROM product_category AS p1
+          INNER JOIN category AS c ON p1.category_id = c.category_id
+      ) AS s ON p0.product_id = s.product_id
+      LEFT JOIN product_image AS p2 ON p0.product_id = p2.product_id
+      ORDER BY p0.created_at DESC, p0.product_id, b.brand_id, s.product_id, s.category_id0, s.category_id
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LQ", Request id "0HNJ57UHQV4LQ:00000006": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method328(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LQ", Request id "0HNJ57UHQV4LQ:00000007": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method327(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LO", Request id "0HNJ57UHQV4LO:0000000A": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method158(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LQ", Request id "0HNJ57UHQV4LQ:00000009": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method158(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LO", Request id "0HNJ57UHQV4LO:0000000B": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at ResolveService(ILEmitResolverBuilderRuntimeContext, ServiceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method158(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)
+fail: Microsoft.AspNetCore.Server.Kestrel[13]
+      Connection id "0HNJ57UHQV4LO", Request id "0HNJ57UHQV4LO:0000000D": An unhandled exception was thrown by the application.
+      System.InvalidOperationException: An error was generated for warning 'Microsoft.EntityFrameworkCore.Infrastructure.ManyServiceProvidersCreatedWarning': More than twenty 'IServiceProvider' instances have been created for internal use by Entity Framework. This is commonly caused by injection of a new singleton service instance into every DbContext instance. For example, calling 'UseLoggerFactory' passing in a new instance each time--see https://go.microsoft.com/fwlink/?linkid=869049 for more details. This may lead to performance issues, consider reviewing calls on 'DbContextOptionsBuilder' that may require new service providers to be built. This exception can be suppressed or logged by passing event ID 'CoreEventId.ManyServiceProvidersCreatedWarning' to the 'ConfigureWarnings' method in 'DbContext.OnConfiguring' or 'AddDbContext'.
+         at Microsoft.EntityFrameworkCore.Diagnostics.EventDefinition.Log[TLoggerCategory](IDiagnosticsLogger`1 logger, Exception exception)
+         at Microsoft.EntityFrameworkCore.Diagnostics.CoreLoggerExtensions.ManyServiceProvidersCreatedWarning(IDiagnosticsLogger`1 diagnostics, ICollection`1 serviceProviders)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<GetOrAdd>g__BuildServiceProvider|4_1(IDbContextOptions _, ValueTuple`2 arguments)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.<>c.<GetOrAdd>b__4_0(IDbContextOptions contextOptions, ValueTuple`2 tuples)
+         at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd[TArg](TKey key, Func`3 valueFactory, TArg factoryArgument)
+         at Microsoft.EntityFrameworkCore.Internal.ServiceProviderCache.GetOrAdd(IDbContextOptions options, Boolean providerRequired)
+         at Microsoft.EntityFrameworkCore.DbContext..ctor(DbContextOptions options)
+         at MV.InfrastructureLayer.DBContext.StemDbContext..ctor(DbContextOptions`1 options) in /src/MV.InfrastructureLayer/DBContext/StemDbContext.cs:line 17
+         at InvokeStub_StemDbContext..ctor(Object, Span`1)
+         at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at lambda_method10(Closure, IServiceProvider, Object[])
+         at Microsoft.AspNetCore.Mvc.Controllers.ControllerFactoryProvider.<>c__DisplayClass6_0.<CreateControllerFactory>g__CreateController|0(ControllerContext controllerContext)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.InvokeInnerFilterAsync()
+      --- End of stack trace from previous location ---
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)
+         at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)
+         at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)
+         at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)
+         at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)
+         at Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http.HttpProtocol.ProcessRequests[TContext](IHttpApplication`1 application)

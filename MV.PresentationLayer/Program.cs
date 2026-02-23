@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MV.ApplicationLayer.Interfaces;
@@ -32,7 +33,9 @@ namespace MV.PresentationLayer
                             "http://127.0.0.1:5173",
                             "http://localhost:5174",
                             "http://localhost:5175",
-                            "http://127.0.0.1:3000"
+                            "http://127.0.0.1:3000",
+                            "http://localhost:5255",  // Swagger Docker
+                            "http://127.0.0.1:5255"
                         )
                         .AllowAnyMethod()
                         .AllowAnyHeader()
@@ -134,12 +137,8 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IProductBundleService, ProductBundleService>();
             builder.Services.AddScoped<IWarrantyService, WarrantyService>();
 
-            // Register Npgsql enum mappings BEFORE DbContext
-            Npgsql.NpgsqlConnection.GlobalTypeMapper.MapEnum<MV.DomainLayer.Enums.ProductTypeEnum>(
-                "product_type_enum",
-                new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
-
             // Register DbContext with connection string from appsettings
+            // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
                     npgsqlOptions =>
@@ -149,7 +148,8 @@ namespace MV.PresentationLayer
                             "product_type_enum",
                             schemaName: null,
                             nameTranslator: new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
-                    }));
+                    })
+                .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.ManyServiceProvidersCreatedWarning)));
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
