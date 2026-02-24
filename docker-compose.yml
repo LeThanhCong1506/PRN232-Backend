@@ -5,6 +5,7 @@ services:
   postgres-db:
     image: postgres:16-alpine
     container_name: stemstore-db
+    command: postgres -c max_connections=200
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 12345
@@ -32,7 +33,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=ecommerce_db;Username=postgres;Password=12345
+      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=ecommerce_db;Username=postgres;Password=12345;Pooling=true;Maximum Pool Size=20;Timeout=15
     ports:
       - "5255:8080"
     depends_on:

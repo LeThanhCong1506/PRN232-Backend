@@ -25,24 +25,39 @@ public class PaymentExpiryBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("PaymentExpiryBackgroundService started");
-
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
+            _logger.LogInformation("PaymentExpiryBackgroundService started");
+
+            while (!stoppingToken.IsCancellationRequested)
             {
-                using var scope = _serviceProvider.CreateScope();
-                var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
-                await paymentService.ExpireOverduePaymentsAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in PaymentExpiryBackgroundService");
+                try
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
+                    await paymentService.ExpireOverduePaymentsAsync();
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error in PaymentExpiryBackgroundService");
+                }
+
+                await Task.Delay(_interval, stoppingToken);
             }
 
-            await Task.Delay(_interval, stoppingToken);
+            _logger.LogInformation("PaymentExpiryBackgroundService stopped");
         }
-
-        _logger.LogInformation("PaymentExpiryBackgroundService stopped");
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("PaymentExpiryBackgroundService cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PaymentExpiryBackgroundService fatal error");
+        }
     }
 }

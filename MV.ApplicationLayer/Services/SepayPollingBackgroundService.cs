@@ -40,39 +40,54 @@ public class SepayPollingBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var apiToken = _configuration["SePay:ApiToken"];
-        var apiBaseUrl = _configuration["SePay:ApiBaseUrl"] ?? "https://my.sepay.vn/";
-        var accountNumber = _configuration["SePay:AccountNumber"];
-
-        if (string.IsNullOrEmpty(apiToken))
+        try
         {
-            _logger.LogWarning("SePay ApiToken is not configured. SepayPollingService is not working.");
-            return;
-        }
+            var apiToken = _configuration["SePay:ApiToken"];
+            var apiBaseUrl = _configuration["SePay:ApiBaseUrl"] ?? "https://my.sepay.vn/";
+            var accountNumber = _configuration["SePay:AccountNumber"];
 
-        _httpClient.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", apiToken);
-
-        _logger.LogInformation("SepayPollingBackgroundService started - polling mỗi {Interval}s", _interval.TotalSeconds);
-
-        // Đợi 10 giây cho app khởi động xong
-        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
+            if (string.IsNullOrEmpty(apiToken))
             {
-                await PollTransactionsAsync(apiBaseUrl, accountNumber, stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in SepayPollingBackgroundService");
+                _logger.LogWarning("SePay ApiToken is not configured. SepayPollingService is not working.");
+                return;
             }
 
-            await Task.Delay(_interval, stoppingToken);
-        }
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", apiToken);
 
-        _logger.LogInformation("SepayPollingBackgroundService stopped");
+            _logger.LogInformation("SepayPollingBackgroundService started - polling mỗi {Interval}s", _interval.TotalSeconds);
+
+            // Đợi 10 giây cho app khởi động xong
+            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await PollTransactionsAsync(apiBaseUrl, accountNumber, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error in SepayPollingBackgroundService");
+                }
+
+                await Task.Delay(_interval, stoppingToken);
+            }
+
+            _logger.LogInformation("SepayPollingBackgroundService stopped");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("SepayPollingBackgroundService cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SepayPollingBackgroundService fatal error");
+        }
     }
 
     private async Task PollTransactionsAsync(string apiBaseUrl, string? accountNumber, CancellationToken ct)
@@ -95,11 +110,18 @@ public class SepayPollingBackgroundService : BackgroundService
         var sepayResponse = JsonSerializer.Deserialize<SepayTransactionListResponse>(json, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
         });
 
         if (sepayResponse?.Transactions == null || sepayResponse.Transactions.Count == 0)
+        {
+            _logger.LogDebug("SePay Polling: No transactions found");
             return;
+        }
+
+        _logger.LogInformation("SePay Polling: Found {Count} transactions, lastProcessedId={LastId}",
+            sepayResponse.Transactions.Count, _lastProcessedId);
 
         // Lấy danh sách order PENDING SEPAY từ DB để match
         using var scope = _serviceProvider.CreateScope();
@@ -115,7 +137,13 @@ public class SepayPollingBackgroundService : BackgroundService
 
             // Chỉ xử lý tiền VÀO (amount_in > 0)
             if (tx.AmountIn <= 0)
+            {
+                _logger.LogDebug("SePay Polling: Skipping tx {TxId} - AmountIn={AmountIn} (not incoming)", tx.Id, tx.AmountIn);
                 continue;
+            }
+
+            _logger.LogInformation("SePay Polling: Processing tx {TxId}, AmountIn={AmountIn}, Content='{Content}'",
+                tx.Id, tx.AmountIn, tx.TransactionContent);
 
             // === Cách 1: Tìm "STEM..." trong nội dung (khi user quét QR trực tiếp) ===
             var content = tx.TransactionContent ?? "";
@@ -125,9 +153,13 @@ public class SepayPollingBackgroundService : BackgroundService
             {
                 // Tìm được STEM... → match trực tiếp
                 var orderNumber = "ORD" + paymentRef.Substring(4);
+                _logger.LogInformation("SePay Polling: Found STEM ref '{PaymentRef}' → OrderNumber='{OrderNumber}'",
+                    paymentRef, orderNumber);
                 await TryCompleteOrder(orderRepo, paymentService, orderNumber, tx);
                 continue;
             }
+
+            _logger.LogInformation("SePay Polling: No STEM ref found in content, trying amount matching...");
 
             // === Cách 2: Match bằng số tiền (khi user thanh toán qua Payment Gateway) ===
             // Tìm order PENDING có amount khớp chính xác với giao dịch
@@ -139,6 +171,7 @@ public class SepayPollingBackgroundService : BackgroundService
         if (maxId > _lastProcessedId)
         {
             _lastProcessedId = maxId;
+            _logger.LogDebug("SePay Polling: Updated lastProcessedId to {LastId}", _lastProcessedId);
         }
     }
 
@@ -183,16 +216,32 @@ public class SepayPollingBackgroundService : BackgroundService
         // Lấy tất cả order PENDING có payment method SEPAY
         var pendingOrders = await orderRepo.GetPendingSepayOrdersAsync();
 
+        _logger.LogInformation("SePay Polling: TryMatchByAmount - Found {Count} pending SEPAY orders for tx amount {Amount}",
+            pendingOrders.Count, tx.AmountIn);
+
         foreach (var order in pendingOrders)
         {
-            if (order.Payment == null) continue;
+            if (order.Payment == null)
+            {
+                _logger.LogDebug("SePay Polling: Order {OrderId} has no payment record, skipping", order.OrderId);
+                continue;
+            }
 
             // Kiểm tra số tiền khớp chính xác
-            if (order.Payment.Amount != tx.AmountIn) continue;
+            if (order.Payment.Amount != tx.AmountIn)
+            {
+                _logger.LogDebug("SePay Polling: Amount mismatch for Order {OrderId}: expected={Expected}, received={Received}",
+                    order.OrderId, order.Payment.Amount, tx.AmountIn);
+                continue;
+            }
 
             // Kiểm tra order chưa hết hạn
             if (order.Payment.ExpiredAt.HasValue && order.Payment.ExpiredAt.Value < DateTime.Now)
+            {
+                _logger.LogDebug("SePay Polling: Order {OrderId} payment expired at {ExpiredAt}, skipping",
+                    order.OrderId, order.Payment.ExpiredAt);
                 continue;
+            }
 
             _logger.LogInformation(
                 "SePay Polling: Match bằng số tiền! OrderId={OrderId}, OrderNumber={OrderNumber}, Amount={Amount}",

@@ -55,7 +55,7 @@ namespace MV.ApplicationLayer.Services
 
             // 4. Calculate Summary
             decimal subtotal = cartDto.Items.Sum(i => i.ItemTotal);
-            decimal shippingFee = 30000; // Fixed as per your requirement
+            decimal shippingFee = 5000; // Fixed fee, synced with OrderService
             decimal discount = 0; // Logic for coupons can be added later
 
             cartDto.Summary = new CartSummaryDto
