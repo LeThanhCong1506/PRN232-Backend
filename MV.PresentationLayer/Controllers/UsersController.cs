@@ -47,8 +47,7 @@ namespace MV.PresentationLayer.Controllers
         }
 
         [HttpGet]
-        //[Authorize]
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAll()
         {
             var users = await _service.GetAllAsync();

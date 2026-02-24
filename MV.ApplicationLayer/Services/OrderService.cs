@@ -17,17 +17,20 @@ public class OrderService : IOrderService
     private readonly ICartRepository _cartRepo;
     private readonly StemDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly INotificationService _notificationService;
 
     public OrderService(
         IOrderRepository orderRepo,
         ICartRepository cartRepo,
         StemDbContext context,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        INotificationService notificationService)
     {
         _orderRepo = orderRepo;
         _cartRepo = cartRepo;
         _context = context;
         _configuration = configuration;
+        _notificationService = notificationService;
     }
 
     // ==================== CHECKOUT ====================
@@ -371,6 +374,9 @@ public class OrderService : IOrderService
         await _orderRepo.UpdateOrderAsync(order);
         await _orderRepo.SetOrderStatusAsync(orderId, newStatus.ToString());
 
+        // Notify realtime: order status changed
+        try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus.ToString()); } catch { }
+
         // Reload and return
         order = await _orderRepo.GetOrderByIdAsync(orderId);
         var detail = await MapToOrderDetail(order!);
@@ -426,6 +432,10 @@ public class OrderService : IOrderService
             }
 
             await transaction.CommitAsync();
+
+            // Notify realtime: order cancelled
+            try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, "CANCELLED"); } catch { }
+
             return ApiResponse<object>.SuccessResponse(null!, "Order cancelled successfully.");
         }
         catch (Exception ex)

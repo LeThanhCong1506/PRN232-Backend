@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Admin.Product.Request;
@@ -18,7 +17,7 @@ public class AdminProductService : IAdminProductService
     private readonly IProductImageRepository _imageRepo;
     private readonly IBrandRepository _brandRepo;
     private readonly ICategoryRepository _categoryRepo;
-    private readonly IWebHostEnvironment _env;
+    private readonly ICloudinaryService _cloudinaryService;
 
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
     private const long MaxFileSize = 5 * 1024 * 1024; // 5MB
@@ -29,13 +28,13 @@ public class AdminProductService : IAdminProductService
         IProductImageRepository imageRepo,
         IBrandRepository brandRepo,
         ICategoryRepository categoryRepo,
-        IWebHostEnvironment env)
+        ICloudinaryService cloudinaryService)
     {
         _productRepo = productRepo;
         _imageRepo = imageRepo;
         _brandRepo = brandRepo;
         _categoryRepo = categoryRepo;
-        _env = env;
+        _cloudinaryService = cloudinaryService;
     }
 
     public async Task<ApiResponse<PagedResponse<AdminProductResponse>>> GetAdminProductsAsync(AdminProductFilter filter)
@@ -178,10 +177,7 @@ public class AdminProductService : IAdminProductService
                 return ApiResponse<List<AdminProductImageResponse>>.ErrorResponse($"File '{file.FileName}' has invalid extension. Allowed: jpg, png, webp.");
         }
 
-        // Save files
-        var uploadDir = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "images", "products");
-        Directory.CreateDirectory(uploadDir);
-
+        // Upload to Cloudinary
         var existingImages = await _imageRepo.GetByProductIdAsync(productId);
         var hasExistingPrimary = existingImages.Any(i => i.IsPrimary == true);
 
@@ -190,14 +186,9 @@ public class AdminProductService : IAdminProductService
         for (int i = 0; i < files.Count; i++)
         {
             var file = files[i];
-            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var fileName = $"{Guid.NewGuid()}{ext}";
-            var filePath = Path.Combine(uploadDir, fileName);
 
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
+            // Upload to Cloudinary
+            var (imageUrl, _) = await _cloudinaryService.UploadImageAsync(file, "products");
 
             var isPrimary = setPrimaryIndex.HasValue
                 ? i == setPrimaryIndex.Value
@@ -212,7 +203,7 @@ public class AdminProductService : IAdminProductService
             var productImage = new ProductImage
             {
                 ProductId = productId,
-                ImageUrl = $"/images/products/{fileName}",
+                ImageUrl = imageUrl,
                 IsPrimary = isPrimary
             };
 
@@ -238,11 +229,10 @@ public class AdminProductService : IAdminProductService
         if (image.ProductId != productId)
             return ApiResponse<bool>.ErrorResponse("Image does not belong to this product.");
 
-        // Delete physical file
-        var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-        var filePath = Path.Combine(webRoot, image.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-        if (File.Exists(filePath))
-            File.Delete(filePath);
+        // Delete from Cloudinary
+        var publicId = _cloudinaryService.ExtractPublicIdFromUrl(image.ImageUrl);
+        if (!string.IsNullOrEmpty(publicId))
+            await _cloudinaryService.DeleteImageAsync(publicId);
 
         var wasPrimary = image.IsPrimary == true;
         await _imageRepo.DeleteAsync(imageId);
