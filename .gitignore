@@ -51,3 +51,4 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 /.claude/settings.local.json
+/.claude/launch.json
