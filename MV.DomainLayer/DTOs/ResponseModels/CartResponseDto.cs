@@ -32,7 +32,7 @@ namespace MV.DomainLayer.DTOs.ResponseModels
     {
         public int TotalItems { get; set; }
         public decimal Subtotal { get; set; }
-        public decimal ShippingFee { get; set; } = 30000; // Fixed fee for now
+        public decimal ShippingFee { get; set; } = 5000; // Fixed fee, synced with OrderService
         public decimal Discount { get; set; } = 0;
         public decimal Total { get; set; } // Subtotal + Shipping - Discount
     }

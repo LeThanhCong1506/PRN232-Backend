@@ -232,7 +232,8 @@ public class OrderRepository : IOrderRepository
     public async Task<string?> GetOrderStatusAsync(int orderId)
     {
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -243,7 +244,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -260,7 +261,8 @@ public class OrderRepository : IOrderRepository
         if (!orderIds.Any()) return result;
 
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -276,7 +278,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
         return result;
     }
@@ -284,7 +286,8 @@ public class OrderRepository : IOrderRepository
     public async Task<string?> GetPaymentMethodByOrderIdAsync(int orderId)
     {
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -295,14 +298,15 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
     public async Task<string?> GetPaymentStatusByOrderIdAsync(int orderId)
     {
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -313,7 +317,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -330,7 +334,8 @@ public class OrderRepository : IOrderRepository
         if (!orderIds.Any()) return result;
 
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -347,7 +352,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
         return result;
     }
@@ -355,7 +360,8 @@ public class OrderRepository : IOrderRepository
     public async Task<string?> GetCouponDiscountTypeAsync(int couponId)
     {
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -366,7 +372,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -376,8 +382,11 @@ public class OrderRepository : IOrderRepository
     {
         // Lấy danh sách order có payment PENDING + SEPAY + chưa hết hạn
         // Dùng raw SQL vì payment_method và status là PostgreSQL enum
+        var orderIds = new List<int>();
+
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -388,25 +397,25 @@ public class OrderRepository : IOrderRepository
                   AND p.payment_method = 'SEPAY'::payment_method_enum
                   AND (p.expired_at IS NULL OR p.expired_at > NOW())";
 
-            var orderIds = new List<int>();
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
                 orderIds.Add(reader.GetInt32(0));
             }
-
-            if (orderIds.Count == 0)
-                return new List<OrderHeader>();
-
-            return await _context.OrderHeaders
-                .Include(o => o.Payment)
-                .Where(o => orderIds.Contains(o.OrderId))
-                .ToListAsync();
         }
         finally
         {
             await conn.CloseAsync();
         }
+
+        // EF Core query AFTER raw connection is closed — avoids MARS error
+        if (orderIds.Count == 0)
+            return new List<OrderHeader>();
+
+        return await _context.OrderHeaders
+            .Include(o => o.Payment)
+            .Where(o => orderIds.Contains(o.OrderId))
+            .ToListAsync();
     }
 
     // ==================== ADMIN ORDER MANAGEMENT ====================

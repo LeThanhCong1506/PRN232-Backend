@@ -158,7 +158,7 @@ public class CheckoutService : ICheckoutService
 
         // 5. Calculate subtotal
         decimal subtotal = cartItemDtos.Sum(item => item.ItemTotal);
-        decimal shippingFee = 30000; // Fixed
+        decimal shippingFee = 5000; // Fixed fee, synced with OrderService
         decimal discount = 0;
         var couponDto = new CheckoutCouponDto
         {
@@ -287,7 +287,7 @@ public class CheckoutService : ICheckoutService
             },
             new PaymentMethodDto
             {
-                Code = "BANK_TRANSFER",
+                Code = "SEPAY",
                 Name = "Bank Transfer",
                 Description = "Bank transfer.",
                 IsActive = true

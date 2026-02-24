@@ -257,6 +257,10 @@ public class OrderService : IOrderService
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
+            Console.WriteLine($"[CHECKOUT ERROR] {ex.GetType().Name}: {ex.Message}");
+            if (ex.InnerException != null)
+                Console.WriteLine($"[CHECKOUT INNER] {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+            Console.WriteLine($"[CHECKOUT STACK] {ex.StackTrace}");
             return ApiResponse<CheckoutResponse>.ErrorResponse($"Order error: {ex.Message}");
         }
     }

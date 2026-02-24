@@ -110,6 +110,20 @@ namespace MV.PresentationLayer
                 .AddJsonOptions(options =>
                 {
                     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+                })
+                .ConfigureApiBehaviorOptions(options =>
+                {
+                    options.InvalidModelStateResponseFactory = context =>
+                    {
+                        var errors = context.ModelState
+                            .Where(e => e.Value?.Errors.Count > 0)
+                            .Select(e => $"{e.Key}: {string.Join(", ", e.Value!.Errors.Select(x => x.ErrorMessage))}")
+                            .ToList();
+                        Console.WriteLine($"[MODEL VALIDATION FAILED] {context.HttpContext.Request.Path}");
+                        foreach (var err in errors)
+                            Console.WriteLine($"  -> {err}");
+                        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(context.ModelState);
+                    };
                 });
 
             builder.Services.AddScoped<IRoleRepository, RoleRepository>();
@@ -151,6 +165,12 @@ namespace MV.PresentationLayer
 
             // Background service: polling SePay API mỗi 15s kiểm tra giao dịch mới → tự cập nhật COMPLETED
             builder.Services.AddHostedService<SepayPollingBackgroundService>();
+
+            // Prevent background service exceptions from crashing the host
+            builder.Services.Configure<HostOptions>(options =>
+            {
+                options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+            });
 
             // Register DbContext with connection string from appsettings
             // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
