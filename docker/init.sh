@@ -1,6 +1,6 @@
 #!/bin/bash
 # init.sh - Docker PostgreSQL initialization script
-# This script runs the SQL init after removing PostgreSQL-specific commands
+# This script runs the SQL init after filtering out incompatible commands
 
 set -e
 

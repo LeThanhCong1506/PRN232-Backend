@@ -1,0 +1,13 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Force shell scripts to use LF line endings (for Docker containers)
+*.sh text eol=lf
+
+# Force SQL files to use LF line endings
+*.sql text eol=lf
+
+# Keep these as CRLF for Windows
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

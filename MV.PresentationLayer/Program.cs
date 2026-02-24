@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MV.ApplicationLayer.Interfaces;
@@ -35,7 +36,9 @@ namespace MV.PresentationLayer
                             "http://127.0.0.1:5173",
                             "http://localhost:5174",
                             "http://localhost:5175",
-                            "http://127.0.0.1:3000"
+                            "http://127.0.0.1:3000",
+                            "http://localhost:5255",  // Swagger Docker
+                            "http://127.0.0.1:5255"
                         )
                         .AllowAnyMethod()
                         .AllowAnyHeader()
@@ -125,6 +128,20 @@ namespace MV.PresentationLayer
                 .AddJsonOptions(options =>
                 {
                     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+                })
+                .ConfigureApiBehaviorOptions(options =>
+                {
+                    options.InvalidModelStateResponseFactory = context =>
+                    {
+                        var errors = context.ModelState
+                            .Where(e => e.Value?.Errors.Count > 0)
+                            .Select(e => $"{e.Key}: {string.Join(", ", e.Value!.Errors.Select(x => x.ErrorMessage))}")
+                            .ToList();
+                        Console.WriteLine($"[MODEL VALIDATION FAILED] {context.HttpContext.Request.Path}");
+                        foreach (var err in errors)
+                            Console.WriteLine($"  -> {err}");
+                        return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(context.ModelState);
+                    };
                 });
 
             builder.Services.AddScoped<IRoleRepository, RoleRepository>();
@@ -174,7 +191,14 @@ namespace MV.PresentationLayer
             // Background service: polling SePay API mỗi 15s kiểm tra giao dịch mới → tự cập nhật COMPLETED
             builder.Services.AddHostedService<SepayPollingBackgroundService>();
 
+            // Prevent background service exceptions from crashing the host
+            builder.Services.Configure<HostOptions>(options =>
+            {
+                options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+            });
+
             // Register DbContext with connection string from appsettings
+            // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
                     npgsqlOptions =>

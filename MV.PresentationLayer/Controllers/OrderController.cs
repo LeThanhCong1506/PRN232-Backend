@@ -30,14 +30,20 @@ public class OrderController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Checkout([FromBody] CreateOrderRequest request)
     {
+        Console.WriteLine($"[CHECKOUT] PaymentMethod={request.PaymentMethod}, CustomerName={request.CustomerName}, Phone={request.CustomerPhone}");
+        
         var userId = GetCurrentUserId();
         if (userId == null)
             return Unauthorized(ApiResponse<object>.ErrorResponse("Invalid Token"));
 
         var result = await _orderService.CheckoutAsync(userId.Value, request);
-
+        
+        Console.WriteLine($"[CHECKOUT RESULT] Success={result.Success}, Message={result.Message}");
         if (!result.Success)
+        {
+            Console.WriteLine($"[CHECKOUT ERRORS] {string.Join(", ", result.Errors ?? new List<string>())}");
             return BadRequest(result);
+        }
 
         return Ok(result);
     }

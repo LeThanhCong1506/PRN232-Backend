@@ -62,7 +62,8 @@ public class SepayRepository : ISepayRepository
         var orderIds = new List<int>();
 
         var conn = _context.Database.GetDbConnection();
-        await conn.OpenAsync();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
         try
         {
             using var cmd = conn.CreateCommand();
@@ -82,7 +83,7 @@ public class SepayRepository : ISepayRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
 
         return orderIds;
