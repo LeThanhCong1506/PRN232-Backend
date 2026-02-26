@@ -85,8 +85,18 @@ public class ChatHub : Hub
             IsRead = false
         };
 
-        _context.ChatMessages.Add(message);
-        await _context.SaveChangesAsync();
+        try
+        {
+            _logger.LogInformation("Attempting to save message to DB. SenderId: {SenderId}, Content: {Content}", senderId, content);
+            _context.ChatMessages.Add(message);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Successfully saved message {MessageId} to DB", message.MessageId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FAILED to save message to DB. SenderId: {SenderId}, Content: {Content}", senderId, content);
+            throw; // Re-throw to inform SignalR client
+        }
 
         var messageDto = new
         {
@@ -141,7 +151,7 @@ public class ChatHub : Hub
 
     private int GetUserId()
     {
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         return int.TryParse(userIdStr, out var userId) ? userId : 0;
     }
 }

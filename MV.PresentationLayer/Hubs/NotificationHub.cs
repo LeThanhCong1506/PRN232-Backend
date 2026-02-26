@@ -21,10 +21,17 @@ public class NotificationHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+            
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            if (role == "Admin" || role == "Staff")
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, "admin_notifications");
+            }
+
             _logger.LogInformation("User {UserId} connected to NotificationHub. ConnectionId: {ConnectionId}", userId, Context.ConnectionId);
         }
 
@@ -33,10 +40,17 @@ public class NotificationHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{userId}");
+            
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            if (role == "Admin" || role == "Staff")
+            {
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, "admin_notifications");
+            }
+            
             _logger.LogInformation("User {UserId} disconnected from NotificationHub. ConnectionId: {ConnectionId}", userId, Context.ConnectionId);
         }
 

@@ -5,6 +5,8 @@ using MV.DomainLayer.DTOs.ResponseModels;
 using MV.InfrastructureLayer.DBContext;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
+using Microsoft.AspNetCore.SignalR;
+using MV.PresentationLayer.Hubs;
 
 namespace MV.PresentationLayer.Controllers;
 
@@ -18,10 +20,14 @@ namespace MV.PresentationLayer.Controllers;
 public class ChatController : ControllerBase
 {
     private readonly StemDbContext _context;
+    private readonly IHubContext<ChatHub> _hubContext;
+    private readonly ILogger<ChatController> _logger;
 
-    public ChatController(StemDbContext context)
+    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext, ILogger<ChatController> logger)
     {
         _context = context;
+        _hubContext = hubContext;
+        _logger = logger;
     }
 
     /// <summary>
@@ -145,9 +151,87 @@ public class ChatController : ControllerBase
         return Ok(ApiResponse<PagedResponse<object>>.SuccessResponse(pagedResponse));
     }
 
+    public class SendMessageRequest
+    {
+        public int? ReceiverId { get; set; }
+        public string Content { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// REST API fallback cho tính năng chat khi client không kết nối được SignalR trực tiếp
+    /// </summary>
+    [HttpPost("send")]
+    [SwaggerOperation(Summary = "Send a chat message via REST API (Fallback)")]
+    public async Task<IActionResult> SendMessage([FromBody] SendMessageRequest request)
+    {
+        var senderId = GetUserId();
+        if (senderId == 0 || string.IsNullOrWhiteSpace(request.Content))
+            return BadRequest(ApiResponse<object>.ErrorResponse("Invalid message content or user"));
+
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        var isAdmin = role == "Admin" || role == "Staff";
+        var senderName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+
+        var message = new DomainLayer.Entities.ChatMessage
+        {
+            SenderId = senderId,
+            ReceiverId = isAdmin ? request.ReceiverId : null,
+            Content = request.Content.Trim(),
+            IsFromAdmin = isAdmin,
+            SentAt = DateTime.Now,
+            IsRead = false
+        };
+
+        try
+        {
+            _context.ChatMessages.Add(message);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("HTTP Fallback: Saved message {MessageId} from {SenderId} to {ReceiverId}", message.MessageId, senderId, request.ReceiverId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "HTTP Fallback: Failed to save message from {SenderId}", senderId);
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("Could not save message to database."));
+        }
+
+        var messageDto = new
+        {
+            message.MessageId,
+            message.SenderId,
+            SenderName = senderName,
+            message.ReceiverId,
+            message.Content,
+            message.IsFromAdmin,
+            message.SentAt,
+            message.IsRead
+        };
+
+        // Push real-time to active SignalR connections
+        try
+        {
+            if (isAdmin && request.ReceiverId.HasValue)
+            {
+                // Admin -> Customer
+                await _hubContext.Clients.Group($"chat_user_{request.ReceiverId.Value}").SendAsync("ReceiveMessage", messageDto);
+                // Notification to self (unnecessary if REST returns the dto, but keeps parity with Hub)
+            }
+            else
+            {
+                // Customer -> Admins
+                await _hubContext.Clients.Group("chat_admins").SendAsync("ReceiveMessage", messageDto);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "HTTP Fallback: Failed to broadcast to SignalR groups.");
+        }
+
+        return Ok(ApiResponse<object>.SuccessResponse(messageDto, "Message sent successfully"));
+    }
+
     private int GetUserId()
     {
-        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         return int.TryParse(userIdStr, out var userId) ? userId : 0;
     }
 }
