@@ -60,6 +60,18 @@ public class ReviewRepository : IReviewRepository
         return result;
     }
 
+    public async Task<bool> HasUserReviewedProductAsync(int userId, int productId)
+    {
+        return await _context.Reviews.AnyAsync(r => r.UserId == userId && r.ProductId == productId);
+    }
+
+    public async Task<Review> AddAsync(Review review)
+    {
+        _context.Reviews.Add(review);
+        await _context.SaveChangesAsync();
+        return review;
+    }
+
     public async Task DeleteAsync(int reviewId)
     {
         var review = await _context.Reviews.FindAsync(reviewId);

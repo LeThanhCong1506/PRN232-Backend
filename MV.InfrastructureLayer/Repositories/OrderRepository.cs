@@ -174,6 +174,34 @@ public class OrderRepository : IOrderRepository
             .CountAsync(o => o.CreatedAt.HasValue && o.CreatedAt.Value.Date == today);
     }
 
+    public async Task<bool> HasUserPurchasedProductAsync(int userId, int productId)
+    {
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT 1
+                FROM order_header oh
+                JOIN order_item oi ON oh.order_id = oi.order_id
+                WHERE oh.user_id = @userId 
+                  AND oi.product_id = @productId
+                  AND oh.status IN ('CONFIRMED'::order_status_enum, 'SHIPPED'::order_status_enum, 'DELIVERED'::order_status_enum)
+                LIMIT 1";
+            cmd.Parameters.Add(new NpgsqlParameter("@userId", userId));
+            cmd.Parameters.Add(new NpgsqlParameter("@productId", productId));
+            
+            var result = await cmd.ExecuteScalarAsync();
+            return result != null;
+        }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
+        }
+    }
+
     // ==================== UPDATE ====================
 
     public async Task UpdateOrderAsync(OrderHeader orderHeader)
