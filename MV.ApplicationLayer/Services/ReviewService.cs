@@ -1,17 +1,21 @@
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.DTOs.Review.Response;
+using MV.DomainLayer.DTOs.Review.Request;
 using MV.InfrastructureLayer.Interfaces;
+using MV.DomainLayer.Entities;
 
 namespace MV.ApplicationLayer.Services;
 
 public class ReviewService : IReviewService
 {
     private readonly IReviewRepository _reviewRepository;
+    private readonly IOrderRepository _orderRepository;
 
-    public ReviewService(IReviewRepository reviewRepository)
+    public ReviewService(IReviewRepository reviewRepository, IOrderRepository orderRepository)
     {
         _reviewRepository = reviewRepository;
+        _orderRepository = orderRepository;
     }
 
     public async Task<ApiResponse<ProductReviewsResponse>> GetProductReviewsAsync(int productId, int page, int pageSize)
@@ -47,6 +51,43 @@ public class ReviewService : IReviewService
         };
 
         return ApiResponse<ProductReviewsResponse>.SuccessResponse(response);
+    }
+
+    public async Task<ApiResponse<ReviewItemResponse>> CreateReviewAsync(int userId, int productId, CreateReviewRequest request)
+    {
+        bool hasPurchased = await _orderRepository.HasUserPurchasedProductAsync(userId, productId);
+        if (!hasPurchased)
+        {
+            return ApiResponse<ReviewItemResponse>.ErrorResponse("You must purchase and receive this product before reviewing it.");
+        }
+
+        bool hasReviewed = await _reviewRepository.HasUserReviewedProductAsync(userId, productId);
+        if (hasReviewed)
+        {
+            return ApiResponse<ReviewItemResponse>.ErrorResponse("You have already reviewed this product.");
+        }
+
+        var review = new Review
+        {
+            ProductId = productId,
+            UserId = userId,
+            Rating = request.Rating,
+            Comment = request.Comment,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _reviewRepository.AddAsync(review);
+
+        var response = new ReviewItemResponse
+        {
+            ReviewId = review.ReviewId,
+            Rating = review.Rating,
+            Comment = review.Comment,
+            Reviewer = "You",
+            CreatedAt = review.CreatedAt
+        };
+
+        return ApiResponse<ReviewItemResponse>.SuccessResponse(response, "Review submitted successfully.");
     }
 
     public async Task<ApiResponse<bool>> DeleteReviewAsync(int reviewId)

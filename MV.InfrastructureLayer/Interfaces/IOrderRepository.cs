@@ -17,6 +17,7 @@ public interface IOrderRepository
     Task<(List<OrderHeader> Items, int TotalCount)> GetOrdersByUserIdAsync(int userId, OrderFilterRequest filter);
     Task<(List<OrderHeader> Items, int TotalCount)> GetAllOrdersAsync(OrderFilterRequest filter);
     Task<int> GetTodayOrderCountAsync();
+    Task<bool> HasUserPurchasedProductAsync(int userId, int productId);
 
     // Update
     Task UpdateOrderAsync(OrderHeader orderHeader);

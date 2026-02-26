@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
+using MV.DomainLayer.DTOs.Review.Request;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace MV.PresentationLayer.Controllers;
@@ -35,6 +37,39 @@ public class ReviewController : ControllerBase
         if (pageSize > 50) pageSize = 50;
 
         var result = await _reviewService.GetProductReviewsAsync(productId, page, pageSize);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Tạo review cho sản phẩm
+    /// </summary>
+    [HttpPost("/api/products/{productId}/reviews")]
+    [Authorize]
+    [SwaggerOperation(Summary = "Create a product review")]
+    public async Task<IActionResult> CreateReview(int productId, [FromBody] CreateReviewRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+        {
+            return Unauthorized();
+        }
+
+        var result = await _reviewService.CreateReviewAsync(userId, productId, request);
+        
+        if (!result.Success)
+        {
+            if (result.Message != null && result.Message.Contains("purchase")) 
+            {
+                return StatusCode(403, result);
+            }
+            return BadRequest(result);
+        }
+
         return Ok(result);
     }
 
