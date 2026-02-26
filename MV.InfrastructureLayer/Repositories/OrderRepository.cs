@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using MV.DomainLayer.DTOs.Admin.Order.Request;
+using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.Order.Request;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
@@ -530,12 +531,17 @@ public class OrderRepository : IOrderRepository
             idsCmd.Parameters.Add(new NpgsqlParameter("@limit", filter.PageSize));
 
             var orderIds = new List<int>();
-            using var reader = await idsCmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-                orderIds.Add(reader.GetInt32(0));
+            using (var reader = await idsCmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                    orderIds.Add(reader.GetInt32(0));
+            } // reader is disposed here
 
             if (orderIds.Count == 0)
                 return (new List<OrderHeader>(), totalCount);
+
+            // Close the raw connection before EF Core query to avoid "command already in progress"
+            await conn.CloseAsync();
 
             var items = await _context.OrderHeaders
                 .AsNoTracking()
@@ -550,7 +556,8 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (conn.State == System.Data.ConnectionState.Open)
+                await conn.CloseAsync();
         }
     }
 
@@ -611,6 +618,47 @@ public class OrderRepository : IOrderRepository
             .OrderByDescending(o => o.CreatedAt)
             .Take(count)
             .ToListAsync();
+    }
+
+    public async Task<List<DailyRevenueData>> GetDailyRevenueAsync(DateTime from, DateTime to, string? status = null)
+    {
+        var result = new List<DailyRevenueData>();
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            var statusFilter = string.IsNullOrEmpty(status)
+                ? "status != 'CANCELLED'::order_status_enum"
+                : "status = @status::order_status_enum";
+            cmd.CommandText = $@"
+                SELECT DATE(created_at) as d, SUM(total_amount) as revenue, COUNT(*) as cnt
+                FROM order_header
+                WHERE {statusFilter}
+                  AND created_at >= @from AND created_at <= @to
+                GROUP BY DATE(created_at)
+                ORDER BY DATE(created_at)";
+            cmd.Parameters.Add(new NpgsqlParameter("@from", from));
+            cmd.Parameters.Add(new NpgsqlParameter("@to", to));
+            if (!string.IsNullOrEmpty(status))
+                cmd.Parameters.Add(new NpgsqlParameter("@status", status));
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                result.Add(new DailyRevenueData
+                {
+                    Date = reader.GetDateTime(0).ToString("yyyy-MM-dd"),
+                    Revenue = reader.GetDecimal(1),
+                    OrderCount = (int)reader.GetInt64(2)
+                });
+            }
+        }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
+        }
+        return result;
     }
 
     public async Task SetProductInstanceStatusByOrderItemIdsAsync(List<int> orderItemIds, string status)

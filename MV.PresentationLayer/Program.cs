@@ -228,7 +228,14 @@ namespace MV.PresentationLayer
 
             app.UseHttpsRedirection();
 
-            app.UseStaticFiles();
+            // Serve static files from wwwroot (product images, etc.)
+            var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+            if (!Directory.Exists(wwwrootPath))
+                Directory.CreateDirectory(wwwrootPath);
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootPath)
+            });
 
             // Enable CORS - must be before Authentication/Authorization
             app.UseCors("AllowFrontend");

@@ -75,6 +75,14 @@ public class AdminOrderController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("dashboard/revenue-chart")]
+    [SwaggerOperation(Summary = "[Admin] Get daily revenue chart data for a date range, optionally filtered by order status")]
+    public async Task<IActionResult> GetRevenueChart([FromQuery] DateTime from, [FromQuery] DateTime to, [FromQuery] string? status = null)
+    {
+        var result = await _adminOrderService.GetRevenueChartAsync(from, to, status);
+        return Ok(result);
+    }
+
     private int GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");

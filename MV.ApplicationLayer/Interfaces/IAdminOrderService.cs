@@ -11,6 +11,7 @@ public interface IAdminOrderService
     Task<ApiResponse<AdminOrderDetailResponse>> UpdateOrderStatusAsync(int orderId, int adminUserId, AdminUpdateOrderStatusRequest request);
     Task<ApiResponse<bool>> UpdatePaymentStatusAsync(int orderId, UpdatePaymentStatusRequest request);
     Task<ApiResponse<DashboardResponse>> GetDashboardAsync();
+    Task<ApiResponse<List<DailyRevenueData>>> GetRevenueChartAsync(DateTime from, DateTime to, string? status = null);
 }
 
 public class AdminOrderListResult

@@ -44,3 +44,10 @@ public class DashboardResponse
         public DateTime? CreatedAt { get; set; }
     }
 }
+
+public class DailyRevenueData
+{
+    public string Date { get; set; } = null!;
+    public decimal Revenue { get; set; }
+    public int OrderCount { get; set; }
+}

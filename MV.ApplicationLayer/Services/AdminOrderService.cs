@@ -396,4 +396,10 @@ public class AdminOrderService : IAdminOrderService
             await _orderRepo.SetProductInstanceStatusByOrderItemIdsAsync(orderItemIds, "IN_STOCK");
         }
     }
+
+    public async Task<ApiResponse<List<DailyRevenueData>>> GetRevenueChartAsync(DateTime from, DateTime to, string? status = null)
+    {
+        var data = await _orderRepo.GetDailyRevenueAsync(from, to, status);
+        return ApiResponse<List<DailyRevenueData>>.SuccessResponse(data);
+    }
 }

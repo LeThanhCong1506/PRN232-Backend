@@ -1,4 +1,5 @@
 using MV.DomainLayer.DTOs.Admin.Order.Request;
+using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.Order.Request;
 using MV.DomainLayer.Entities;
 
@@ -49,6 +50,7 @@ public interface IOrderRepository
     Task<(List<OrderHeader> Items, int TotalCount)> GetAdminOrdersAsync(AdminOrderFilter filter);
     Task<Dictionary<string, int>> GetOrderStatusCountsAsync();
     Task<decimal> GetDeliveredRevenueAsync(DateTime from, DateTime to);
+    Task<List<DailyRevenueData>> GetDailyRevenueAsync(DateTime from, DateTime to, string? status = null);
     Task<List<OrderHeader>> GetRecentOrdersAsync(int count);
     Task SetProductInstanceStatusByOrderItemIdsAsync(List<int> orderItemIds, string status);
     Task CreateWarrantiesForDeliveredOrderAsync(int orderId);
