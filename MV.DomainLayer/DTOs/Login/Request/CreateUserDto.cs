@@ -7,6 +7,8 @@ namespace MV.DomainLayer.DTOs.Login.Request
         [Required(ErrorMessage = "Username is required")]
         public string Username { get; set; } = null!;
 
+        public string? FullName { get; set; }
+
         [Required(ErrorMessage = "Email address is required")]
         [EmailAddress(ErrorMessage = "Invalid email format")]
         // Regex for a standard email pattern (e.g., user@domain.com)

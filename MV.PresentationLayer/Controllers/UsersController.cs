@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Login.Request;
 using MV.DomainLayer.DTOs.Login.Response;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace MV.PresentationLayer.Controllers
 {
@@ -21,19 +23,19 @@ namespace MV.PresentationLayer.Controllers
         public async Task<IActionResult> Register(CreateUserDto dto)
         {
             var result = await _service.CreateAsync(dto);
-            if (result == "OK")
-                return Ok("Tạo tài khoản thành công");
-            else
+            if (result != "OK")
                 return BadRequest(result);
-            //try
-            //{
-            //    await _service.CreateAsync(dto);
-            //    return Ok("Tạo tài khoản thành công");
-            //}
-            //catch (Exception ex)
-            //{
-            //    return BadRequest(ex.Message);
-            //}
+
+            var loginResult = await _service.LoginAsync(new LoginDto
+            {
+                Email = dto.Email,
+                Password = dto.Password
+            });
+
+            if (loginResult == null)
+                return StatusCode(500, "Registration succeeded but auto-login failed");
+
+            return Ok(loginResult);
         }
 
         [HttpPost("login")]
@@ -52,6 +54,37 @@ namespace MV.PresentationLayer.Controllers
         {
             var users = await _service.GetAllAsync();
             return Ok(users);
+        }
+
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> GetCurrentUser()
+        {
+            var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!int.TryParse(sub, out var userId))
+                return Unauthorized();
+
+            var user = await _service.GetByIdAsync(userId);
+            if (user == null)
+                return NotFound("User không tồn tại");
+
+            return Ok(new
+            {
+                id = user.UserId,
+                username = user.Username,
+                email = user.Email,
+                role = user.RoleName,
+                fullName = user.FullName,
+                phone = user.Phone,
+                address = user.Address,
+                avatarUrl = (string?)null,
+                city = (string?)null,
+                district = (string?)null,
+                ward = (string?)null,
+                createdAt = user.CreatedAt?.ToString("o")
+            });
         }
 
         [HttpGet("{id}")]
