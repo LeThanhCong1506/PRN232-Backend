@@ -27,7 +27,7 @@ public class ReviewController : ControllerBase
     /// <param name="page">Trang (default: 1)</param>
     /// <param name="pageSize">Số lượng mỗi trang (default: 10, max: 50)</param>
     /// <returns>Rating distribution, average rating, paginated reviews</returns>
-    [HttpGet("/api/products/{productId}/reviews")]
+    [HttpGet("/api/Product/{productId}/reviews")]
     [AllowAnonymous]
     [SwaggerOperation(Summary = "Get product reviews with rating distribution")]
     public async Task<IActionResult> GetProductReviews(int productId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
@@ -43,7 +43,7 @@ public class ReviewController : ControllerBase
     /// <summary>
     /// Tạo review cho sản phẩm
     /// </summary>
-    [HttpPost("/api/products/{productId}/reviews")]
+    [HttpPost("/api/Product/{productId}/reviews")]
     [Authorize]
     [SwaggerOperation(Summary = "Create a product review")]
     public async Task<IActionResult> CreateReview(int productId, [FromBody] CreateReviewRequest request)
