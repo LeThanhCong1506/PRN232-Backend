@@ -8,5 +8,7 @@ public interface IReviewRepository
     Task<List<Review>> GetByProductIdAsync(int productId, int page, int pageSize);
     Task<int> CountByProductIdAsync(int productId);
     Task<Dictionary<int, int>> GetRatingDistributionAsync(int productId);
+    Task<bool> HasUserReviewedProductAsync(int userId, int productId);
+    Task<Review> AddAsync(Review review);
     Task DeleteAsync(int reviewId);
 }
