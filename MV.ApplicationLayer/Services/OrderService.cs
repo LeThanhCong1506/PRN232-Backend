@@ -206,11 +206,11 @@ public class OrderService : IOrderService
                 var sepayConfig = _configuration.GetSection("SePay");
 
                 // Generate QR Code URL (hiển thị QR trực tiếp trên frontend)
-                var accountNumber = sepayConfig["AccountNumber"];
-                var bankName = sepayConfig["BankName"];
-                var qrBaseUrl = sepayConfig["QrBaseUrl"] ?? "https://qr.sepay.vn/img";
-                payment.QrCodeUrl = $"{qrBaseUrl}?bank={bankName}&acc={accountNumber}" +
-                                    $"&template=compact&amount={totalAmount:F0}&des={payment.PaymentReference}";
+                // VietQR format: https://img.vietqr.io/image/{BankBIN}-{AccountNo}-{template}.jpg?amount=X&addInfo=Y
+                var accountNumber = sepayConfig["AccountNumber"] ?? "0344171575";
+                var bankBin = sepayConfig["BankName"] ?? "970422";
+                payment.QrCodeUrl = $"https://img.vietqr.io/image/{bankBin}-{accountNumber}-compact.jpg" +
+                                    $"?amount={totalAmount:F0}&addInfo={payment.PaymentReference}";
             }
 
             // CreatePaymentAsync giờ INSERT kèm luôn payment_method và status (PostgreSQL enum)
