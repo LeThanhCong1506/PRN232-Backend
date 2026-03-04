@@ -466,7 +466,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION generate_payment_reference(p_order_number VARCHAR)
 RETURNS VARCHAR(100) AS $$
 BEGIN
-    RETURN 'STEM' || SUBSTRING(p_order_number FROM 4);
+    RETURN 'SEVQR' || SUBSTRING(p_order_number FROM 4);
 END;
 $$ LANGUAGE plpgsql;
 

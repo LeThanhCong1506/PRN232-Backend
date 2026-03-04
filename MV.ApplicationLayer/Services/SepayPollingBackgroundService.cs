@@ -153,12 +153,12 @@ public class SepayPollingBackgroundService : BackgroundService
 
             if (!string.IsNullOrEmpty(paymentRef))
             {
-                // === STEM reference found → LUÔN thử match (an toàn vì match chính xác theo mã) ===
-                // Đây là fix chính: giao dịch có STEM ref sẽ được re-check mỗi poll
+                // === SEVQR reference found → LUÔN thử match (an toàn vì match chính xác theo mã) ===
+                // Đây là fix chính: giao dịch có SEVQR ref sẽ được re-check mỗi poll
                 // cho đến khi match thành công, kể cả khi order được tạo SAU giao dịch
-                var orderNumber = "ORD" + paymentRef.Substring(4);
+                var orderNumber = "ORD" + paymentRef.Substring(5);
                 _logger.LogInformation(
-                    "SePay Polling: Tx {TxId} has STEM ref '{PaymentRef}' → trying OrderNumber='{OrderNumber}'",
+                    "SePay Polling: Tx {TxId} has SEVQR ref '{PaymentRef}' → trying OrderNumber='{OrderNumber}'",
                     tx.Id, paymentRef, orderNumber);
 
                 if (await TryCompleteOrder(orderRepo, paymentService, orderNumber, tx))
@@ -291,19 +291,19 @@ public class SepayPollingBackgroundService : BackgroundService
     }
 
     /// <summary>
-    /// Tìm chuỗi "STEMxxxxxxxxxxx" trong nội dung chuyển khoản
+    /// Tìm chuỗi "SEVQRxxxxxxxxxxx" trong nội dung chuyển khoản
     /// </summary>
     private static string? ExtractPaymentReference(string content)
     {
         var upperContent = content.ToUpper();
-        var index = upperContent.IndexOf("STEM");
+        var index = upperContent.IndexOf("SEVQR");
         if (index < 0) return null;
 
         var remaining = content.Substring(index);
-        if (remaining.Length < 15) return null;
+        if (remaining.Length < 16) return null;
 
-        var reference = remaining.Substring(0, 15).ToUpper();
-        var digits = reference.Substring(4);
+        var reference = remaining.Substring(0, 16).ToUpper();
+        var digits = reference.Substring(5);
         if (!digits.All(char.IsDigit)) return null;
 
         return reference;
