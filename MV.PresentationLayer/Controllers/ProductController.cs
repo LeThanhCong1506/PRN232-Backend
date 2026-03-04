@@ -106,7 +106,7 @@ namespace MV.PresentationLayer.Controllers
         /// - HasSerialTracking = true → StockQuantity = 0 (quản lý bằng serial)
         /// </remarks>
         [HttpPost]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Create new product")]
         public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request)
         {
@@ -162,7 +162,7 @@ namespace MV.PresentationLayer.Controllers
         /// - Nếu có lỗi bất kỳ → rollback toàn bộ
         /// </remarks>
         [HttpPost("kit")]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Create KIT product with components in single atomic transaction")]
         public async Task<IActionResult> CreateKit([FromBody] CreateKitRequest request)
         {
@@ -206,7 +206,7 @@ namespace MV.PresentationLayer.Controllers
         /// - Categories cũ sẽ bị xóa và thay bằng CategoryIds mới
         /// </remarks>
         [HttpPut("{id}")]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Update product")]
         public async Task<IActionResult> UpdateProduct(int id, [FromBody] UpdateProductRequest request)
         {
@@ -240,7 +240,7 @@ namespace MV.PresentationLayer.Controllers
         /// - Tự động xóa ảnh, categories liên quan
         /// </remarks>
         [HttpDelete("{id}")]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Delete product")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
@@ -271,7 +271,7 @@ namespace MV.PresentationLayer.Controllers
         /// - Không trùng lặp
         /// </remarks>
         [HttpPost("{id}/categories")]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Add categories to product")]
         public async Task<IActionResult> AddCategoriesToProduct(int id, [FromBody] List<int> categoryIds)
         {
@@ -297,7 +297,7 @@ namespace MV.PresentationLayer.Controllers
         ///     DELETE /api/product/5/categories/3
         /// </remarks>
         [HttpDelete("{id}/categories/{categoryId}")]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Remove category from product")]
         public async Task<IActionResult> RemoveCategoryFromProduct(int id, int categoryId)
         {
@@ -401,7 +401,7 @@ namespace MV.PresentationLayer.Controllers
         /// - Child product chưa có trong bundle
         /// </remarks>
         [HttpPost("{kitId}/bundle")]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Add product to KIT")]
         public async Task<IActionResult> AddProductToKit(int kitId, [FromBody] AddProductToBundleRequest request)
         {
@@ -434,7 +434,7 @@ namespace MV.PresentationLayer.Controllers
         /// Xóa Arduino Uno khỏi Arduino Starter Kit
         /// </remarks>
         [HttpDelete("{kitId}/bundle/{childProductId}")]
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [SwaggerOperation(Summary = "Remove product from KIT")]
         public async Task<IActionResult> RemoveProductFromKit(int kitId, int childProductId)
         {

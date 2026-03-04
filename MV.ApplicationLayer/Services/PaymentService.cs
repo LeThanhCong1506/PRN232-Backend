@@ -19,19 +19,22 @@ public class PaymentService : IPaymentService
     private readonly StemDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<PaymentService> _logger;
+    private readonly INotificationService _notificationService;
 
     public PaymentService(
         ISepayRepository sepayRepo,
         IOrderRepository orderRepo,
         StemDbContext context,
         IConfiguration configuration,
-        ILogger<PaymentService> logger)
+        ILogger<PaymentService> logger,
+        INotificationService notificationService)
     {
         _sepayRepo = sepayRepo;
         _orderRepo = orderRepo;
         _context = context;
         _configuration = configuration;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     // ==================== PROCESS WEBHOOK ====================
@@ -156,6 +159,9 @@ public class PaymentService : IPaymentService
                 _logger.LogInformation(
                     "Payment completed successfully: OrderId={OrderId}, Amount={Amount}",
                     payment.OrderId, request.TransferAmount);
+
+                // Notify realtime: payment confirmed
+                try { await _notificationService.SendPaymentConfirmedAsync(payment.Order.UserId, payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
 
                 return ApiResponse<object>.SuccessResponse(null!, "Payment processed successfully");
             }
@@ -397,6 +403,9 @@ public class PaymentService : IPaymentService
                     "Success callback: Payment completed for OrderId={OrderId}, OrderNumber={OrderNumber}",
                     order.OrderId, order.OrderNumber);
 
+                // Notify realtime: payment confirmed
+                try { await _notificationService.SendPaymentConfirmedAsync(order.UserId, order.OrderId, order.OrderNumber, payment.Amount); } catch { }
+
                 return ApiResponse<PaymentStatusResponse>.SuccessResponse(new PaymentStatusResponse
                 {
                     OrderId = order.OrderId,
@@ -477,6 +486,9 @@ public class PaymentService : IPaymentService
                     }
 
                     await transaction.CommitAsync();
+
+                    // Notify realtime: payment expired
+                    try { await _notificationService.SendPaymentExpiredAsync(order.UserId, orderId, order.OrderNumber); } catch { }
 
                     _logger.LogInformation("Expired and cancelled order: OrderId={OrderId}", orderId);
                 }

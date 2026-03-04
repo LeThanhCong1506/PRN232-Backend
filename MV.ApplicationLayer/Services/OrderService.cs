@@ -17,17 +17,20 @@ public class OrderService : IOrderService
     private readonly ICartRepository _cartRepo;
     private readonly StemDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly INotificationService _notificationService;
 
     public OrderService(
         IOrderRepository orderRepo,
         ICartRepository cartRepo,
         StemDbContext context,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        INotificationService notificationService)
     {
         _orderRepo = orderRepo;
         _cartRepo = cartRepo;
         _context = context;
         _configuration = configuration;
+        _notificationService = notificationService;
     }
 
     // ==================== CHECKOUT ====================
@@ -204,11 +207,11 @@ public class OrderService : IOrderService
                 var sepayConfig = _configuration.GetSection("SePay");
 
                 // Generate QR Code URL (hiển thị QR trực tiếp trên frontend)
-                var accountNumber = sepayConfig["AccountNumber"];
-                var bankName = sepayConfig["BankName"];
-                var qrBaseUrl = sepayConfig["QrBaseUrl"] ?? "https://qr.sepay.vn/img";
-                payment.QrCodeUrl = $"{qrBaseUrl}?bank={bankName}&acc={accountNumber}" +
-                                    $"&template=compact&amount={totalAmount:F0}&des={payment.PaymentReference}";
+                // VietQR format: https://img.vietqr.io/image/{BankBIN}-{AccountNo}-{template}.jpg?amount=X&addInfo=Y
+                var accountNumber = sepayConfig["AccountNumber"] ?? "0344171575";
+                var bankBin = sepayConfig["BankName"] ?? "970422";
+                payment.QrCodeUrl = $"https://img.vietqr.io/image/{bankBin}-{accountNumber}-compact.jpg" +
+                                    $"?amount={totalAmount:F0}&addInfo={payment.PaymentReference}";
             }
 
             // CreatePaymentAsync giờ INSERT kèm luôn payment_method và status (PostgreSQL enum)
@@ -252,6 +255,9 @@ public class OrderService : IOrderService
                     ? "Order successful. Payment upon delivery."
                     : "Order successful. Redirect to checkoutUrl to complete payment."
             };
+
+            // Notify admins about new order
+            try { await _notificationService.SendToAdminsAsync("NewOrderPlaced", new { OrderId = order.OrderId, OrderNumber = orderNumber, TotalAmount = totalAmount, UserId = userId }); } catch { }
 
             return ApiResponse<CheckoutResponse>.SuccessResponse(response, "Order placed successfully.");
         }
@@ -376,6 +382,9 @@ public class OrderService : IOrderService
         await _orderRepo.UpdateOrderAsync(order);
         await _orderRepo.SetOrderStatusAsync(orderId, newStatus.ToString());
 
+        // Notify realtime: order status changed
+        try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus.ToString()); } catch { }
+
         // Reload and return
         order = await _orderRepo.GetOrderByIdAsync(orderId);
         var detail = await MapToOrderDetail(order!);
@@ -431,6 +440,10 @@ public class OrderService : IOrderService
             }
 
             await transaction.CommitAsync();
+
+            // Notify realtime: order cancelled
+            try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, "CANCELLED"); } catch { }
+
             return ApiResponse<object>.SuccessResponse(null!, "Order cancelled successfully.");
         }
         catch (Exception ex)

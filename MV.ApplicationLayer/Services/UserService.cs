@@ -34,6 +34,7 @@ namespace MV.ApplicationLayer.Services
             {
                 RoleId = 2, //User role
                 Username = dto.Username,
+                FullName = dto.FullName,
                 Email = dto.Email,
                 PasswordHash = HashPassword(dto.Password),
                 Phone = dto.Phone,
@@ -99,6 +100,7 @@ namespace MV.ApplicationLayer.Services
                 Username = user.Username,
                 Email = user.Email,
                 RoleName = user.Role.RoleName,
+                FullName = user.FullName,
                 Phone = user.Phone,
                 Address = user.Address,
                 IsActive = user.IsActive,
