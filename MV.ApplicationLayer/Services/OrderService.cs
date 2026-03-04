@@ -197,7 +197,8 @@ public class OrderService : IOrderService
             string? checkoutUrl = null;
             if (paymentMethod == PaymentMethodEnum.SEPAY)
             {
-                payment.PaymentReference = "STEM" + orderNumber.Substring(3);
+                // Nội dung chuyển khoản
+                payment.PaymentReference = "SEVQR" + orderNumber.Substring(3);
                 payment.ExpiredAt = DateTime.Now.AddMinutes(30);
 
                 var sepayConfig = _configuration.GetSection("SePay");
