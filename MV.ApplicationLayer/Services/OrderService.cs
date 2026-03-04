@@ -202,7 +202,7 @@ public class OrderService : IOrderService
             {
                 // Nội dung chuyển khoản
                 payment.PaymentReference = "SEVQR" + orderNumber.Substring(3);
-                payment.ExpiredAt = DateTime.Now.AddMinutes(30);
+                payment.ExpiredAt = DateTime.Now.AddMinutes(10);
 
                 var sepayConfig = _configuration.GetSection("SePay");
 
