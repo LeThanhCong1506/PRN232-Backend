@@ -19,19 +19,22 @@ public class PaymentService : IPaymentService
     private readonly StemDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<PaymentService> _logger;
+    private readonly INotificationService _notificationService;
 
     public PaymentService(
         ISepayRepository sepayRepo,
         IOrderRepository orderRepo,
         StemDbContext context,
         IConfiguration configuration,
-        ILogger<PaymentService> logger)
+        ILogger<PaymentService> logger,
+        INotificationService notificationService)
     {
         _sepayRepo = sepayRepo;
         _orderRepo = orderRepo;
         _context = context;
         _configuration = configuration;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     // ==================== PROCESS WEBHOOK ====================
@@ -156,6 +159,9 @@ public class PaymentService : IPaymentService
                 _logger.LogInformation(
                     "Payment completed successfully: OrderId={OrderId}, Amount={Amount}",
                     payment.OrderId, request.TransferAmount);
+
+                // Notify realtime: payment confirmed
+                try { await _notificationService.SendPaymentConfirmedAsync(payment.Order.UserId, payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
 
                 return ApiResponse<object>.SuccessResponse(null!, "Payment processed successfully");
             }
@@ -397,6 +403,9 @@ public class PaymentService : IPaymentService
                     "Success callback: Payment completed for OrderId={OrderId}, OrderNumber={OrderNumber}",
                     order.OrderId, order.OrderNumber);
 
+                // Notify realtime: payment confirmed
+                try { await _notificationService.SendPaymentConfirmedAsync(order.UserId, order.OrderId, order.OrderNumber, payment.Amount); } catch { }
+
                 return ApiResponse<PaymentStatusResponse>.SuccessResponse(new PaymentStatusResponse
                 {
                     OrderId = order.OrderId,
@@ -478,6 +487,9 @@ public class PaymentService : IPaymentService
 
                     await transaction.CommitAsync();
 
+                    // Notify realtime: payment expired
+                    try { await _notificationService.SendPaymentExpiredAsync(order.UserId, orderId, order.OrderNumber); } catch { }
+
                     _logger.LogInformation("Expired and cancelled order: OrderId={OrderId}", orderId);
                 }
                 catch (Exception ex)
@@ -496,8 +508,8 @@ public class PaymentService : IPaymentService
     // ==================== PRIVATE HELPERS ====================
 
     /// <summary>
-    /// Extract payment reference (e.g., "STEM20260207001") from transfer content.
-    /// SePay content may have extra text, so we search for the STEM pattern.
+    /// Extract payment reference (e.g., "SEVQR20260207001") from transfer content.
+    /// SePay content may have extra text, so we search for the SEVQR pattern.
     /// </summary>
     private static string? ExtractPaymentReference(string? content)
     {
@@ -507,20 +519,20 @@ public class PaymentService : IPaymentService
         // Normalize: uppercase, remove spaces
         var normalized = content.ToUpperInvariant().Replace(" ", "");
 
-        // Look for STEM pattern: STEM + 8 digits (date) + 3 digits (sequence)
-        var index = normalized.IndexOf("STEM", StringComparison.Ordinal);
+        // Look for SEVQR pattern: SEVQR + 8 digits (date) + 3 digits (sequence)
+        var index = normalized.IndexOf("SEVQR", StringComparison.Ordinal);
         if (index < 0)
             return null;
 
-        // STEM + 11 chars = "STEM20260207001"
+        // SEVQR + 11 chars = "SEVQR20260207001"
         var remaining = normalized.Substring(index);
-        if (remaining.Length < 15) // "STEM" (4) + "yyyyMMdd" (8) + "###" (3) = 15
+        if (remaining.Length < 16) // "SEVQR" (5) + "yyyyMMdd" (8) + "###" (3) = 16
             return null;
 
-        var reference = remaining.Substring(0, 15);
+        var reference = remaining.Substring(0, 16);
 
-        // Validate format: STEM + 11 digits
-        var digitPart = reference.Substring(4);
+        // Validate format: SEVQR + 11 digits
+        var digitPart = reference.Substring(5);
         if (digitPart.All(char.IsDigit))
             return reference;
 

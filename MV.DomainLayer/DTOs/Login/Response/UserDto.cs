@@ -12,6 +12,7 @@ namespace MV.DomainLayer.DTOs.Login.Response
         public string Username { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string RoleName { get; set; } = null!;
+        public string? FullName { get; set; }
         public string Phone { get; set; }
         public string Address { get; set; }
         public bool? IsActive { get; set; }

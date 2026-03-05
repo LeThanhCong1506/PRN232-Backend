@@ -9,6 +9,9 @@ using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
+using MV.InfrastructureLayer.Services;
+using MV.PresentationLayer.Hubs;
+using MV.PresentationLayer.Services;
 using System.Text;
 
 namespace MV.PresentationLayer
@@ -99,6 +102,21 @@ namespace MV.PresentationLayer
                             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
                         )
                     };
+
+                    // SignalR: cho phép gửi JWT token qua query string (vì WebSocket không hỗ trợ header)
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+                            var path = context.HttpContext.Request.Path;
+                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                            {
+                                context.Token = accessToken;
+                            }
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
 
             builder.Services.AddAuthorization();
@@ -159,6 +177,13 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IAdminProductService, AdminProductService>();
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
+
+            // Cloudinary
+            builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
+
+            // SignalR + Realtime Notification
+            builder.Services.AddSignalR();
+            builder.Services.AddSingleton<INotificationService, SignalRNotificationService>();
 
             // Background service: auto-expire overdue SEPAY payments every 60 seconds
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
@@ -221,6 +246,10 @@ namespace MV.PresentationLayer
             app.UseAuthorization();
 
             app.MapControllers();
+
+            // SignalR Hub endpoints
+            app.MapHub<NotificationHub>("/hubs/notification");
+            app.MapHub<ChatHub>("/hubs/chat");
 
             app.Run();
         }

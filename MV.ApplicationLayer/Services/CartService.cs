@@ -11,12 +11,14 @@ namespace MV.ApplicationLayer.Services
         private readonly ICartRepository _cartRepository;
         private readonly IProductRepository _productRepository;
         private readonly ICouponRepository _couponRepository;
+        private readonly INotificationService _notificationService;
 
-        public CartService(ICartRepository cartRepository, IProductRepository productRepository, ICouponRepository couponRepository)
+        public CartService(ICartRepository cartRepository, IProductRepository productRepository, ICouponRepository couponRepository, INotificationService notificationService)
         {
             _cartRepository = cartRepository;
             _productRepository = productRepository;
             _couponRepository = couponRepository;
+            _notificationService = notificationService;
         }
 
         public async Task<ApiResponse<CartResponseDto>> GetCartAsync(int userId)
@@ -132,6 +134,9 @@ namespace MV.ApplicationLayer.Services
                 ItemTotal = (cartItem.Quantity ?? 0) * (cartItem.Product.Price)
             };
 
+            // Notify realtime: cart updated
+            await NotifyCartUpdatedAsync(userId);
+
             return new ApiResponse<object>
             {
                 Success = true,
@@ -154,6 +159,7 @@ namespace MV.ApplicationLayer.Services
             if (quantity == 0)
             {
                 await _cartRepository.DeleteCartItemAsync(cartItem);
+                await NotifyCartUpdatedAsync(userId);
                 return new ApiResponse<object>
                 {
                     Success = true,
@@ -192,6 +198,9 @@ namespace MV.ApplicationLayer.Services
                 ItemTotal = (cartItem.Quantity ?? 0) * (cartItem.Product.Price)
             };
 
+            // Notify realtime: cart updated
+            await NotifyCartUpdatedAsync(userId);
+
             return new ApiResponse<object>
             {
                 Success = true,
@@ -221,6 +230,9 @@ namespace MV.ApplicationLayer.Services
             // 4. Xóa
             await _cartRepository.DeleteCartItemAsync(cartItem);
 
+            // Notify realtime: cart updated
+            await NotifyCartUpdatedAsync(userId);
+
             // 5. Trả về thông báo thành công
             return new ApiResponse<object>
             {
@@ -248,6 +260,9 @@ namespace MV.ApplicationLayer.Services
 
             // 3. Xóa tất cả cart items (giữ lại cart record)
             await _cartRepository.ClearCartAsync(cart.CartId);
+
+            // Notify realtime: cart cleared
+            await _notificationService.SendCartUpdatedAsync(userId, 0);
 
             // 4. Trả về thành công
             return new ApiResponse<object>
@@ -333,6 +348,23 @@ namespace MV.ApplicationLayer.Services
             };
 
             return ApiResponse<ValidateCouponResponseDto>.SuccessResponse(responseData, "Coupon applied successfully.");
+        }
+
+        /// <summary>
+        /// Helper: tính tổng items trong cart rồi gửi notification realtime
+        /// </summary>
+        private async Task NotifyCartUpdatedAsync(int userId)
+        {
+            try
+            {
+                var cart = await _cartRepository.GetCartByUserIdAsync(userId);
+                var totalItems = cart?.CartItems?.Sum(ci => ci.Quantity ?? 0) ?? 0;
+                await _notificationService.SendCartUpdatedAsync(userId, totalItems);
+            }
+            catch
+            {
+                // Notification failure should not break the cart operation
+            }
         }
     }
 }

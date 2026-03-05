@@ -64,6 +64,8 @@ public partial class StemDbContext : DbContext
 
     public virtual DbSet<WarrantyPolicy> WarrantyPolicies { get; set; }
 
+    public virtual DbSet<ChatMessage> ChatMessages { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -1223,6 +1225,32 @@ public partial class StemDbContext : DbContext
                 .HasMaxLength(100)
                 .HasColumnName("policy_name");
             entity.Property(e => e.TermsAndConditions).HasColumnName("terms_and_conditions");
+        });
+
+        // ChatMessage entity configuration
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.HasKey(e => e.MessageId).HasName("chat_message_pkey");
+
+            entity.ToTable("chat_message");
+
+            entity.Property(e => e.MessageId).HasColumnName("message_id");
+            entity.Property(e => e.SenderId).HasColumnName("sender_id");
+            entity.Property(e => e.ReceiverId).HasColumnName("receiver_id");
+            entity.Property(e => e.Content).HasColumnName("content");
+            entity.Property(e => e.IsFromAdmin).HasColumnName("is_from_admin");
+            entity.Property(e => e.SentAt).HasColumnName("sent_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsRead).HasColumnName("is_read").HasDefaultValue(false);
+
+            entity.HasOne(e => e.Sender)
+                .WithMany()
+                .HasForeignKey(e => e.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.Receiver)
+                .WithMany()
+                .HasForeignKey(e => e.ReceiverId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         OnModelCreatingPartial(modelBuilder);
