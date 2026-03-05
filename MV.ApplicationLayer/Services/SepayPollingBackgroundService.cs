@@ -24,7 +24,9 @@ public class SepayPollingBackgroundService : BackgroundService
     private readonly HttpClient _httpClient;
     private readonly TimeSpan _interval = TimeSpan.FromSeconds(8); // Thời gian check
 
-    // Lưu ID giao dịch đã xử lý để không xử lý lại
+    // Track giao dịch đã match thành công → không cần thử lại
+    private readonly HashSet<long> _matchedTransactionIds = new();
+    // Track ID cao nhất để phân biệt giao dịch mới (chỉ dùng cho amount matching)
     private long _lastProcessedId = 0;
 
     public SepayPollingBackgroundService(
@@ -120,73 +122,90 @@ public class SepayPollingBackgroundService : BackgroundService
             return;
         }
 
-        _logger.LogInformation("SePay Polling: Found {Count} transactions, lastProcessedId={LastId}",
-            sepayResponse.Transactions.Count, _lastProcessedId);
-
         // Lấy danh sách order PENDING SEPAY từ DB để match
         using var scope = _serviceProvider.CreateScope();
         var orderRepo = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
         var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
-        var sepayRepo = scope.ServiceProvider.GetRequiredService<ISepayRepository>();
+
+        // Kiểm tra có pending orders không - nếu không có thì skip để tiết kiệm resource
+        var pendingOrders = await orderRepo.GetPendingSepayOrdersAsync();
+        if (pendingOrders.Count == 0)
+        {
+            // Không có order PENDING → chỉ cập nhật lastProcessedId rồi skip
+            var maxId = sepayResponse.Transactions.Max(t => t.Id);
+            if (maxId > _lastProcessedId)
+                _lastProcessedId = maxId;
+            return;
+        }
+
+        _logger.LogInformation(
+            "SePay Polling: Found {TxCount} transactions, {OrderCount} pending orders, lastProcessedId={LastId}",
+            sepayResponse.Transactions.Count, pendingOrders.Count, _lastProcessedId);
 
         foreach (var tx in sepayResponse.Transactions)
         {
-            // Chỉ xử lý giao dịch mới (ID lớn hơn giao dịch đã xử lý cuối cùng)
-            if (tx.Id <= _lastProcessedId)
+            // Skip tiền RA hoặc giao dịch đã match thành công
+            if (tx.AmountIn <= 0 || _matchedTransactionIds.Contains(tx.Id))
                 continue;
 
-            // Chỉ xử lý tiền VÀO (amount_in > 0)
-            if (tx.AmountIn <= 0)
-            {
-                _logger.LogDebug("SePay Polling: Skipping tx {TxId} - AmountIn={AmountIn} (not incoming)", tx.Id, tx.AmountIn);
-                continue;
-            }
-
-            _logger.LogInformation("SePay Polling: Processing tx {TxId}, AmountIn={AmountIn}, Content='{Content}'",
-                tx.Id, tx.AmountIn, tx.TransactionContent);
-
-            // === Cách 1: Tìm "STEM..." trong nội dung (khi user quét QR trực tiếp) ===
             var content = tx.TransactionContent ?? "";
             var paymentRef = ExtractPaymentReference(content);
 
             if (!string.IsNullOrEmpty(paymentRef))
             {
-                // Tìm được STEM... → match trực tiếp
-                var orderNumber = "ORD" + paymentRef.Substring(4);
-                _logger.LogInformation("SePay Polling: Found STEM ref '{PaymentRef}' → OrderNumber='{OrderNumber}'",
-                    paymentRef, orderNumber);
-                await TryCompleteOrder(orderRepo, paymentService, orderNumber, tx);
-                continue;
+                // === SEVQR reference found → LUÔN thử match (an toàn vì match chính xác theo mã) ===
+                // Đây là fix chính: giao dịch có SEVQR ref sẽ được re-check mỗi poll
+                // cho đến khi match thành công, kể cả khi order được tạo SAU giao dịch
+                var orderNumber = "ORD" + paymentRef.Substring(5);
+                _logger.LogInformation(
+                    "SePay Polling: Tx {TxId} has SEVQR ref '{PaymentRef}' → trying OrderNumber='{OrderNumber}'",
+                    tx.Id, paymentRef, orderNumber);
+
+                if (await TryCompleteOrder(orderRepo, paymentService, orderNumber, tx))
+                {
+                    _matchedTransactionIds.Add(tx.Id);
+                }
             }
+            else if (tx.Id > _lastProcessedId)
+            {
+                // === Không có STEM ref, CHỈ thử cho giao dịch MỚI (tránh false match bằng amount) ===
+                _logger.LogInformation(
+                    "SePay Polling: New tx {TxId}, AmountIn={AmountIn}, no STEM ref, trying amount match...",
+                    tx.Id, tx.AmountIn);
 
-            _logger.LogInformation("SePay Polling: No STEM ref found in content, trying amount matching...");
-
-            // === Cách 2: Match bằng số tiền (khi user thanh toán qua Payment Gateway) ===
-            // Tìm order PENDING có amount khớp chính xác với giao dịch
-            await TryMatchByAmount(orderRepo, paymentService, tx);
+                if (await TryMatchByAmount(orderRepo, paymentService, tx))
+                {
+                    _matchedTransactionIds.Add(tx.Id);
+                }
+            }
         }
 
-        // Cập nhật lastProcessedId = max ID trong batch
-        var maxId = sepayResponse.Transactions.Max(t => t.Id);
-        if (maxId > _lastProcessedId)
+        // Cập nhật lastProcessedId (chỉ dùng cho amount matching filter)
+        var maxTxId = sepayResponse.Transactions.Max(t => t.Id);
+        if (maxTxId > _lastProcessedId)
         {
-            _lastProcessedId = maxId;
+            _lastProcessedId = maxTxId;
             _logger.LogDebug("SePay Polling: Updated lastProcessedId to {LastId}", _lastProcessedId);
         }
+
+        // Cleanup: chỉ giữ IDs còn trong batch hiện tại (xóa các ID cũ đã ra khỏi top 20)
+        _matchedTransactionIds.IntersectWith(sepayResponse.Transactions.Select(t => t.Id));
     }
 
     /// <summary>
-    /// Cập nhật order khi tìm được payment reference trực tiếp
+    /// Cập nhật order khi tìm được payment reference trực tiếp.
+    /// Returns true nếu match thành công (order đã COMPLETED hoặc vừa được cập nhật).
     /// </summary>
-    private async Task TryCompleteOrder(
+    private async Task<bool> TryCompleteOrder(
         IOrderRepository orderRepo, IPaymentService paymentService,
         string orderNumber, SepayTransactionItem tx)
     {
         var order = await orderRepo.GetOrderByOrderNumberAsync(orderNumber);
-        if (order == null) return;
+        if (order == null) return false;
 
         var paymentStatus = await orderRepo.GetPaymentStatusByOrderIdAsync(order.OrderId);
-        if (paymentStatus != PaymentStatusEnum.PENDING.ToString()) return;
+        if (paymentStatus == PaymentStatusEnum.COMPLETED.ToString()) return true; // Đã xong
+        if (paymentStatus != PaymentStatusEnum.PENDING.ToString()) return false;
 
         // Kiểm tra số tiền
         if (order.Payment != null && tx.AmountIn < order.Payment.Amount)
@@ -194,7 +213,7 @@ public class SepayPollingBackgroundService : BackgroundService
             _logger.LogWarning(
                 "SePay Polling: Số tiền không khớp. OrderId={OrderId}, Expected={Expected}, Received={Received}",
                 order.OrderId, order.Payment.Amount, tx.AmountIn);
-            return;
+            return false;
         }
 
         _logger.LogInformation(
@@ -203,13 +222,15 @@ public class SepayPollingBackgroundService : BackgroundService
 
         var result = await paymentService.ProcessSuccessCallbackAsync(orderNumber);
         LogResult(order.OrderId, result);
+        return result.Success;
     }
 
     /// <summary>
     /// Match giao dịch với order PENDING bằng số tiền chính xác.
     /// Dùng khi thanh toán qua SePay Payment Gateway (nội dung không chứa STEM...).
+    /// Returns true nếu match thành công.
     /// </summary>
-    private async Task TryMatchByAmount(
+    private async Task<bool> TryMatchByAmount(
         IOrderRepository orderRepo, IPaymentService paymentService,
         SepayTransactionItem tx)
     {
@@ -251,8 +272,10 @@ public class SepayPollingBackgroundService : BackgroundService
             LogResult(order.OrderId, result);
 
             // Đã match 1 order → dừng (không match giao dịch này với order khác)
-            break;
+            return result.Success;
         }
+
+        return false;
     }
 
     private void LogResult(int orderId, DomainLayer.DTOs.ResponseModels.ApiResponse<DomainLayer.DTOs.Payment.Response.PaymentStatusResponse> result)
@@ -268,19 +291,19 @@ public class SepayPollingBackgroundService : BackgroundService
     }
 
     /// <summary>
-    /// Tìm chuỗi "STEMxxxxxxxxxxx" trong nội dung chuyển khoản
+    /// Tìm chuỗi "SEVQRxxxxxxxxxxx" trong nội dung chuyển khoản
     /// </summary>
     private static string? ExtractPaymentReference(string content)
     {
         var upperContent = content.ToUpper();
-        var index = upperContent.IndexOf("STEM");
+        var index = upperContent.IndexOf("SEVQR");
         if (index < 0) return null;
 
         var remaining = content.Substring(index);
-        if (remaining.Length < 15) return null;
+        if (remaining.Length < 16) return null;
 
-        var reference = remaining.Substring(0, 15).ToUpper();
-        var digits = reference.Substring(4);
+        var reference = remaining.Substring(0, 16).ToUpper();
+        var digits = reference.Substring(5);
         if (!digits.All(char.IsDigit)) return null;
 
         return reference;

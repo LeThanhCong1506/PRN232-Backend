@@ -508,8 +508,8 @@ public class PaymentService : IPaymentService
     // ==================== PRIVATE HELPERS ====================
 
     /// <summary>
-    /// Extract payment reference (e.g., "STEM20260207001") from transfer content.
-    /// SePay content may have extra text, so we search for the STEM pattern.
+    /// Extract payment reference (e.g., "SEVQR20260207001") from transfer content.
+    /// SePay content may have extra text, so we search for the SEVQR pattern.
     /// </summary>
     private static string? ExtractPaymentReference(string? content)
     {
@@ -519,20 +519,20 @@ public class PaymentService : IPaymentService
         // Normalize: uppercase, remove spaces
         var normalized = content.ToUpperInvariant().Replace(" ", "");
 
-        // Look for STEM pattern: STEM + 8 digits (date) + 3 digits (sequence)
-        var index = normalized.IndexOf("STEM", StringComparison.Ordinal);
+        // Look for SEVQR pattern: SEVQR + 8 digits (date) + 3 digits (sequence)
+        var index = normalized.IndexOf("SEVQR", StringComparison.Ordinal);
         if (index < 0)
             return null;
 
-        // STEM + 11 chars = "STEM20260207001"
+        // SEVQR + 11 chars = "SEVQR20260207001"
         var remaining = normalized.Substring(index);
-        if (remaining.Length < 15) // "STEM" (4) + "yyyyMMdd" (8) + "###" (3) = 15
+        if (remaining.Length < 16) // "SEVQR" (5) + "yyyyMMdd" (8) + "###" (3) = 16
             return null;
 
-        var reference = remaining.Substring(0, 15);
+        var reference = remaining.Substring(0, 16);
 
-        // Validate format: STEM + 11 digits
-        var digitPart = reference.Substring(4);
+        // Validate format: SEVQR + 11 digits
+        var digitPart = reference.Substring(5);
         if (digitPart.All(char.IsDigit))
             return reference;
 

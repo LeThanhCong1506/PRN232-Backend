@@ -260,8 +260,8 @@ http://localhost:3000/payment/success?status=success&orderId=42&orderNumber=ORD2
     "totalAmount": 505000,
     "paymentMethod": "SEPAY",
     "paymentStatus": "PENDING",
-    "paymentReference": "STEM20260223001",
-    "qrCodeUrl": "https://qr.sepay.vn/img?bank=MBBank&acc=0123456789&template=compact&amount=505000&des=STEM20260223001",
+    "paymentReference": "SEVQR20260223001",
+    "qrCodeUrl": "https://qr.sepay.vn/img?bank=MBBank&acc=0123456789&template=compact&amount=505000&des=SEVQR20260223001",
     "checkoutUrl": "/api/Payment/42/checkout",
     "paymentExpiredAt": "2026-02-23T10:43:20+07:00",
     "message": "Order successful. Redirect to checkoutUrl to complete payment."
@@ -334,7 +334,7 @@ Authorization: Bearer <token>
     "amount": 505000,
     "receivedAmount": null,
     "qrCodeUrl": "https://qr.sepay.vn/img?bank=MBBank&acc=...",
-    "paymentReference": "STEM20260223001",
+    "paymentReference": "SEVQR20260223001",
     "expiredAt": "2026-02-23T10:43:20+07:00",
     "isPaid": false,
     "remainingSeconds": 1423
@@ -434,7 +434,7 @@ GET /api/Payment/42/checkout?successUrl=http://localhost:3000/payment/success&er
       "status": "PENDING",
       "amount": 505000,
       "receivedAmount": null,
-      "paymentReference": "STEM20260223001",
+      "paymentReference": "SEVQR20260223001",
       "transactionId": null,
       "qrCodeUrl": "https://qr.sepay.vn/img?...",
       "paymentDate": null,
@@ -538,7 +538,7 @@ GET /api/Order/my-orders?status=PENDING&pageNumber=1&pageSize=10
      │                    │───────────────────▶│                     │
      │                    │                     │ Tạo Order (PENDING) │
      │                    │                     │ Tạo Payment (PENDING, SEPAY)
-     │                    │                     │ + PaymentReference: STEM...
+     │                    │                     │ + PaymentReference: SEVQR...
      │                    │                     │ + QR Code URL
      │                    │                     │ + ExpiredAt (30 phút)
      │                    │                     │ Trừ stock, dùng coupon
@@ -940,7 +940,7 @@ Dùng **Cách 2** (SePay Redirect) khi:
 ### Q4: PaymentReference dùng để làm gì?
 
 - Đây là **nội dung chuyển khoản** mà user phải ghi khi chuyển tiền
-- Ví dụ: `STEM20260223001`
+- Ví dụ: `SEVQR20260223001`
 - Backend dùng nó để khớp giao dịch từ SePay webhook
 - **FE nên hiển thị rõ ràng** và cho user **copy** nội dung này
 
