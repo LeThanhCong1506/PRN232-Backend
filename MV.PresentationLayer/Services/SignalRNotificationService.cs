@@ -92,17 +92,4 @@ public class SignalRNotificationService : INotificationService
             _logger.LogError(ex, "Error sending {EventType} to user {UserId}", eventType, userId);
         }
     }
-
-    public async Task SendToAdminsAsync(string eventType, object data)
-    {
-        try
-        {
-            await _hubContext.Clients.Group("admin_notifications").SendAsync(eventType, data);
-            _logger.LogInformation("Admin broadcast sent: {EventType}", eventType);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending {EventType} to admins", eventType);
-        }
-    }
 }

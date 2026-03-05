@@ -33,16 +33,8 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
 
     public async Task UpdateAsync(WarrantyClaim claim)
     {
-        // Must use Raw SQL for PostgreSQL ENUM (claim_status_enum)
-        var sql = @"
-            UPDATE warranty_claim
-            SET status = {0}::claim_status_enum,
-                resolution = {1},
-                resolution_note = {2},
-                resolved_date = {3}
-            WHERE claim_id = {4}
-        ";
-        await _context.Database.ExecuteSqlRawAsync(sql, claim.Status, claim.Resolution, claim.ResolutionNote, claim.ResolvedDate, claim.ClaimId);
+        _context.WarrantyClaims.Update(claim);
+        await _context.SaveChangesAsync();
     }
 
     public async Task<List<WarrantyClaim>> GetAllAsync(string? status, int page, int pageSize)

@@ -29,9 +29,4 @@ public interface INotificationService
     /// Gửi thông báo tùy chỉnh
     /// </summary>
     Task SendNotificationAsync(int userId, string eventType, object data);
-
-    /// <summary>
-    /// Gửi thông báo tới Admin group
-    /// </summary>
-    Task SendToAdminsAsync(string eventType, object data);
 }
