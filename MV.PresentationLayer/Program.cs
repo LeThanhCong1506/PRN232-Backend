@@ -26,20 +26,28 @@ namespace MV.PresentationLayer
             var builder = WebApplication.CreateBuilder(args);
 
             // Configure CORS for Frontend
+            // Đọc thêm origins từ config (dùng cho production frontend URL)
+            var extraOrigins = builder.Configuration
+                .GetSection("Cors:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
+
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowFrontend", policy =>
                 {
-                    policy.WithOrigins(
-                            "http://localhost:5173",  
-                            "http://localhost:3000",  
-                            "http://127.0.0.1:5173",
-                            "http://localhost:5174",
-                            "http://localhost:5175",
-                            "http://127.0.0.1:3000",
-                            "http://localhost:5255",  // Swagger Docker
-                            "http://127.0.0.1:5255"
-                        )
+                    var origins = new[]
+                    {
+                        "http://localhost:5173",
+                        "http://localhost:3000",
+                        "http://127.0.0.1:5173",
+                        "http://localhost:5174",
+                        "http://localhost:5175",
+                        "http://127.0.0.1:3000",
+                        "http://localhost:5255",  // Swagger Docker
+                        "http://127.0.0.1:5255"
+                    }.Concat(extraOrigins).Distinct().ToArray();
+
+                    policy.WithOrigins(origins)
                         .AllowAnyMethod()
                         .AllowAnyHeader()
                         .AllowCredentials();
@@ -217,6 +225,13 @@ namespace MV.PresentationLayer
 
             var app = builder.Build();
 
+            // Auto-migrate database on startup (áp dụng các EF Core migrations chưa chạy)
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<StemDbContext>();
+                db.Database.Migrate();
+            }
+
             // Configure the HTTP request pipeline.
             // Enable Swagger in Development or when EnableSwagger is true (for Docker)
             var enableSwagger = app.Configuration.GetValue<bool>("EnableSwagger", false);
@@ -226,7 +241,12 @@ namespace MV.PresentationLayer
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
+            // Chỉ dùng HTTPS redirect khi không phải môi trường production trên Render
+            // (Render tự xử lý SSL termination, container chạy HTTP)
+            if (!app.Environment.IsProduction())
+            {
+                app.UseHttpsRedirection();
+            }
 
             // Serve static files from wwwroot (product images, etc.)
             var wwwrootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
