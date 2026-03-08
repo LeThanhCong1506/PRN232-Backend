@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Warranty.Request;
 using Swashbuckle.AspNetCore.Annotations;
@@ -15,10 +16,35 @@ namespace MV.PresentationLayer.Controllers;
 public class WarrantyController : ControllerBase
 {
     private readonly IWarrantyService _warrantyService;
+    private readonly MV.InfrastructureLayer.DBContext.StemDbContext _context;
 
-    public WarrantyController(IWarrantyService warrantyService)
+    public WarrantyController(IWarrantyService warrantyService, MV.InfrastructureLayer.DBContext.StemDbContext context)
     {
         _warrantyService = warrantyService;
+        _context = context;
+    }
+
+    /// <summary>
+    /// Lấy danh sách warranty policies (dùng cho dropdown trong form product)
+    /// </summary>
+    [HttpGet("policies")]
+    [AllowAnonymous]
+    [SwaggerOperation(Summary = "Get all warranty policies for dropdown")]
+    public async Task<IActionResult> GetWarrantyPolicies()
+    {
+        var policies = await _context.WarrantyPolicies
+            .Where(p => p.IsActive == true)
+            .OrderBy(p => p.DurationMonths)
+            .Select(p => new
+            {
+                p.PolicyId,
+                p.PolicyName,
+                p.DurationMonths,
+                p.Description
+            })
+            .ToListAsync();
+
+        return Ok(MV.DomainLayer.DTOs.ResponseModels.ApiResponse<object>.SuccessResponse(policies));
     }
 
     /// <summary>

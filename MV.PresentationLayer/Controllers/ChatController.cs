@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.DTOs.ResponseModels;
+using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
+using MV.PresentationLayer.Hubs;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
 
@@ -18,10 +21,78 @@ namespace MV.PresentationLayer.Controllers;
 public class ChatController : ControllerBase
 {
     private readonly StemDbContext _context;
+    private readonly IHubContext<ChatHub> _hubContext;
 
-    public ChatController(StemDbContext context)
+    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext)
     {
         _context = context;
+        _hubContext = hubContext;
+    }
+
+    /// <summary>
+    /// DTO for REST send message fallback
+    /// </summary>
+    public class SendMessageDto
+    {
+        public int? ReceiverId { get; set; }
+        public string Content { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// REST fallback: gửi tin nhắn khi SignalR chưa kết nối được.
+    /// Mirrors logic của ChatHub.SendMessage.
+    /// </summary>
+    [HttpPost("send")]
+    [SwaggerOperation(Summary = "Send chat message (REST fallback when SignalR is unavailable)")]
+    public async Task<IActionResult> SendMessage([FromBody] SendMessageDto dto)
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(dto.Content))
+            return BadRequest(ApiResponse<object>.ErrorResponse("Message content is required"));
+
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        var isAdmin = role == "Admin" || role == "Staff";
+        var senderName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+
+        var message = new ChatMessage
+        {
+            SenderId = userId,
+            ReceiverId = isAdmin ? dto.ReceiverId : null,
+            Content = dto.Content.Trim(),
+            IsFromAdmin = isAdmin,
+            SentAt = DateTime.Now,
+            IsRead = false
+        };
+
+        _context.ChatMessages.Add(message);
+        await _context.SaveChangesAsync();
+
+        var messageDto = new
+        {
+            message.MessageId,
+            message.SenderId,
+            SenderName = senderName,
+            message.ReceiverId,
+            message.Content,
+            message.IsFromAdmin,
+            message.SentAt,
+            message.IsRead
+        };
+
+        // Broadcast via SignalR hub context (even though client used REST)
+        if (isAdmin && dto.ReceiverId.HasValue)
+        {
+            await _hubContext.Clients.Group($"chat_user_{dto.ReceiverId.Value}")
+                .SendAsync("ReceiveMessage", messageDto);
+        }
+        else
+        {
+            await _hubContext.Clients.Group("chat_admins")
+                .SendAsync("ReceiveMessage", messageDto);
+        }
+
+        return Ok(ApiResponse<object>.SuccessResponse(messageDto, "Message sent"));
     }
 
     /// <summary>
