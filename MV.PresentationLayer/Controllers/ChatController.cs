@@ -216,6 +216,84 @@ public class ChatController : ControllerBase
         return Ok(ApiResponse<PagedResponse<object>>.SuccessResponse(pagedResponse));
     }
 
+    /// <summary>
+    /// [Admin] Mark all messages from a user as read
+    /// </summary>
+    [HttpPost("mark-read/{userId}")]
+    [Authorize(Roles = "Admin,Staff")]
+    [SwaggerOperation(Summary = "Mark all messages from a user as read (Admin only)")]
+    public async Task<IActionResult> MarkAsRead(int userId)
+    {
+        var unreadMessages = await _context.ChatMessages
+            .Where(m => m.SenderId == userId && !m.IsFromAdmin && !m.IsRead)
+            .ToListAsync();
+
+        foreach (var msg in unreadMessages)
+        {
+            msg.IsRead = true;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { markedCount = unreadMessages.Count }, "Messages marked as read"));
+    }
+
+    /// <summary>
+    /// [Customer] Get unread message count (messages from admin that customer hasn't read)
+    /// </summary>
+    [HttpGet("unread-count")]
+    [SwaggerOperation(Summary = "Get unread message count for current user")]
+    public async Task<IActionResult> GetUnreadCount()
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        var isAdmin = role == "Admin" || role == "Staff";
+
+        int count;
+        if (isAdmin)
+        {
+            // Admin: count unread messages from all customers
+            count = await _context.ChatMessages
+                .Where(m => !m.IsFromAdmin && !m.IsRead)
+                .CountAsync();
+        }
+        else
+        {
+            // Customer: count unread messages from admin to them
+            count = await _context.ChatMessages
+                .Where(m => m.IsFromAdmin && m.ReceiverId == userId && !m.IsRead)
+                .CountAsync();
+        }
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { unreadCount = count }));
+    }
+
+    /// <summary>
+    /// [Customer] Mark admin messages as read
+    /// </summary>
+    [HttpPost("mark-read")]
+    [SwaggerOperation(Summary = "Mark admin messages as read (Customer)")]
+    public async Task<IActionResult> MarkMyMessagesAsRead()
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+
+        var unreadMessages = await _context.ChatMessages
+            .Where(m => m.IsFromAdmin && m.ReceiverId == userId && !m.IsRead)
+            .ToListAsync();
+
+        foreach (var msg in unreadMessages)
+        {
+            msg.IsRead = true;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { markedCount = unreadMessages.Count }));
+    }
+
     private int GetUserId()
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
