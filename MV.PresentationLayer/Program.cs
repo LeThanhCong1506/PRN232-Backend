@@ -188,9 +188,8 @@ namespace MV.PresentationLayer
             // Background service: auto-expire overdue SEPAY payments every 60 seconds
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
 
-            // Background service: polling SePay API - TẠM TẮT do gây hết DB connections (53300: too many clients)
-            // TODO: Team BE fix connection pooling / dispose scope đúng cách trước khi bật lại
-            // builder.Services.AddHostedService<SepayPollingBackgroundService>();
+            // Background service: polling SePay API (bật cho local dev)
+            builder.Services.AddHostedService<SepayPollingBackgroundService>();
 
             // Prevent background service exceptions from crashing the host
             builder.Services.Configure<HostOptions>(options =>
