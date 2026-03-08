@@ -22,7 +22,7 @@ public class SepayPollingBackgroundService : BackgroundService
     private readonly IConfiguration _configuration;
     private readonly ILogger<SepayPollingBackgroundService> _logger;
     private readonly HttpClient _httpClient;
-    private readonly TimeSpan _interval = TimeSpan.FromSeconds(8); // Thời gian check
+    private readonly TimeSpan _interval = TimeSpan.FromSeconds(30); // Giảm tải DB, tránh conflict
 
     // Track giao dịch đã match thành công → không cần thử lại
     private readonly HashSet<long> _matchedTransactionIds = new();
