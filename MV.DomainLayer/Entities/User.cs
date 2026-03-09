@@ -33,6 +33,8 @@ public partial class User
 
     public string? StreetAddress { get; set; }
 
+    public string? FcmToken { get; set; }
+
     public virtual Cart? Cart { get; set; }
 
     public virtual ICollection<OrderHeader> OrderHeaderCancelledByNavigations { get; set; } = new List<OrderHeader>();

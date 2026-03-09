@@ -867,6 +867,9 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.Ward)
                 .HasMaxLength(50)
                 .HasColumnName("ward");
+            entity.Property(e => e.FcmToken)
+                .HasMaxLength(512)
+                .HasColumnName("fcm_token");
 
             entity.HasOne(d => d.Role).WithMany(p => p.Users)
                 .HasForeignKey(d => d.RoleId)

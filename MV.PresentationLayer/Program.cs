@@ -10,6 +10,8 @@ using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using MV.InfrastructureLayer.Repositories;
 using MV.InfrastructureLayer.Services;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 using MV.PresentationLayer.Hubs;
 using MV.PresentationLayer.Services;
 using System.Text;
@@ -187,9 +189,21 @@ namespace MV.PresentationLayer
             // Cloudinary
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 
-            // SignalR + Realtime Notification
+            // Firebase FCM
+            var firebaseCredPath = builder.Configuration["Firebase:CredentialPath"];
+            if (!string.IsNullOrEmpty(firebaseCredPath) && File.Exists(firebaseCredPath))
+            {
+                using var stream = new FileStream(firebaseCredPath, FileMode.Open, FileAccess.Read);
+                FirebaseApp.Create(new AppOptions
+                {
+                    Credential = GoogleCredential.FromStream(stream)
+                });
+            }
+            builder.Services.AddSingleton<IFcmService, FcmService>();
+
+            // SignalR + Realtime Notification + FCM Push
             builder.Services.AddSignalR();
-            builder.Services.AddSingleton<INotificationService, SignalRNotificationService>();
+            builder.Services.AddSingleton<INotificationService, HybridNotificationService>();
 
             // Background service: auto-expire overdue SEPAY payments every 60 seconds
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();

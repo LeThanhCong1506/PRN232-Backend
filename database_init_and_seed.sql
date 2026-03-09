@@ -53,6 +53,7 @@ CREATE TABLE "USER" (
     district VARCHAR(50),
     ward VARCHAR(50),
     street_address VARCHAR(200),
+    fcm_token VARCHAR(512),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_role FOREIGN KEY (role_id) REFERENCES ROLE(role_id) ON DELETE RESTRICT
