@@ -53,3 +53,5 @@ nunit-*.xml
 /.claude/settings.local.json
 /.claude/launch.json
 /MV.PresentationLayer/appsettings.json
+/MV.PresentationLayer/appsettings.json
+/MV.PresentationLayer/serviceAccountKey.json
