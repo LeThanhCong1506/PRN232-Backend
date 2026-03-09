@@ -1182,7 +1182,7 @@ public partial class StemDbContext : DbContext
                 .HasColumnName("created_at");
             entity.Property(e => e.IssueDescription).HasColumnName("issue_description");
             entity.Property(e => e.Status)
-                .HasMaxLength(50)
+                .HasColumnType("claim_status_enum")
                 .HasColumnName("status");
             entity.Property(e => e.Resolution).HasColumnName("resolution");
             entity.Property(e => e.ResolutionNote)

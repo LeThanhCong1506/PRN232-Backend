@@ -194,7 +194,7 @@ namespace MV.PresentationLayer
             // Background service: auto-expire overdue SEPAY payments every 60 seconds
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
 
-            // Background service: polling SePay API mỗi 15s kiểm tra giao dịch mới → tự cập nhật COMPLETED
+            // Background service: polling SePay API (bật cho local dev)
             builder.Services.AddHostedService<SepayPollingBackgroundService>();
 
             // Prevent background service exceptions from crashing the host
