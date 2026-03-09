@@ -223,11 +223,12 @@ namespace MV.PresentationLayer
 
             var app = builder.Build();
 
-            // Auto-migrate database on startup (áp dụng các EF Core migrations chưa chạy)
+            // Kiểm tra kết nối database khi startup (không tạo/xóa schema)
+            // Schema được quản lý bằng database_init_and_seed.sql
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<StemDbContext>();
-                db.Database.Migrate();
+                db.Database.CanConnect(); // chỉ kiểm tra kết nối, không thay đổi schema
             }
 
             // Configure the HTTP request pipeline.
