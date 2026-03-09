@@ -435,13 +435,14 @@ public class PaymentController : ControllerBase
             if (result.Success)
             {
                 var data = result.Data;
+                if (result.Message != null && result.Message.Contains("đã hoàn tất"))
+                {
+                    return Redirect($"{redirectUrl}?status=success&orderNumber={orderInvoiceNumber}&note=already_completed");
+                }
                 return Redirect($"{redirectUrl}?status=success&orderId={data?.OrderId}&orderNumber={orderInvoiceNumber}");
             }
             else
             {
-                if (result.Message.Contains("đã hoàn tất"))
-                    return Redirect($"{redirectUrl}?status=success&orderNumber={orderInvoiceNumber}&note=already_completed");
-
                 return Redirect($"{redirectUrl}?status=error&orderNumber={orderInvoiceNumber}&message={Uri.EscapeDataString(result.Message)}");
             }
         }
