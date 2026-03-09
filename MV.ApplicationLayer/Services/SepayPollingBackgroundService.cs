@@ -22,7 +22,8 @@ public class SepayPollingBackgroundService : BackgroundService
     private readonly IConfiguration _configuration;
     private readonly ILogger<SepayPollingBackgroundService> _logger;
     private readonly HttpClient _httpClient;
-    private readonly TimeSpan _interval = TimeSpan.FromSeconds(8); // Thời gian check
+    private readonly TimeSpan _interval = TimeSpan.FromSeconds(15); // Thời gian check
+    private readonly TimeSpan _errorBackoffDelay = TimeSpan.FromSeconds(30); // Chờ lâu hơn khi DB lỗi
 
     // Track giao dịch đã match thành công → không cần thử lại
     private readonly HashSet<long> _matchedTransactionIds = new();
@@ -64,6 +65,7 @@ public class SepayPollingBackgroundService : BackgroundService
 
             while (!stoppingToken.IsCancellationRequested)
             {
+                var delay = _interval;
                 try
                 {
                     await PollTransactionsAsync(apiBaseUrl, accountNumber, stoppingToken);
@@ -74,10 +76,11 @@ public class SepayPollingBackgroundService : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error in SepayPollingBackgroundService");
+                    _logger.LogError(ex, "Error in SepayPollingBackgroundService - backing off for {Seconds}s", _errorBackoffDelay.TotalSeconds);
+                    delay = _errorBackoffDelay; // Chờ lâu hơn khi lỗi DB để tránh hammer
                 }
 
-                await Task.Delay(_interval, stoppingToken);
+                await Task.Delay(delay, stoppingToken);
             }
 
             _logger.LogInformation("SepayPollingBackgroundService stopped");
@@ -173,7 +176,7 @@ public class SepayPollingBackgroundService : BackgroundService
                     "SePay Polling: New tx {TxId}, AmountIn={AmountIn}, no STEM ref, trying amount match...",
                     tx.Id, tx.AmountIn);
 
-                if (await TryMatchByAmount(orderRepo, paymentService, tx))
+                if (await TryMatchByAmount(orderRepo, paymentService, pendingOrders, tx))
                 {
                     _matchedTransactionIds.Add(tx.Id);
                 }
@@ -232,11 +235,9 @@ public class SepayPollingBackgroundService : BackgroundService
     /// </summary>
     private async Task<bool> TryMatchByAmount(
         IOrderRepository orderRepo, IPaymentService paymentService,
+        List<DomainLayer.Entities.OrderHeader> pendingOrders,
         SepayTransactionItem tx)
     {
-        // Lấy tất cả order PENDING có payment method SEPAY
-        var pendingOrders = await orderRepo.GetPendingSepayOrdersAsync();
-
         _logger.LogInformation("SePay Polling: TryMatchByAmount - Found {Count} pending SEPAY orders for tx amount {Amount}",
             pendingOrders.Count, tx.AmountIn);
 

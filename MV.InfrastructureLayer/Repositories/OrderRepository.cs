@@ -40,7 +40,8 @@ public class OrderRepository : IOrderRepository
         // EF Core không scaffold được enum type → không có property trên entity
         // Dùng NpgsqlParameter để handle NULL values đúng cách
         var conn = _context.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
             await conn.OpenAsync();
 
         try
@@ -98,7 +99,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            // Không đóng connection vì đang trong transaction do EF Core quản lý
+            if (!wasOpen) await conn.CloseAsync();
         }
 
         return payment;
@@ -414,7 +415,8 @@ public class OrderRepository : IOrderRepository
         var orderIds = new List<int>();
 
         var conn = _context.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
             await conn.OpenAsync();
         try
         {
@@ -434,7 +436,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
 
         // EF Core query AFTER raw connection is closed — avoids MARS error
@@ -442,6 +444,7 @@ public class OrderRepository : IOrderRepository
             return new List<OrderHeader>();
 
         return await _context.OrderHeaders
+            .AsNoTracking()
             .Include(o => o.Payment)
             .Where(o => orderIds.Contains(o.OrderId))
             .ToListAsync();
@@ -501,7 +504,8 @@ public class OrderRepository : IOrderRepository
         var whereClause = string.Join(" AND ", conditions);
 
         var conn = _context.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
             await conn.OpenAsync();
         try
         {
@@ -541,7 +545,7 @@ public class OrderRepository : IOrderRepository
                 return (new List<OrderHeader>(), totalCount);
 
             // Close the raw connection before EF Core query to avoid "command already in progress"
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
 
             var items = await _context.OrderHeaders
                 .AsNoTracking()
@@ -556,8 +560,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            if (conn.State == System.Data.ConnectionState.Open)
-                await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -565,7 +568,8 @@ public class OrderRepository : IOrderRepository
     {
         var result = new Dictionary<string, int>();
         var conn = _context.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
             await conn.OpenAsync();
         try
         {
@@ -581,7 +585,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
         return result;
     }
@@ -589,7 +593,8 @@ public class OrderRepository : IOrderRepository
     public async Task<decimal> GetDeliveredRevenueAsync(DateTime from, DateTime to)
     {
         var conn = _context.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
             await conn.OpenAsync();
         try
         {
@@ -606,7 +611,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            await conn.CloseAsync();
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -666,7 +671,8 @@ public class OrderRepository : IOrderRepository
         if (!orderItemIds.Any()) return;
 
         var conn = _context.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
             await conn.OpenAsync();
 
         try
@@ -686,7 +692,7 @@ public class OrderRepository : IOrderRepository
         }
         finally
         {
-            // Don't close - may be in a transaction
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 

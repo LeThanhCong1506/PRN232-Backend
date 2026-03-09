@@ -197,8 +197,13 @@ namespace MV.PresentationLayer
 
             // Register DbContext with connection string from appsettings
             // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
+            // Maximum Pool Size=20: giới hạn số connection để không vượt quá max_connections của PostgreSQL
+            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+            if (!connectionString!.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
+                connectionString += ";Maximum Pool Size=20;Minimum Pool Size=1;Connection Idle Lifetime=60";
+
             builder.Services.AddDbContext<StemDbContext>(options =>
-                options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+                options.UseNpgsql(connectionString,
                     npgsqlOptions =>
                     {
                         npgsqlOptions.MigrationsAssembly("MV.InfrastructureLayer");
