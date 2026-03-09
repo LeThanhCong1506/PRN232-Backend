@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.DTOs.ResponseModels;
+using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
+using MV.PresentationLayer.Hubs;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
-using Microsoft.AspNetCore.SignalR;
-using MV.PresentationLayer.Hubs;
 
 namespace MV.PresentationLayer.Controllers;
 
@@ -21,13 +22,77 @@ public class ChatController : ControllerBase
 {
     private readonly StemDbContext _context;
     private readonly IHubContext<ChatHub> _hubContext;
-    private readonly ILogger<ChatController> _logger;
 
-    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext, ILogger<ChatController> logger)
+    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext)
     {
         _context = context;
         _hubContext = hubContext;
-        _logger = logger;
+    }
+
+    /// <summary>
+    /// DTO for REST send message fallback
+    /// </summary>
+    public class SendMessageDto
+    {
+        public int? ReceiverId { get; set; }
+        public string Content { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// REST fallback: gửi tin nhắn khi SignalR chưa kết nối được.
+    /// Mirrors logic của ChatHub.SendMessage.
+    /// </summary>
+    [HttpPost("send")]
+    [SwaggerOperation(Summary = "Send chat message (REST fallback when SignalR is unavailable)")]
+    public async Task<IActionResult> SendMessage([FromBody] SendMessageDto dto)
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(dto.Content))
+            return BadRequest(ApiResponse<object>.ErrorResponse("Message content is required"));
+
+        var role = User.FindFirst(ClaimTypes.Role)?.Value;
+        var isAdmin = role == "Admin" || role == "Staff";
+        var senderName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+
+        var message = new ChatMessage
+        {
+            SenderId = userId,
+            ReceiverId = isAdmin ? dto.ReceiverId : null,
+            Content = dto.Content.Trim(),
+            IsFromAdmin = isAdmin,
+            SentAt = DateTime.Now,
+            IsRead = false
+        };
+
+        _context.ChatMessages.Add(message);
+        await _context.SaveChangesAsync();
+
+        var messageDto = new
+        {
+            message.MessageId,
+            message.SenderId,
+            SenderName = senderName,
+            message.ReceiverId,
+            message.Content,
+            message.IsFromAdmin,
+            message.SentAt,
+            message.IsRead
+        };
+
+        // Broadcast via SignalR hub context (even though client used REST)
+        if (isAdmin && dto.ReceiverId.HasValue)
+        {
+            await _hubContext.Clients.Group($"chat_user_{dto.ReceiverId.Value}")
+                .SendAsync("ReceiveMessage", messageDto);
+        }
+        else
+        {
+            await _hubContext.Clients.Group("chat_admins")
+                .SendAsync("ReceiveMessage", messageDto);
+        }
+
+        return Ok(ApiResponse<object>.SuccessResponse(messageDto, "Message sent"));
     }
 
     /// <summary>
@@ -151,87 +216,87 @@ public class ChatController : ControllerBase
         return Ok(ApiResponse<PagedResponse<object>>.SuccessResponse(pagedResponse));
     }
 
-    public class SendMessageRequest
+    /// <summary>
+    /// [Admin] Mark all messages from a user as read
+    /// </summary>
+    [HttpPost("mark-read/{userId}")]
+    [Authorize(Roles = "Admin,Staff")]
+    [SwaggerOperation(Summary = "Mark all messages from a user as read (Admin only)")]
+    public async Task<IActionResult> MarkAsRead(int userId)
     {
-        public int? ReceiverId { get; set; }
-        public string Content { get; set; } = null!;
+        var unreadMessages = await _context.ChatMessages
+            .Where(m => m.SenderId == userId && !m.IsFromAdmin && !m.IsRead)
+            .ToListAsync();
+
+        foreach (var msg in unreadMessages)
+        {
+            msg.IsRead = true;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { markedCount = unreadMessages.Count }, "Messages marked as read"));
     }
 
     /// <summary>
-    /// REST API fallback cho tính năng chat khi client không kết nối được SignalR trực tiếp
+    /// [Customer] Get unread message count (messages from admin that customer hasn't read)
     /// </summary>
-    [HttpPost("send")]
-    [SwaggerOperation(Summary = "Send a chat message via REST API (Fallback)")]
-    public async Task<IActionResult> SendMessage([FromBody] SendMessageRequest request)
+    [HttpGet("unread-count")]
+    [SwaggerOperation(Summary = "Get unread message count for current user")]
+    public async Task<IActionResult> GetUnreadCount()
     {
-        var senderId = GetUserId();
-        if (senderId == 0 || string.IsNullOrWhiteSpace(request.Content))
-            return BadRequest(ApiResponse<object>.ErrorResponse("Invalid message content or user"));
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
 
         var role = User.FindFirst(ClaimTypes.Role)?.Value;
         var isAdmin = role == "Admin" || role == "Staff";
-        var senderName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
 
-        var message = new DomainLayer.Entities.ChatMessage
+        int count;
+        if (isAdmin)
         {
-            SenderId = senderId,
-            ReceiverId = isAdmin ? request.ReceiverId : null,
-            Content = request.Content.Trim(),
-            IsFromAdmin = isAdmin,
-            SentAt = DateTime.Now,
-            IsRead = false
-        };
-
-        try
-        {
-            _context.ChatMessages.Add(message);
-            await _context.SaveChangesAsync();
-            _logger.LogInformation("HTTP Fallback: Saved message {MessageId} from {SenderId} to {ReceiverId}", message.MessageId, senderId, request.ReceiverId);
+            // Admin: count unread messages from all customers
+            count = await _context.ChatMessages
+                .Where(m => !m.IsFromAdmin && !m.IsRead)
+                .CountAsync();
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogError(ex, "HTTP Fallback: Failed to save message from {SenderId}", senderId);
-            return StatusCode(500, ApiResponse<object>.ErrorResponse("Could not save message to database."));
+            // Customer: count unread messages from admin to them
+            count = await _context.ChatMessages
+                .Where(m => m.IsFromAdmin && m.ReceiverId == userId && !m.IsRead)
+                .CountAsync();
         }
 
-        var messageDto = new
-        {
-            message.MessageId,
-            message.SenderId,
-            SenderName = senderName,
-            message.ReceiverId,
-            message.Content,
-            message.IsFromAdmin,
-            message.SentAt,
-            message.IsRead
-        };
+        return Ok(ApiResponse<object>.SuccessResponse(new { unreadCount = count }));
+    }
 
-        // Push real-time to active SignalR connections
-        try
+    /// <summary>
+    /// [Customer] Mark admin messages as read
+    /// </summary>
+    [HttpPost("mark-read")]
+    [SwaggerOperation(Summary = "Mark admin messages as read (Customer)")]
+    public async Task<IActionResult> MarkMyMessagesAsRead()
+    {
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized();
+
+        var unreadMessages = await _context.ChatMessages
+            .Where(m => m.IsFromAdmin && m.ReceiverId == userId && !m.IsRead)
+            .ToListAsync();
+
+        foreach (var msg in unreadMessages)
         {
-            if (isAdmin && request.ReceiverId.HasValue)
-            {
-                // Admin -> Customer
-                await _hubContext.Clients.Group($"chat_user_{request.ReceiverId.Value}").SendAsync("ReceiveMessage", messageDto);
-                // Notification to self (unnecessary if REST returns the dto, but keeps parity with Hub)
-            }
-            else
-            {
-                // Customer -> Admins
-                await _hubContext.Clients.Group("chat_admins").SendAsync("ReceiveMessage", messageDto);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "HTTP Fallback: Failed to broadcast to SignalR groups.");
+            msg.IsRead = true;
         }
 
-        return Ok(ApiResponse<object>.SuccessResponse(messageDto, "Message sent successfully"));
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<object>.SuccessResponse(new { markedCount = unreadMessages.Count }));
     }
 
     private int GetUserId()
     {
-        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return int.TryParse(userIdStr, out var userId) ? userId : 0;
     }
 }

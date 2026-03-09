@@ -8,7 +8,8 @@ namespace MV.InfrastructureLayer.Services;
 
 public class CloudinaryService : ICloudinaryService
 {
-    private readonly Cloudinary _cloudinary;
+    private readonly Cloudinary? _cloudinary;
+    private readonly bool _isConfigured;
 
     public CloudinaryService(IConfiguration configuration)
     {
@@ -17,15 +18,23 @@ public class CloudinaryService : ICloudinaryService
         var apiSecret = configuration["Cloudinary:ApiSecret"];
 
         if (string.IsNullOrEmpty(cloudName) || string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret))
-            throw new InvalidOperationException("Cloudinary configuration is missing. Please set Cloudinary:CloudName, ApiKey, ApiSecret in appsettings.json");
+        {
+            _isConfigured = false;
+            Console.WriteLine("[WARNING] Cloudinary configuration is missing. Image upload/delete will be disabled.");
+            return;
+        }
 
         var account = new Account(cloudName, apiKey, apiSecret);
         _cloudinary = new Cloudinary(account);
         _cloudinary.Api.Secure = true;
+        _isConfigured = true;
     }
 
     public async Task<(string ImageUrl, string PublicId)> UploadImageAsync(IFormFile file, string folder = "products")
     {
+        if (!_isConfigured || _cloudinary == null)
+            throw new InvalidOperationException("Cloudinary is not configured. Please set Cloudinary:CloudName, ApiKey, ApiSecret in appsettings.json");
+
         if (file == null || file.Length == 0)
             throw new ArgumentException("File is empty or null.");
 
@@ -50,6 +59,9 @@ public class CloudinaryService : ICloudinaryService
 
     public async Task<bool> DeleteImageAsync(string publicId)
     {
+        if (!_isConfigured || _cloudinary == null)
+            return false;
+
         if (string.IsNullOrEmpty(publicId))
             return false;
 

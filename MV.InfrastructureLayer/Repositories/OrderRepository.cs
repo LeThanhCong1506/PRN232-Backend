@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.Order.Request;
@@ -13,10 +14,13 @@ namespace MV.InfrastructureLayer.Repositories;
 public class OrderRepository : IOrderRepository
 {
     private readonly StemDbContext _context;
+    private readonly string _connectionString;
 
-    public OrderRepository(StemDbContext context)
+    public OrderRepository(StemDbContext context, IConfiguration configuration)
     {
         _context = context;
+        // Get connection string directly from config (DbConnection strips password)
+        _connectionString = configuration.GetConnectionString("DefaultConnection")!;
     }
 
     // ==================== CREATE ====================
@@ -290,11 +294,10 @@ public class OrderRepository : IOrderRepository
         var result = new Dictionary<int, string>();
         if (!orderIds.Any()) return result;
 
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-        try
+        var connStr = _connectionString;
+        using (var conn = new NpgsqlConnection(connStr))
         {
+            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT order_id, status::text FROM order_header WHERE order_id = ANY(@ids)";
             cmd.Parameters.Add(new NpgsqlParameter("@ids", orderIds.ToArray()));
@@ -306,48 +309,34 @@ public class OrderRepository : IOrderRepository
                 result[orderId] = status;
             }
         }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
-        }
         return result;
     }
 
     public async Task<string?> GetPaymentMethodByOrderIdAsync(int orderId)
     {
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-        try
+        var connStr = _connectionString;
+        using (var conn = new NpgsqlConnection(connStr))
         {
+            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT p.payment_method::text FROM payment p WHERE p.order_id = @id";
             cmd.Parameters.Add(new NpgsqlParameter("@id", orderId));
             var result = await cmd.ExecuteScalarAsync();
             return result?.ToString();
         }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
-        }
     }
 
     public async Task<string?> GetPaymentStatusByOrderIdAsync(int orderId)
     {
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-        try
+        var connStr = _connectionString;
+        using (var conn = new NpgsqlConnection(connStr))
         {
+            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT p.status::text FROM payment p WHERE p.order_id = @id";
             cmd.Parameters.Add(new NpgsqlParameter("@id", orderId));
             var result = await cmd.ExecuteScalarAsync();
             return result?.ToString();
-        }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -363,11 +352,10 @@ public class OrderRepository : IOrderRepository
         var result = new Dictionary<int, (string? Method, string? Status)>();
         if (!orderIds.Any()) return result;
 
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-        try
+        var connStr = _connectionString;
+        using (var conn = new NpgsqlConnection(connStr))
         {
+            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT order_id, payment_method::text, status::text FROM payment WHERE order_id = ANY(@ids)";
             cmd.Parameters.Add(new NpgsqlParameter("@ids", orderIds.ToArray()));
@@ -380,29 +368,20 @@ public class OrderRepository : IOrderRepository
                 result[orderId] = (method, status);
             }
         }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
-        }
         return result;
     }
 
     public async Task<string?> GetCouponDiscountTypeAsync(int couponId)
     {
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-        try
+        var connStr = _connectionString;
+        using (var conn = new NpgsqlConnection(connStr))
         {
+            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT discount_type::text FROM coupon WHERE coupon_id = @id";
             cmd.Parameters.Add(new NpgsqlParameter("@id", couponId));
             var result = await cmd.ExecuteScalarAsync();
             return result?.ToString();
-        }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -410,8 +389,8 @@ public class OrderRepository : IOrderRepository
 
     public async Task<List<OrderHeader>> GetPendingSepayOrdersAsync()
     {
-        // Lấy danh sách order có payment PENDING + SEPAY + chưa hết hạn
-        // Dùng raw SQL vì payment_method và status là PostgreSQL enum
+        // Use standalone connection to avoid corrupting EF Core's managed connection
+        var connStr = _connectionString;
         var orderIds = new List<int>();
 
         var conn = _context.Database.GetDbConnection();
@@ -439,7 +418,6 @@ public class OrderRepository : IOrderRepository
             if (!wasOpen) await conn.CloseAsync();
         }
 
-        // EF Core query AFTER raw connection is closed — avoids MARS error
         if (orderIds.Count == 0)
             return new List<OrderHeader>();
 
@@ -456,48 +434,48 @@ public class OrderRepository : IOrderRepository
     {
         // Build base query with raw SQL for enum filtering
         var conditions = new List<string> { "1=1" };
-        var parameters = new List<NpgsqlParameter>();
+        var paramValues = new Dictionary<string, object>();
         var paramIndex = 0;
 
         if (!string.IsNullOrEmpty(filter.Search))
         {
             conditions.Add($"(oh.order_number ILIKE @p{paramIndex} OR oh.customer_name ILIKE @p{paramIndex} OR oh.customer_phone ILIKE @p{paramIndex} OR oh.customer_email ILIKE @p{paramIndex})");
-            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", $"%{filter.Search}%"));
+            paramValues[$"@p{paramIndex}"] = $"%{filter.Search}%";
             paramIndex++;
         }
 
         if (!string.IsNullOrEmpty(filter.Status))
         {
             conditions.Add($"oh.status = @p{paramIndex}::order_status_enum");
-            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.Status));
+            paramValues[$"@p{paramIndex}"] = filter.Status;
             paramIndex++;
         }
 
         if (!string.IsNullOrEmpty(filter.PaymentMethod))
         {
             conditions.Add($"p.payment_method = @p{paramIndex}::payment_method_enum");
-            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.PaymentMethod));
+            paramValues[$"@p{paramIndex}"] = filter.PaymentMethod;
             paramIndex++;
         }
 
         if (!string.IsNullOrEmpty(filter.PaymentStatus))
         {
             conditions.Add($"p.status = @p{paramIndex}::payment_status_enum");
-            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.PaymentStatus));
+            paramValues[$"@p{paramIndex}"] = filter.PaymentStatus;
             paramIndex++;
         }
 
         if (filter.DateFrom.HasValue)
         {
             conditions.Add($"oh.created_at >= @p{paramIndex}");
-            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.DateFrom.Value));
+            paramValues[$"@p{paramIndex}"] = filter.DateFrom.Value;
             paramIndex++;
         }
 
         if (filter.DateTo.HasValue)
         {
             conditions.Add($"oh.created_at <= @p{paramIndex}");
-            parameters.Add(new NpgsqlParameter($"@p{paramIndex}", filter.DateTo.Value));
+            paramValues[$"@p{paramIndex}"] = filter.DateTo.Value;
             paramIndex++;
         }
 
@@ -507,6 +485,9 @@ public class OrderRepository : IOrderRepository
         var wasOpen = conn.State == System.Data.ConnectionState.Open;
         if (!wasOpen)
             await conn.OpenAsync();
+
+        var totalCount = 0;
+        var orderIds = new List<int>();
         try
         {
             // Count query
@@ -516,9 +497,9 @@ public class OrderRepository : IOrderRepository
                 FROM order_header oh
                 LEFT JOIN payment p ON p.order_id = oh.order_id
                 WHERE {whereClause}";
-            foreach (var param in parameters)
-                countCmd.Parameters.Add(new NpgsqlParameter(param.ParameterName, param.Value));
-            var totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
+            foreach (var kv in paramValues)
+                countCmd.Parameters.Add(new NpgsqlParameter(kv.Key, kv.Value));
+            totalCount = Convert.ToInt32(await countCmd.ExecuteScalarAsync());
 
             // IDs query with pagination
             using var idsCmd = conn.CreateCommand();
@@ -529,39 +510,36 @@ public class OrderRepository : IOrderRepository
                 WHERE {whereClause}
                 ORDER BY oh.order_id DESC
                 OFFSET @offset LIMIT @limit";
-            foreach (var param in parameters)
-                idsCmd.Parameters.Add(new NpgsqlParameter(param.ParameterName, param.Value));
+            foreach (var kv in paramValues)
+                idsCmd.Parameters.Add(new NpgsqlParameter(kv.Key, kv.Value));
             idsCmd.Parameters.Add(new NpgsqlParameter("@offset", (filter.PageNumber - 1) * filter.PageSize));
             idsCmd.Parameters.Add(new NpgsqlParameter("@limit", filter.PageSize));
 
-            var orderIds = new List<int>();
-            using (var reader = await idsCmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                    orderIds.Add(reader.GetInt32(0));
-            } // reader is disposed here
-
-            if (orderIds.Count == 0)
-                return (new List<OrderHeader>(), totalCount);
-
-            // Close the raw connection before EF Core query to avoid "command already in progress"
-            if (!wasOpen) await conn.CloseAsync();
-
-            var items = await _context.OrderHeaders
-                .AsNoTracking()
-                .Include(o => o.OrderItems)
-                .Include(o => o.Payment)
-                .Include(o => o.User)
-                .Where(o => orderIds.Contains(o.OrderId))
-                .OrderByDescending(o => o.CreatedAt)
-                .ToListAsync();
-
-            return (items, totalCount);
+            using var reader = await idsCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                orderIds.Add(reader.GetInt32(0));
         }
         finally
         {
             if (!wasOpen) await conn.CloseAsync();
         }
+
+        if (orderIds.Count == 0)
+            return (new List<OrderHeader>(), totalCount);
+
+        // Close the raw connection before EF Core query to avoid "command already in progress"
+        if (!wasOpen) await conn.CloseAsync();
+
+        var items = await _context.OrderHeaders
+            .AsNoTracking()
+            .Include(o => o.OrderItems)
+            .Include(o => o.Payment)
+            .Include(o => o.User)
+            .Where(o => orderIds.Contains(o.OrderId))
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync();
+
+        return (items, totalCount);
     }
 
     public async Task<Dictionary<string, int>> GetOrderStatusCountsAsync()
@@ -628,11 +606,10 @@ public class OrderRepository : IOrderRepository
     public async Task<List<DailyRevenueData>> GetDailyRevenueAsync(DateTime from, DateTime to, string? status = null)
     {
         var result = new List<DailyRevenueData>();
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-        try
+        var connStr = _connectionString;
+        using (var conn = new NpgsqlConnection(connStr))
         {
+            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             var statusFilter = string.IsNullOrEmpty(status)
                 ? "status != 'CANCELLED'::order_status_enum"
@@ -658,10 +635,6 @@ public class OrderRepository : IOrderRepository
                     OrderCount = (int)reader.GetInt64(2)
                 });
             }
-        }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
         }
         return result;
     }
@@ -705,40 +678,81 @@ public class OrderRepository : IOrderRepository
 
         if (order == null) return;
 
-        // Find all product instances linked to this order's items
-        var orderItemIds = order.OrderItems.Select(oi => oi.OrderItemId).ToList();
-        var instances = await _context.ProductInstances
-            .Include(pi => pi.Product)
-            .Where(pi => pi.OrderItemId.HasValue && orderItemIds.Contains(pi.OrderItemId.Value))
-            .ToListAsync();
-
         var today = DateOnly.FromDateTime(DateTime.Today);
 
-        foreach (var instance in instances)
+        foreach (var orderItem in order.OrderItems)
         {
-            if (instance.Product.WarrantyPolicyId == null) continue;
-
-            // Check if warranty already exists for this serial
-            var existingWarranty = await _context.Warranties
-                .AnyAsync(w => w.SerialNumber == instance.SerialNumber);
-            if (existingWarranty) continue;
+            var product = orderItem.Product;
+            if (product == null || product.WarrantyPolicyId == null) continue;
 
             var policy = await _context.WarrantyPolicies
-                .FirstOrDefaultAsync(wp => wp.PolicyId == instance.Product.WarrantyPolicyId.Value);
+                .FirstOrDefaultAsync(wp => wp.PolicyId == product.WarrantyPolicyId.Value);
             if (policy == null) continue;
 
-            var warranty = new Warranty
+            // Check if ProductInstance already exists for this order item
+            var instances = await _context.ProductInstances
+                .Where(pi => pi.OrderItemId == orderItem.OrderItemId)
+                .ToListAsync();
+
+            if (instances.Count > 0)
             {
-                SerialNumber = instance.SerialNumber,
-                WarrantyPolicyId = policy.PolicyId,
-                StartDate = today,
-                EndDate = today.AddMonths(policy.DurationMonths),
-                IsActive = true,
-                ActivationDate = DateTime.UtcNow,
-                Notes = $"Auto-created on delivery of order #{order.OrderNumber}",
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.Warranties.Add(warranty);
+                // Use existing instances
+                foreach (var instance in instances)
+                {
+                    var alreadyHasWarranty = await _context.Warranties
+                        .AnyAsync(w => w.SerialNumber == instance.SerialNumber);
+                    if (alreadyHasWarranty) continue;
+
+                    _context.Warranties.Add(new Warranty
+                    {
+                        SerialNumber = instance.SerialNumber,
+                        WarrantyPolicyId = policy.PolicyId,
+                        StartDate = today,
+                        EndDate = today.AddMonths(policy.DurationMonths),
+                        IsActive = true,
+                        ActivationDate = DateTime.UtcNow,
+                        Notes = $"Auto-created on delivery of order #{order.OrderNumber}",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+            else
+            {
+                // No serial tracking — auto-create a ProductInstance for warranty purposes
+                for (int i = 0; i < orderItem.Quantity; i++)
+                {
+                    var serialNumber = $"SN-{orderId}-{orderItem.OrderItemId}-{i + 1}-{DateTime.Now:yyyyMMddHHmmss}";
+
+                    var instance = new ProductInstance
+                    {
+                        SerialNumber = serialNumber,
+                        ProductId = product.ProductId,
+                        OrderItemId = orderItem.OrderItemId,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.ProductInstances.Add(instance);
+
+                    // Set status via raw SQL after flush
+                    await _context.SaveChangesAsync();
+
+                    // Set status to SOLD using raw SQL (enum column)
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "UPDATE product_instance SET status = 'SOLD'::instance_status_enum WHERE serial_number = {0}",
+                        serialNumber);
+
+                    _context.Warranties.Add(new Warranty
+                    {
+                        SerialNumber = serialNumber,
+                        WarrantyPolicyId = policy.PolicyId,
+                        StartDate = today,
+                        EndDate = today.AddMonths(policy.DurationMonths),
+                        IsActive = true,
+                        ActivationDate = DateTime.UtcNow,
+                        Notes = $"Auto-created on delivery of order #{order.OrderNumber}",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
         }
 
         await _context.SaveChangesAsync();

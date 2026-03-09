@@ -11,13 +11,11 @@ public class WarrantyClaimService : IWarrantyClaimService
 {
     private readonly IWarrantyClaimRepository _claimRepository;
     private readonly IWarrantyRepository _warrantyRepository;
-    private readonly INotificationService _notificationService;
 
-    public WarrantyClaimService(IWarrantyClaimRepository claimRepository, IWarrantyRepository warrantyRepository, INotificationService notificationService)
+    public WarrantyClaimService(IWarrantyClaimRepository claimRepository, IWarrantyRepository warrantyRepository)
     {
         _claimRepository = claimRepository;
         _warrantyRepository = warrantyRepository;
-        _notificationService = notificationService;
     }
 
     /// <summary>
@@ -70,9 +68,6 @@ public class WarrantyClaimService : IWarrantyClaimService
             Status = "SUBMITTED",
             SubmittedAt = created.CreatedAt ?? DateTime.Now
         };
-
-        // Notify admins about new warranty claim
-        try { await _notificationService.SendToAdminsAsync("NewWarrantyClaim", new { ClaimId = created.ClaimId, WarrantyId = warrantyId, UserId = userId }); } catch { }
 
         return ApiResponse<SubmitWarrantyClaimResponse>.SuccessResponse(response, "Warranty claim submitted successfully");
     }
