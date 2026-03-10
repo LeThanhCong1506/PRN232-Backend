@@ -72,19 +72,24 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
 
     public async Task<List<WarrantyClaim>> GetAllAsync(string? status, int page, int pageSize)
     {
-        var query = _context.WarrantyClaims
+        IQueryable<WarrantyClaim> query;
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var pStatus = new Npgsql.NpgsqlParameter("pStatus", status);
+            query = _context.WarrantyClaims
+                .FromSqlRaw("SELECT * FROM warranty_claim WHERE status = @pStatus::claim_status_enum", pStatus);
+        }
+        else
+        {
+            query = _context.WarrantyClaims.AsQueryable();
+        }
+
+        return await query
             .Include(c => c.Warranty)
                 .ThenInclude(w => w.SerialNumberNavigation)
                     .ThenInclude(pi => pi.Product)
             .Include(c => c.User)
-            .AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(status))
-        {
-            query = query.Where(c => c.Status == status);
-        }
-
-        return await query
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -93,13 +98,14 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
 
     public async Task<int> CountAsync(string? status)
     {
-        var query = _context.WarrantyClaims.AsQueryable();
-
         if (!string.IsNullOrWhiteSpace(status))
         {
-            query = query.Where(c => c.Status == status);
+            var pStatus = new Npgsql.NpgsqlParameter("pStatus", status);
+            return await _context.WarrantyClaims
+                .FromSqlRaw("SELECT * FROM warranty_claim WHERE status = @pStatus::claim_status_enum", pStatus)
+                .CountAsync();
         }
 
-        return await query.CountAsync();
+        return await _context.WarrantyClaims.CountAsync();
     }
 }

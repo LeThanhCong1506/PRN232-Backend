@@ -1,4 +1,4 @@
-﻿using MV.ApplicationLayer.Interfaces;
+using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Login.Request;
 using MV.DomainLayer.DTOs.Login.Response;
 using MV.DomainLayer.Entities;
@@ -103,6 +103,9 @@ namespace MV.ApplicationLayer.Services
                 FullName = user.FullName,
                 Phone = user.Phone,
                 Address = user.Address,
+                City = user.Province,
+                District = user.District,
+                Ward = user.Ward,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt
             };
@@ -115,6 +118,10 @@ namespace MV.ApplicationLayer.Services
             user.Email = dto.Email;
             user.Phone = dto.Phone;
             user.Address = dto.Address;
+            user.FullName = dto.FullName;
+            user.Province = dto.City;
+            user.District = dto.District;
+            user.Ward = dto.Ward;
             await _repo.UpdateAsync(user);
             return true;
         }

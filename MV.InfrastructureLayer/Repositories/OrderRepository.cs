@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Configuration;
 using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.Order.Request;
@@ -14,13 +13,10 @@ namespace MV.InfrastructureLayer.Repositories;
 public class OrderRepository : IOrderRepository
 {
     private readonly StemDbContext _context;
-    private readonly string _connectionString;
 
-    public OrderRepository(StemDbContext context, IConfiguration configuration)
+    public OrderRepository(StemDbContext context)
     {
         _context = context;
-        // Get connection string directly from config (DbConnection strips password)
-        _connectionString = configuration.GetConnectionString("DefaultConnection")!;
     }
 
     // ==================== CREATE ====================
@@ -294,10 +290,11 @@ public class OrderRepository : IOrderRepository
         var result = new Dictionary<int, string>();
         if (!orderIds.Any()) return result;
 
-        var connStr = _connectionString;
-        using (var conn = new NpgsqlConnection(connStr))
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
         {
-            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT order_id, status::text FROM order_header WHERE order_id = ANY(@ids)";
             cmd.Parameters.Add(new NpgsqlParameter("@ids", orderIds.ToArray()));
@@ -309,34 +306,48 @@ public class OrderRepository : IOrderRepository
                 result[orderId] = status;
             }
         }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
+        }
         return result;
     }
 
     public async Task<string?> GetPaymentMethodByOrderIdAsync(int orderId)
     {
-        var connStr = _connectionString;
-        using (var conn = new NpgsqlConnection(connStr))
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
         {
-            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT p.payment_method::text FROM payment p WHERE p.order_id = @id";
             cmd.Parameters.Add(new NpgsqlParameter("@id", orderId));
             var result = await cmd.ExecuteScalarAsync();
             return result?.ToString();
         }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
+        }
     }
 
     public async Task<string?> GetPaymentStatusByOrderIdAsync(int orderId)
     {
-        var connStr = _connectionString;
-        using (var conn = new NpgsqlConnection(connStr))
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
         {
-            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT p.status::text FROM payment p WHERE p.order_id = @id";
             cmd.Parameters.Add(new NpgsqlParameter("@id", orderId));
             var result = await cmd.ExecuteScalarAsync();
             return result?.ToString();
+        }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -352,10 +363,11 @@ public class OrderRepository : IOrderRepository
         var result = new Dictionary<int, (string? Method, string? Status)>();
         if (!orderIds.Any()) return result;
 
-        var connStr = _connectionString;
-        using (var conn = new NpgsqlConnection(connStr))
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
         {
-            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT order_id, payment_method::text, status::text FROM payment WHERE order_id = ANY(@ids)";
             cmd.Parameters.Add(new NpgsqlParameter("@ids", orderIds.ToArray()));
@@ -368,20 +380,29 @@ public class OrderRepository : IOrderRepository
                 result[orderId] = (method, status);
             }
         }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
+        }
         return result;
     }
 
     public async Task<string?> GetCouponDiscountTypeAsync(int couponId)
     {
-        var connStr = _connectionString;
-        using (var conn = new NpgsqlConnection(connStr))
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
         {
-            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT discount_type::text FROM coupon WHERE coupon_id = @id";
             cmd.Parameters.Add(new NpgsqlParameter("@id", couponId));
             var result = await cmd.ExecuteScalarAsync();
             return result?.ToString();
+        }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
         }
     }
 
@@ -389,42 +410,17 @@ public class OrderRepository : IOrderRepository
 
     public async Task<List<OrderHeader>> GetPendingSepayOrdersAsync()
     {
-        // Use standalone connection to avoid corrupting EF Core's managed connection
-        var connStr = _connectionString;
-        var orderIds = new List<int>();
-
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen)
-            await conn.OpenAsync();
-        try
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT p.order_id
-                FROM payment p
+        // Use a single EF Core query (one connection) instead of standalone + EF Core (two connections)
+        return await _context.OrderHeaders
+            .FromSqlRaw(@"
+                SELECT oh.*
+                FROM order_header oh
+                INNER JOIN payment p ON p.order_id = oh.order_id
                 WHERE p.status = 'PENDING'::payment_status_enum
                   AND p.payment_method = 'SEPAY'::payment_method_enum
-                  AND (p.expired_at IS NULL OR p.expired_at > NOW())";
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                orderIds.Add(reader.GetInt32(0));
-            }
-        }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
-        }
-
-        if (orderIds.Count == 0)
-            return new List<OrderHeader>();
-
-        return await _context.OrderHeaders
+                  AND (p.expired_at IS NULL OR p.expired_at > NOW())")
             .AsNoTracking()
             .Include(o => o.Payment)
-            .Where(o => orderIds.Contains(o.OrderId))
             .ToListAsync();
     }
 
@@ -606,10 +602,11 @@ public class OrderRepository : IOrderRepository
     public async Task<List<DailyRevenueData>> GetDailyRevenueAsync(DateTime from, DateTime to, string? status = null)
     {
         var result = new List<DailyRevenueData>();
-        var connStr = _connectionString;
-        using (var conn = new NpgsqlConnection(connStr))
+        var conn = _context.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await conn.OpenAsync();
+        try
         {
-            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             var statusFilter = string.IsNullOrEmpty(status)
                 ? "status != 'CANCELLED'::order_status_enum"
@@ -635,6 +632,10 @@ public class OrderRepository : IOrderRepository
                     OrderCount = (int)reader.GetInt64(2)
                 });
             }
+        }
+        finally
+        {
+            if (!wasOpen) await conn.CloseAsync();
         }
         return result;
     }
