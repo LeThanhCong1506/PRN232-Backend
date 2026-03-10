@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Login.Request;
@@ -80,14 +80,50 @@ namespace MV.PresentationLayer.Controllers
                 phone = user.Phone,
                 address = user.Address,
                 avatarUrl = (string?)null,
-                city = (string?)null,
-                district = (string?)null,
-                ward = (string?)null,
+                city = user.City,
+                district = user.District,
+                ward = user.Ward,
                 createdAt = user.CreatedAt?.ToString("o")
             });
         }
 
-        [HttpGet("{id}")]
+        [HttpPut("me")]
+        [Authorize]
+        public async Task<IActionResult> UpdateCurrentUser(UpdateUserDto dto)
+        {
+            var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!int.TryParse(sub, out var userId))
+                return Unauthorized();
+
+            var result = await _service.UpdateAsync(userId, dto);
+            if (result == true)
+            {
+                var updatedUser = await _service.GetByIdAsync(userId);
+                return Ok(new
+                {
+                    id = updatedUser!.UserId,
+                    username = updatedUser.Username,
+                    email = updatedUser.Email,
+                    role = updatedUser.RoleName,
+                    fullName = updatedUser.FullName,
+                    phone = updatedUser.Phone,
+                    address = updatedUser.Address,
+                    avatarUrl = (string?)null,
+                    city = updatedUser.City,
+                    district = updatedUser.District,
+                    ward = updatedUser.Ward,
+                    createdAt = updatedUser.CreatedAt?.ToString("o")
+                });
+            }
+            else
+            {
+                return BadRequest("Cập nhật thất bại");
+            }
+        }
+
+        [HttpGet("{id:int}")]
         [Authorize]
         public async Task<IActionResult> GetById(int id)
         {
@@ -98,7 +134,7 @@ namespace MV.PresentationLayer.Controllers
             return Ok(user);
         }
 
-        [HttpPut("{id}")]
+        [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, UpdateUserDto dto)
         {
             var result = await _service.UpdateAsync(id, dto);

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace MV.DomainLayer.DTOs.Login.Request
 {
@@ -16,5 +16,9 @@ namespace MV.DomainLayer.DTOs.Login.Request
         public string? Phone { get; set; }
 
         public string? Address { get; set; }
+        public string? FullName { get; set; }
+        public string? City { get; set; }
+        public string? District { get; set; }
+        public string? Ward { get; set; }
     }
 }

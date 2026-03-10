@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
@@ -9,10 +10,12 @@ namespace MV.InfrastructureLayer.Repositories;
 public class SepayRepository : ISepayRepository
 {
     private readonly StemDbContext _context;
+    private readonly string _connectionString;
 
-    public SepayRepository(StemDbContext context)
+    public SepayRepository(StemDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _connectionString = configuration.GetConnectionString("DefaultConnection")!;
     }
 
     // ==================== SEPAY TRANSACTION ====================
@@ -61,11 +64,10 @@ public class SepayRepository : ISepayRepository
     {
         var orderIds = new List<int>();
 
-        var conn = _context.Database.GetDbConnection();
-        var wasOpen = conn.State == System.Data.ConnectionState.Open;
-        if (!wasOpen) await conn.OpenAsync();
-        try
+        var connStr = _connectionString;
+        using (var conn = new NpgsqlConnection(connStr))
         {
+            await conn.OpenAsync();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT p.order_id
@@ -80,10 +82,6 @@ public class SepayRepository : ISepayRepository
             {
                 orderIds.Add(reader.GetInt32(0));
             }
-        }
-        finally
-        {
-            if (!wasOpen) await conn.CloseAsync();
         }
 
         return orderIds;
