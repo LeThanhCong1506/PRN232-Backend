@@ -136,7 +136,7 @@ public class ChatController : ControllerBase
             {
                 m.MessageId,
                 m.SenderId,
-                SenderName = m.Sender.Username,
+                SenderName = m.Sender != null ? m.Sender.Username : "Unknown",
                 m.ReceiverId,
                 m.Content,
                 m.IsFromAdmin,
@@ -196,7 +196,7 @@ public class ChatController : ControllerBase
             {
                 m.MessageId,
                 m.SenderId,
-                SenderName = m.Sender.Username,
+                SenderName = m.Sender != null ? m.Sender.Username : "Unknown",
                 m.ReceiverId,
                 m.Content,
                 m.IsFromAdmin,
