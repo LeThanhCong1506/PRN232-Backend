@@ -48,7 +48,25 @@ npgsqlOptions.EnableRetryOnFailure(
 
 ## 🔌 Health Check Endpoints
 
-### **Endpoint 1: `/health`**
+Ứng dụng cung cấp **2 implementation** cho health checks:
+
+### **A. Built-in ASP.NET Core Health Checks** (Recommended cho production)
+- Endpoint: `/health` và `/health/detail`
+- Sử dụng middleware `app.MapHealthChecks()`
+- Performance tốt, chuẩn Microsoft
+
+### **B. Custom HealthController** (Flexible, dễ mở rộng)
+- Endpoint: `/api/health`, `/api/health/detail`, `/api/health/ping`, `/api/health/version`
+- Controller riêng, dễ customize
+- Có thêm endpoints bổ sung
+
+**💡 Khuyến nghị:** Dùng **cả 2** cho các mục đích khác nhau:
+- `/health` (built-in) → Cho UptimeRobot keep-alive
+- `/api/health/detail` (controller) → Cho debugging/monitoring chi tiết
+
+---
+
+### **Endpoint 1: `/health` (Built-in)**
 **Công dụng:** Simple health check cho monitoring services (UptimeRobot, Pingdom, etc.)
 
 **Response khi healthy:**
@@ -71,7 +89,7 @@ Unhealthy
 
 ---
 
-### **Endpoint 2: `/health/detail`**
+### **Endpoint 2: `/health/detail` (Built-in)**
 **Công dụng:** Detailed health check với thông tin về database connection
 
 **Response (JSON format):**
@@ -105,6 +123,94 @@ Unhealthy
       "exception": "Npgsql.NpgsqlException: connection timeout"
     }
   ]
+}
+```
+
+---
+
+### **Endpoint 3: `/api/health` (HealthController)**
+**Công dụng:** Custom health check với response JSON đẹp hơn
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-03-11T10:00:00Z",
+  "service": "PRN232 Backend API"
+}
+```
+
+---
+
+### **Endpoint 4: `/api/health/detail` (HealthController)**
+**Công dụng:** Detailed check với thông tin database + duration
+
+**Response khi healthy:**
+```json
+{
+  "status": "Healthy",
+  "timestamp": "2024-03-11T10:00:00Z",
+  "totalDuration": "45ms",
+  "service": "PRN232 Backend API",
+  "checks": [
+    {
+      "name": "postgresql",
+      "status": "Healthy",
+      "duration": "42ms",
+      "database": "prn232_db_k24y",
+      "description": "Database connection successful"
+    }
+  ]
+}
+```
+
+**Response khi unhealthy:**
+```json
+{
+  "status": "Unhealthy",
+  "timestamp": "2024-03-11T10:00:00Z",
+  "totalDuration": "10023ms",
+  "service": "PRN232 Backend API",
+  "checks": [
+    {
+      "name": "postgresql",
+      "status": "Unhealthy",
+      "duration": "10020ms",
+      "description": "Database connection failed",
+      "exception": "Npgsql.NpgsqlException: connection timeout"
+    }
+  ]
+}
+```
+
+---
+
+### **Endpoint 5: `/api/health/ping` (HealthController)**
+**Công dụng:** Minimal keep-alive endpoint, không check database
+
+**Response:**
+```json
+{
+  "status": "pong",
+  "timestamp": "2024-03-11T10:00:00Z"
+}
+```
+
+**💡 Use case:** Dùng cho cron jobs cần response nhanh (< 50ms), không quan tâm database status.
+
+---
+
+### **Endpoint 6: `/api/health/version` (HealthController)**
+**Công dụng:** Thông tin version và environment
+
+**Response:**
+```json
+{
+  "version": "1.0.0",
+  "buildDate": "2024-03-11T10:00:00Z",
+  "environment": "Production",
+  "framework": ".NET 8",
+  "timestamp": "2024-03-11T10:00:00Z"
 }
 ```
 
