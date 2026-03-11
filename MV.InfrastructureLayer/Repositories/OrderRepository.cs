@@ -130,20 +130,35 @@ public class OrderRepository : IOrderRepository
     public async Task<(List<OrderHeader> Items, int TotalCount)> GetOrdersByUserIdAsync(
         int userId, OrderFilterRequest filter)
     {
-        var query = _context.OrderHeaders
+        // PERFORMANCE FIX: Tách Count và Load data riêng để tránh duplicate query
+        // Bước 1: Build base query KHÔNG có Include (nhẹ hơn)
+        var baseQuery = _context.OrderHeaders
             .Where(o => o.UserId == userId)
-            .Include(o => o.OrderItems)
-            .Include(o => o.Payment)
             .AsQueryable();
 
-        query = ApplyBaseFilters(query, filter);
+        baseQuery = ApplyBaseFilters(baseQuery, filter);
 
-        var totalCount = await query.CountAsync();
+        // Bước 2: Count trên query nhẹ (không Include relationships)
+        var totalCount = await baseQuery.CountAsync();
 
-        var items = await query
+        // Bước 3: Lấy IDs với pagination
+        var orderIds = await baseQuery
             .OrderByDescending(o => o.CreatedAt)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
             .Take(filter.PageSize)
+            .Select(o => o.OrderId)
+            .ToListAsync();
+
+        if (orderIds.Count == 0)
+            return (new List<OrderHeader>(), totalCount);
+
+        // Bước 4: Load full data với AsSplitQuery chỉ cho các IDs đã lọc
+        var items = await _context.OrderHeaders
+            .AsSplitQuery() // Split thành nhiều query nhỏ tránh Cartesian explosion
+            .Include(o => o.OrderItems)
+            .Include(o => o.Payment)
+            .Where(o => orderIds.Contains(o.OrderId))
+            .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
 
         return (items, totalCount);
@@ -151,19 +166,32 @@ public class OrderRepository : IOrderRepository
 
     public async Task<(List<OrderHeader> Items, int TotalCount)> GetAllOrdersAsync(OrderFilterRequest filter)
     {
-        var query = _context.OrderHeaders
-            .Include(o => o.OrderItems)
-            .Include(o => o.Payment)
-            .AsQueryable();
+        // PERFORMANCE FIX: Tách Count và Load data riêng để tránh duplicate query
+        // Bước 1: Build base query KHÔNG có Include (nhẹ hơn)
+        var baseQuery = _context.OrderHeaders.AsQueryable();
+        baseQuery = ApplyBaseFilters(baseQuery, filter);
 
-        query = ApplyBaseFilters(query, filter);
+        // Bước 2: Count trên query nhẹ (không Include relationships)
+        var totalCount = await baseQuery.CountAsync();
 
-        var totalCount = await query.CountAsync();
-
-        var items = await query
+        // Bước 3: Lấy IDs với pagination
+        var orderIds = await baseQuery
             .OrderByDescending(o => o.CreatedAt)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
             .Take(filter.PageSize)
+            .Select(o => o.OrderId)
+            .ToListAsync();
+
+        if (orderIds.Count == 0)
+            return (new List<OrderHeader>(), totalCount);
+
+        // Bước 4: Load full data với AsSplitQuery chỉ cho các IDs đã lọc
+        var items = await _context.OrderHeaders
+            .AsSplitQuery() // Split thành nhiều query nhỏ tránh Cartesian explosion
+            .Include(o => o.OrderItems)
+            .Include(o => o.Payment)
+            .Where(o => orderIds.Contains(o.OrderId))
+            .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
 
         return (items, totalCount);

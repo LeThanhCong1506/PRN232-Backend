@@ -19,41 +19,56 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<(List<Product> Items, int TotalCount)> GetPagedProductsAsync(ProductFilter filter)
         {
-            var query = _context.Products
-                .AsNoTracking()
+            // PERFORMANCE FIX: Tách Count và Load riêng
+            // Bước 1: Build base query KHÔNG có Include
+            var baseQuery = _context.Products
                 .Where(p => p.IsDeleted != true)
-                .Include(p => p.Brand)
-                .Include(p => p.Categories)
-                .Include(p => p.ProductImages)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.SearchTerm))
             {
                 var term = filter.SearchTerm.ToLower();
-                query = query.Where(p => p.Name.ToLower().Contains(term) ||
+                baseQuery = baseQuery.Where(p => p.Name.ToLower().Contains(term) ||
                                          p.Sku.ToLower().Contains(term));
             }
 
             if (filter.BrandId.HasValue)
-                query = query.Where(p => p.BrandId == filter.BrandId.Value);
+                baseQuery = baseQuery.Where(p => p.BrandId == filter.BrandId.Value);
 
             if (filter.CategoryId.HasValue)
             {
-                query = query.Where(p => p.Categories.Any(c => c.CategoryId == filter.CategoryId.Value));
+                baseQuery = baseQuery.Where(p => p.Categories.Any(c => c.CategoryId == filter.CategoryId.Value));
             }
 
             if (filter.MinPrice.HasValue)
-                query = query.Where(p => p.Price >= filter.MinPrice.Value);
+                baseQuery = baseQuery.Where(p => p.Price >= filter.MinPrice.Value);
 
             if (filter.MaxPrice.HasValue)
-                query = query.Where(p => p.Price <= filter.MaxPrice.Value);
+                baseQuery = baseQuery.Where(p => p.Price <= filter.MaxPrice.Value);
 
-            var totalCount = await query.CountAsync();
+            // Bước 2: Count trên query nhẹ
+            var totalCount = await baseQuery.CountAsync();
 
-            var items = await query
+            // Bước 3: Lấy IDs với pagination
+            var productIds = await baseQuery
                 .OrderByDescending(p => p.CreatedAt)
                 .Skip((filter.PageNumber - 1) * filter.PageSize)
                 .Take(filter.PageSize)
+                .Select(p => p.ProductId)
+                .ToListAsync();
+
+            if (productIds.Count == 0)
+                return (new List<Product>(), totalCount);
+
+            // Bước 4: Load full data với AsSplitQuery
+            var items = await _context.Products
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(p => p.Brand)
+                .Include(p => p.Categories)
+                .Include(p => p.ProductImages)
+                .Where(p => productIds.Contains(p.ProductId))
+                .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
             return (items, totalCount);
@@ -61,38 +76,52 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<(List<Product> Items, int TotalCount)> GetAdminPagedProductsAsync(AdminProductFilter filter)
         {
-            var query = _context.Products
-                .AsNoTracking()
-                .Include(p => p.Brand)
-                .Include(p => p.Categories)
-                .Include(p => p.ProductImages)
-                .AsQueryable();
+            // PERFORMANCE FIX: Tách Count và Load riêng
+            // Bước 1: Build base query KHÔNG có Include
+            var baseQuery = _context.Products.AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.Search))
             {
                 var term = filter.Search.ToLower();
-                query = query.Where(p => p.Name.ToLower().Contains(term) ||
+                baseQuery = baseQuery.Where(p => p.Name.ToLower().Contains(term) ||
                                          p.Sku.ToLower().Contains(term));
             }
 
             if (filter.BrandId.HasValue)
-                query = query.Where(p => p.BrandId == filter.BrandId.Value);
+                baseQuery = baseQuery.Where(p => p.BrandId == filter.BrandId.Value);
 
             if (filter.CategoryId.HasValue)
-                query = query.Where(p => p.Categories.Any(c => c.CategoryId == filter.CategoryId.Value));
+                baseQuery = baseQuery.Where(p => p.Categories.Any(c => c.CategoryId == filter.CategoryId.Value));
 
             if (!string.IsNullOrEmpty(filter.ProductType))
-                query = query.Where(p => p.ProductType == filter.ProductType);
+                baseQuery = baseQuery.Where(p => p.ProductType == filter.ProductType);
 
             if (filter.LowStock == true)
-                query = query.Where(p => (p.StockQuantity ?? 0) < 10);
+                baseQuery = baseQuery.Where(p => (p.StockQuantity ?? 0) < 10);
 
-            var totalCount = await query.CountAsync();
+            // Bước 2: Count trên query nhẹ
+            var totalCount = await baseQuery.CountAsync();
 
-            var items = await query
+            // Bước 3: Lấy IDs với pagination
+            var productIds = await baseQuery
                 .OrderBy(p => p.StockQuantity ?? 0)
                 .Skip((filter.PageNumber - 1) * filter.PageSize)
                 .Take(filter.PageSize)
+                .Select(p => p.ProductId)
+                .ToListAsync();
+
+            if (productIds.Count == 0)
+                return (new List<Product>(), totalCount);
+
+            // Bước 4: Load full data với AsSplitQuery
+            var items = await _context.Products
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(p => p.Brand)
+                .Include(p => p.Categories)
+                .Include(p => p.ProductImages)
+                .Where(p => productIds.Contains(p.ProductId))
+                .OrderBy(p => p.StockQuantity ?? 0)
                 .ToListAsync();
 
             return (items, totalCount);
@@ -151,14 +180,30 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<Product?> GetDetailByIdAsync(int productId)
         {
-            return await _context.Products
+            // PERFORMANCE FIX: Tách reviews ra query riêng và limit số lượng
+            // Load product với basic includes (không include Reviews)
+            var product = await _context.Products
+                .AsNoTracking()
+                .AsSplitQuery()
                 .Include(p => p.Brand)
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)
                 .Include(p => p.WarrantyPolicy)
-                .Include(p => p.Reviews)
-                    .ThenInclude(r => r.User)
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
+
+            if (product == null) return null;
+
+            // Load reviews separately với pagination (tránh load tất cả reviews)
+            // Chỉ load 20 reviews gần nhất thay vì toàn bộ
+            product.Reviews = await _context.Reviews
+                .AsNoTracking()
+                .Include(r => r.User)
+                .Where(r => r.ProductId == productId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Take(20)
+                .ToListAsync();
+
+            return product;
         }
 
         public async Task<Product> CreateAsync(Product product)

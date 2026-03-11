@@ -205,13 +205,14 @@ namespace MV.PresentationLayer
 
             // Register DbContext with connection string from appsettings
             // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
-            // Maximum Pool Size=20: giới hạn số connection để không vượt quá max_connections của PostgreSQL
-            // Keepalive=30: gửi keepalive packet mỗi 30s để tránh stale connections
-            // Connection Idle Lifetime=60: recycle connections sau 60s idle để tránh zombie connections
-            // Timeout=30: timeout cho connection attempts
+            // Maximum Pool Size=10: giới hạn số connection tránh exhaust trên free tier database
+            // Keepalive=15: gửi keepalive packet mỗi 15s để tránh stale connections
+            // Connection Idle Lifetime=30: recycle connections sau 30s idle để tránh zombie connections
+            // Timeout=15: timeout cho connection attempts
+            // Command Timeout=30: timeout cho command execution
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (!connectionString!.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
-                connectionString += ";Maximum Pool Size=20;Minimum Pool Size=1;Connection Idle Lifetime=60;Keepalive=30;Timeout=30";
+                connectionString += ";Maximum Pool Size=10;Minimum Pool Size=1;Connection Idle Lifetime=30;Keepalive=15;Timeout=15;Command Timeout=30";
 
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(connectionString,
@@ -226,11 +227,17 @@ namespace MV.PresentationLayer
                             maxRetryDelay: TimeSpan.FromSeconds(30),
                             errorCodesToAdd: null);
 
+                        // PERFORMANCE FIX: Use QuerySplittingBehavior.SplitQuery để tránh Cartesian Explosion
+                        // khi query có nhiều Include() relationships
+                        npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+
                         npgsqlOptions.MapEnum<MV.DomainLayer.Enums.ProductTypeEnum>(
                             "product_type_enum",
                             schemaName: null,
                             nameTranslator: new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
                     })
+                // PERFORMANCE FIX: Set default NoTracking cho read-only queries
+                .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
                 .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)));
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

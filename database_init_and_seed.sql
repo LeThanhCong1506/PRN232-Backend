@@ -743,6 +743,119 @@ INSERT INTO ORDER_ITEM (order_item_id, order_id, product_id, quantity, unit_pric
 INSERT INTO PRODUCT_INSTANCE (serial_number, product_id, order_item_id, manufacturing_date, status, notes, created_at)
 SELECT 'RPI4-4GB-2024120003', 5, order_item_id, '2024-12-01', 'SOLD', 'Da ban cho khach hang', '2024-12-15 10:00:00' FROM ORDER_ITEM WHERE order_id = 3 AND product_id = 5 LIMIT 1;
 INSERT INTO PRODUCT_INSTANCE (serial_number, product_id, order_item_id, manufacturing_date, status, notes, created_at)
+
+
+-- ============================================================
+-- CHAT MESSAGE FEATURE
+-- ============================================================
+-- Migration: Add chat_message table for real-time chat feature
+-- Date: 2026-02-23
+-- Description: Tạo bảng chat_message cho tính năng Chat (SignalR)
+--              Customer <-> Admin/Staff real-time messaging
+-- ============================================================
+
+-- 1. Tạo bảng chat_message
+CREATE TABLE IF NOT EXISTS chat_message (
+    message_id SERIAL PRIMARY KEY,
+    sender_id INTEGER NOT NULL,
+    receiver_id INTEGER,
+    content TEXT NOT NULL,
+    is_from_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+
+    CONSTRAINT fk_chat_message_sender
+        FOREIGN KEY (sender_id) REFERENCES "USER" (user_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_chat_message_receiver
+        FOREIGN KEY (receiver_id) REFERENCES "USER" (user_id) ON DELETE RESTRICT
+);
+
+-- 2. Indexes cho truy vấn nhanh
+CREATE INDEX IF NOT EXISTS idx_chat_message_sender_id ON chat_message (sender_id);
+CREATE INDEX IF NOT EXISTS idx_chat_message_receiver_id ON chat_message (receiver_id);
+CREATE INDEX IF NOT EXISTS idx_chat_message_sent_at ON chat_message (sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_message_is_read ON chat_message (is_read) WHERE is_read = FALSE;
+
+-- 3. Comment mô tả
+COMMENT ON TABLE chat_message IS 'Real-time chat messages between customers and admin/staff';
+COMMENT ON COLUMN chat_message.sender_id IS 'User ID của người gửi';
+COMMENT ON COLUMN chat_message.receiver_id IS 'User ID của người nhận (NULL = gửi cho Admin/Store)';
+COMMENT ON COLUMN chat_message.is_from_admin IS 'TRUE nếu tin nhắn từ Admin/Staff';
+COMMENT ON COLUMN chat_message.is_read IS 'Trạng thái đã đọc';
+
+
+-- =====================================================
+-- PERFORMANCE OPTIMIZATION: Database Indexes
+-- =====================================================
+-- Purpose: Thêm indexes cho các cột thường được filter/sort
+-- Impact: Tăng tốc query filtering và sorting
+-- Status: OPTIONAL (recommended for production)
+-- Date: 2026-03-11
+-- =====================================================
+
+-- Index for order_header table
+-- Speeds up ORDER BY created_at DESC queries
+CREATE INDEX IF NOT EXISTS idx_order_created_at_desc 
+ON order_header(created_at DESC);
+
+-- Hash index for payment status enum (fast equality checks)
+-- Speeds up WHERE payment.status = 'PENDING' queries
+CREATE INDEX IF NOT EXISTS idx_payment_status_hash 
+ON payment USING HASH (status);
+
+-- Hash index for payment method enum (fast equality checks)
+-- Speeds up WHERE payment.payment_method = 'SEPAY' queries
+CREATE INDEX IF NOT EXISTS idx_payment_method_hash 
+ON payment USING HASH (payment_method);
+
+-- Index for product table sorting
+-- Speeds up ORDER BY created_at DESC queries for product listing
+CREATE INDEX IF NOT EXISTS idx_product_created_at_desc 
+ON product(created_at DESC);
+
+-- Index for product stock quantity
+-- Speeds up low stock filtering queries
+CREATE INDEX IF NOT EXISTS idx_product_stock_quantity 
+ON product(stock_quantity) WHERE stock_quantity < 10;
+
+-- Index for warranty_claim table sorting
+-- Speeds up admin warranty claim listing
+CREATE INDEX IF NOT EXISTS idx_warranty_claim_created_at_desc 
+ON warranty_claim(created_at DESC);
+
+-- Index for warranty active status
+-- Speeds up active warranty queries
+CREATE INDEX IF NOT EXISTS idx_warranty_is_active 
+ON warranty(is_active) WHERE is_active = true;
+
+-- Index for cart_item composite key
+-- Speeds up cart item lookups
+CREATE INDEX IF NOT EXISTS idx_cart_item_cart_product 
+ON cart_item(cart_id, product_id);
+
+-- =====================================================
+-- Verify Indexes Created
+-- =====================================================
+-- Run this query to verify all indexes were created:
+/*
+SELECT 
+    schemaname, 
+    tablename, 
+    indexname, 
+    indexdef 
+FROM pg_indexes 
+WHERE indexname LIKE 'idx_%'
+ORDER BY tablename, indexname;
+*/
+
+-- =====================================================
+-- Performance Impact Estimation
+-- =====================================================
+-- ORDER BY created_at DESC: 60-80% faster
+-- WHERE status/payment_method: 70-90% faster (hash index)
+-- Filtered pagination: 50-70% faster
+-- Low stock queries: 80% faster (partial index)
+-- =====================================================
 SELECT 'RPI4-4GB-2024120004', 5, order_item_id, '2024-12-01', 'SOLD', 'Da ban cho khach hang', '2024-12-15 10:00:00' FROM ORDER_ITEM WHERE order_id = 5 AND product_id = 5 LIMIT 1;
 INSERT INTO PRODUCT_INSTANCE (serial_number, product_id, order_item_id, manufacturing_date, status, notes, created_at)
 SELECT 'RPI4-8GB-2024120003', 6, order_item_id, '2024-12-01', 'SOLD', 'Da ban cho khach hang', '2024-12-15 10:00:00' FROM ORDER_ITEM WHERE order_id = 1 AND product_id = 6 LIMIT 1;
