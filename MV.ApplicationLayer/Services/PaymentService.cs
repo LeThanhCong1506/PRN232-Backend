@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MV.ApplicationLayer.Interfaces;
@@ -123,54 +124,58 @@ public class PaymentService : IPaymentService
             }
 
             // 8. Complete payment in a transaction
-            using var dbTransaction = await _context.Database.BeginTransactionAsync();
-            try
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                // Update Payment record
-                payment.PaymentDate = DateTime.Now;
-                payment.ReceivedAmount = request.TransferAmount;
-                payment.TransactionId = sepayId;
-                payment.BankCode = request.Gateway;
-                payment.GatewayResponse = JsonSerializer.Serialize(request);
-                payment.UpdatedAt = DateTime.Now;
-                await _orderRepo.UpdatePaymentAsync(payment);
-
-                // Set payment status to COMPLETED
-                await _orderRepo.SetPaymentStatusByOrderIdAsync(payment.OrderId, PaymentStatusEnum.COMPLETED.ToString());
-
-                // Auto-confirm the order (payment received → order confirmed)
-                var currentOrderStatus = await _orderRepo.GetOrderStatusAsync(payment.OrderId);
-                if (currentOrderStatus == OrderStatusEnum.PENDING.ToString())
+                using var dbTransaction = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    await _orderRepo.SetOrderStatusAsync(payment.OrderId, OrderStatusEnum.CONFIRMED.ToString());
-                    payment.Order.ConfirmedAt = DateTime.Now;
-                    payment.Order.UpdatedAt = DateTime.Now;
-                    await _orderRepo.UpdateOrderAsync(payment.Order);
+                    // Update Payment record
+                    payment.PaymentDate = DateTime.Now;
+                    payment.ReceivedAmount = request.TransferAmount;
+                    payment.TransactionId = sepayId;
+                    payment.BankCode = request.Gateway;
+                    payment.GatewayResponse = JsonSerializer.Serialize(request);
+                    payment.UpdatedAt = DateTime.Now;
+                    await _orderRepo.UpdatePaymentAsync(payment);
+
+                    // Set payment status to COMPLETED
+                    await _orderRepo.SetPaymentStatusByOrderIdAsync(payment.OrderId, PaymentStatusEnum.COMPLETED.ToString());
+
+                    // Auto-confirm the order (payment received → order confirmed)
+                    var currentOrderStatus = await _orderRepo.GetOrderStatusAsync(payment.OrderId);
+                    if (currentOrderStatus == OrderStatusEnum.PENDING.ToString())
+                    {
+                        await _orderRepo.SetOrderStatusAsync(payment.OrderId, OrderStatusEnum.CONFIRMED.ToString());
+                        payment.Order.ConfirmedAt = DateTime.Now;
+                        payment.Order.UpdatedAt = DateTime.Now;
+                        await _orderRepo.UpdateOrderAsync(payment.Order);
+                    }
+
+                    // Mark SePay transaction as processed
+                    sepayTransaction.IsProcessed = true;
+                    sepayTransaction.ProcessedAt = DateTime.Now;
+                    sepayTransaction.OrderId = payment.OrderId;
+                    await _sepayRepo.UpdateTransactionAsync(sepayTransaction);
+
+                    await dbTransaction.CommitAsync();
+
+                    _logger.LogInformation(
+                        "Payment completed successfully: OrderId={OrderId}, Amount={Amount}",
+                        payment.OrderId, request.TransferAmount);
+
+                    // Notify realtime: payment confirmed
+                    try { await _notificationService.SendPaymentConfirmedAsync(payment.Order.UserId, payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
                 }
+                catch (Exception ex)
+                {
+                    await dbTransaction.RollbackAsync();
+                    _logger.LogError(ex, "Error processing payment for OrderId={OrderId}", payment.OrderId);
+                    throw;
+                }
+            });
 
-                // Mark SePay transaction as processed
-                sepayTransaction.IsProcessed = true;
-                sepayTransaction.ProcessedAt = DateTime.Now;
-                sepayTransaction.OrderId = payment.OrderId;
-                await _sepayRepo.UpdateTransactionAsync(sepayTransaction);
-
-                await dbTransaction.CommitAsync();
-
-                _logger.LogInformation(
-                    "Payment completed successfully: OrderId={OrderId}, Amount={Amount}",
-                    payment.OrderId, request.TransferAmount);
-
-                // Notify realtime: payment confirmed
-                try { await _notificationService.SendPaymentConfirmedAsync(payment.Order.UserId, payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
-
-                return ApiResponse<object>.SuccessResponse(null!, "Payment processed successfully");
-            }
-            catch (Exception ex)
-            {
-                await dbTransaction.RollbackAsync();
-                _logger.LogError(ex, "Error processing payment for OrderId={OrderId}", payment.OrderId);
-                throw;
-            }
+            return ApiResponse<object>.SuccessResponse(null!, "Payment processed successfully");
         }
         catch (Exception ex)
         {
@@ -264,56 +269,67 @@ public class PaymentService : IPaymentService
                 $"Payment cannot be confirmed in this status {currentStatus}.");
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        var strategy = _context.Database.CreateExecutionStrategy();
         try
         {
-            // Update payment
-            payment.PaymentDate = DateTime.Now;
-            payment.ReceivedAmount = payment.Amount;
-            payment.VerifiedBy = adminUserId;
-            payment.VerifiedAt = DateTime.Now;
-            payment.UpdatedAt = DateTime.Now;
-            payment.Notes = "Xác nhận thủ công bởi Admin";
-            await _orderRepo.UpdatePaymentAsync(payment);
-
-            // Set payment status to COMPLETED
-            await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.COMPLETED.ToString());
-
-            // Auto-confirm order if still PENDING
-            var orderStatus = await _orderRepo.GetOrderStatusAsync(orderId);
-            if (orderStatus == OrderStatusEnum.PENDING.ToString())
+            return await strategy.ExecuteAsync(async () =>
             {
-                await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CONFIRMED.ToString());
-                order.ConfirmedAt = DateTime.Now;
-                order.ConfirmedBy = adminUserId;
-                order.UpdatedAt = DateTime.Now;
-                await _orderRepo.UpdateOrderAsync(order);
-            }
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    // Update payment
+                    payment.PaymentDate = DateTime.Now;
+                    payment.ReceivedAmount = payment.Amount;
+                    payment.VerifiedBy = adminUserId;
+                    payment.VerifiedAt = DateTime.Now;
+                    payment.UpdatedAt = DateTime.Now;
+                    payment.Notes = "Xác nhận thủ công bởi Admin";
+                    await _orderRepo.UpdatePaymentAsync(payment);
 
-            await transaction.CommitAsync();
+                    // Set payment status to COMPLETED
+                    await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.COMPLETED.ToString());
 
-            // Return updated status
-            var response = new PaymentStatusResponse
-            {
-                OrderId = orderId,
-                OrderNumber = order.OrderNumber,
-                PaymentMethod = PaymentMethodEnum.SEPAY.ToString(),
-                PaymentStatus = PaymentStatusEnum.COMPLETED.ToString(),
-                Amount = payment.Amount,
-                ReceivedAmount = payment.ReceivedAmount,
-                QrCodeUrl = payment.QrCodeUrl,
-                PaymentReference = payment.PaymentReference,
-                ExpiredAt = payment.ExpiredAt,
-                IsPaid = true,
-                RemainingSeconds = 0
-            };
+                    // Auto-confirm order if still PENDING
+                    var orderStatus = await _orderRepo.GetOrderStatusAsync(orderId);
+                    if (orderStatus == OrderStatusEnum.PENDING.ToString())
+                    {
+                        await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CONFIRMED.ToString());
+                        order.ConfirmedAt = DateTime.Now;
+                        order.ConfirmedBy = adminUserId;
+                        order.UpdatedAt = DateTime.Now;
+                        await _orderRepo.UpdateOrderAsync(order);
+                    }
 
-            return ApiResponse<PaymentStatusResponse>.SuccessResponse(
-                response, "Payment confirmed.");
+                    await transaction.CommitAsync();
+
+                    // Return updated status
+                    var response = new PaymentStatusResponse
+                    {
+                        OrderId = orderId,
+                        OrderNumber = order.OrderNumber,
+                        PaymentMethod = PaymentMethodEnum.SEPAY.ToString(),
+                        PaymentStatus = PaymentStatusEnum.COMPLETED.ToString(),
+                        Amount = payment.Amount,
+                        ReceivedAmount = payment.ReceivedAmount,
+                        QrCodeUrl = payment.QrCodeUrl,
+                        PaymentReference = payment.PaymentReference,
+                        ExpiredAt = payment.ExpiredAt,
+                        IsPaid = true,
+                        RemainingSeconds = 0
+                    };
+
+                    return ApiResponse<PaymentStatusResponse>.SuccessResponse(
+                        response, "Payment confirmed.");
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return ApiResponse<PaymentStatusResponse>.ErrorResponse(
                 $"Error confirming payment: {ex.Message}");
         }
@@ -374,56 +390,67 @@ public class PaymentService : IPaymentService
             }
 
             // 5. Cập nhật payment status → COMPLETED, order status → CONFIRMED
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            var strategy = _context.Database.CreateExecutionStrategy();
             try
             {
-                // Update payment record
-                payment.PaymentDate = DateTime.Now;
-                payment.ReceivedAmount = payment.Amount; // SePay đã xác nhận thanh toán thành công
-                payment.UpdatedAt = DateTime.Now;
-                payment.Notes = "Automatic confirmation from SePay success callback.";
-                await _orderRepo.UpdatePaymentAsync(payment);
-
-                // Set payment status to COMPLETED
-                await _orderRepo.SetPaymentStatusByOrderIdAsync(order.OrderId, PaymentStatusEnum.COMPLETED.ToString());
-
-                // Auto-confirm order if still PENDING
-                var orderStatus = await _orderRepo.GetOrderStatusAsync(order.OrderId);
-                if (orderStatus == OrderStatusEnum.PENDING.ToString())
+                return await strategy.ExecuteAsync(async () =>
                 {
-                    await _orderRepo.SetOrderStatusAsync(order.OrderId, OrderStatusEnum.CONFIRMED.ToString());
-                    order.ConfirmedAt = DateTime.Now;
-                    order.UpdatedAt = DateTime.Now;
-                    await _orderRepo.UpdateOrderAsync(order);
-                }
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        // Update payment record
+                        payment.PaymentDate = DateTime.Now;
+                        payment.ReceivedAmount = payment.Amount; // SePay đã xác nhận thanh toán thành công
+                        payment.UpdatedAt = DateTime.Now;
+                        payment.Notes = "Automatic confirmation from SePay success callback.";
+                        await _orderRepo.UpdatePaymentAsync(payment);
 
-                await transaction.CommitAsync();
+                        // Set payment status to COMPLETED
+                        await _orderRepo.SetPaymentStatusByOrderIdAsync(order.OrderId, PaymentStatusEnum.COMPLETED.ToString());
 
-                _logger.LogInformation(
-                    "Success callback: Payment completed for OrderId={OrderId}, OrderNumber={OrderNumber}",
-                    order.OrderId, order.OrderNumber);
+                        // Auto-confirm order if still PENDING
+                        var orderStatus = await _orderRepo.GetOrderStatusAsync(order.OrderId);
+                        if (orderStatus == OrderStatusEnum.PENDING.ToString())
+                        {
+                            await _orderRepo.SetOrderStatusAsync(order.OrderId, OrderStatusEnum.CONFIRMED.ToString());
+                            order.ConfirmedAt = DateTime.Now;
+                            order.UpdatedAt = DateTime.Now;
+                            await _orderRepo.UpdateOrderAsync(order);
+                        }
 
-                // Notify realtime: payment confirmed
-                try { await _notificationService.SendPaymentConfirmedAsync(order.UserId, order.OrderId, order.OrderNumber, payment.Amount); } catch { }
+                        await transaction.CommitAsync();
 
-                return ApiResponse<PaymentStatusResponse>.SuccessResponse(new PaymentStatusResponse
-                {
-                    OrderId = order.OrderId,
-                    OrderNumber = order.OrderNumber,
-                    PaymentMethod = PaymentMethodEnum.SEPAY.ToString(),
-                    PaymentStatus = PaymentStatusEnum.COMPLETED.ToString(),
-                    Amount = payment.Amount,
-                    ReceivedAmount = payment.ReceivedAmount,
-                    QrCodeUrl = payment.QrCodeUrl,
-                    PaymentReference = payment.PaymentReference,
-                    ExpiredAt = payment.ExpiredAt,
-                    IsPaid = true,
-                    RemainingSeconds = 0
-                }, "Payment successful.");
+                        _logger.LogInformation(
+                            "Success callback: Payment completed for OrderId={OrderId}, OrderNumber={OrderNumber}",
+                            order.OrderId, order.OrderNumber);
+
+                        // Notify realtime: payment confirmed
+                        try { await _notificationService.SendPaymentConfirmedAsync(order.UserId, order.OrderId, order.OrderNumber, payment.Amount); } catch { }
+
+                        return ApiResponse<PaymentStatusResponse>.SuccessResponse(new PaymentStatusResponse
+                        {
+                            OrderId = order.OrderId,
+                            OrderNumber = order.OrderNumber,
+                            PaymentMethod = PaymentMethodEnum.SEPAY.ToString(),
+                            PaymentStatus = PaymentStatusEnum.COMPLETED.ToString(),
+                            Amount = payment.Amount,
+                            ReceivedAmount = payment.ReceivedAmount,
+                            QrCodeUrl = payment.QrCodeUrl,
+                            PaymentReference = payment.PaymentReference,
+                            ExpiredAt = payment.ExpiredAt,
+                            IsPaid = true,
+                            RemainingSeconds = 0
+                        }, "Payment successful.");
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
                 _logger.LogError(ex, "Error processing success callback for OrderId={OrderId}", order.OrderId);
                 return ApiResponse<PaymentStatusResponse>.ErrorResponse(
                     $"Lỗi khi xử lý callback: {ex.Message}");
@@ -451,50 +478,61 @@ public class PaymentService : IPaymentService
 
             foreach (var orderId in expiredOrderIds)
             {
-                using var transaction = await _context.Database.BeginTransactionAsync();
+                var strategy = _context.Database.CreateExecutionStrategy();
                 try
                 {
-                    var order = await _orderRepo.GetOrderByIdAsync(orderId);
-                    if (order == null) continue;
-
-                    // Set payment status to EXPIRED
-                    await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.EXPIRED.ToString());
-
-                    if (order.Payment != null)
+                    await strategy.ExecuteAsync(async () =>
                     {
-                        order.Payment.UpdatedAt = DateTime.Now;
-                        await _orderRepo.UpdatePaymentAsync(order.Payment);
-                    }
+                        using var transaction = await _context.Database.BeginTransactionAsync();
+                        try
+                        {
+                            var order = await _orderRepo.GetOrderByIdAsync(orderId);
+                            if (order == null) return;
 
-                    // Cancel the order
-                    await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
-                    order.CancelledAt = DateTime.Now;
-                    order.CancelReason = "Hết hạn thanh toán SEPAY (30 phút)";
-                    order.UpdatedAt = DateTime.Now;
-                    await _orderRepo.UpdateOrderAsync(order);
+                            // Set payment status to EXPIRED
+                            await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.EXPIRED.ToString());
 
-                    // Restore stock
-                    foreach (var item in order.OrderItems)
-                    {
-                        await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
-                    }
+                            if (order.Payment != null)
+                            {
+                                order.Payment.UpdatedAt = DateTime.Now;
+                                await _orderRepo.UpdatePaymentAsync(order.Payment);
+                            }
 
-                    // Restore coupon
-                    if (order.CouponId.HasValue)
-                    {
-                        await _orderRepo.DecrementCouponUsedCountAsync(order.CouponId.Value);
-                    }
+                            // Cancel the order
+                            await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
+                            order.CancelledAt = DateTime.Now;
+                            order.CancelReason = "Hết hạn thanh toán SEPAY (30 phút)";
+                            order.UpdatedAt = DateTime.Now;
+                            await _orderRepo.UpdateOrderAsync(order);
 
-                    await transaction.CommitAsync();
+                            // Restore stock
+                            foreach (var item in order.OrderItems)
+                            {
+                                await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+                            }
 
-                    // Notify realtime: payment expired
-                    try { await _notificationService.SendPaymentExpiredAsync(order.UserId, orderId, order.OrderNumber); } catch { }
+                            // Restore coupon
+                            if (order.CouponId.HasValue)
+                            {
+                                await _orderRepo.DecrementCouponUsedCountAsync(order.CouponId.Value);
+                            }
 
-                    _logger.LogInformation("Expired and cancelled order: OrderId={OrderId}", orderId);
+                            await transaction.CommitAsync();
+
+                            // Notify realtime: payment expired
+                            try { await _notificationService.SendPaymentExpiredAsync(order.UserId, orderId, order.OrderNumber); } catch { }
+
+                            _logger.LogInformation("Expired and cancelled order: OrderId={OrderId}", orderId);
+                        }
+                        catch
+                        {
+                            await transaction.RollbackAsync();
+                            throw;
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
-                    await transaction.RollbackAsync();
                     _logger.LogError(ex, "Error expiring payment for OrderId={OrderId}", orderId);
                 }
             }

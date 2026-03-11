@@ -185,35 +185,46 @@ public class AdminOrderService : IAdminOrderService
                 $"Cannot transition from {currentStatus} to {newStatus}.");
 
         // Use transaction for complex status changes
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        var strategy = _context.Database.CreateExecutionStrategy();
         try
         {
-            switch (newStatus)
+            await strategy.ExecuteAsync(async () =>
             {
-                case "CONFIRMED":
-                    await HandleConfirmOrder(order, adminUserId, request);
-                    break;
-                case "SHIPPED":
-                    await HandleShipOrder(order, adminUserId, request);
-                    break;
-                case "DELIVERED":
-                    await HandleDeliverOrder(order, orderId);
-                    break;
-                case "CANCELLED":
-                    await HandleCancelOrder(order, adminUserId, currentStatus, request);
-                    break;
-            }
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    switch (newStatus)
+                    {
+                        case "CONFIRMED":
+                            await HandleConfirmOrder(order, adminUserId, request);
+                            break;
+                        case "SHIPPED":
+                            await HandleShipOrder(order, adminUserId, request);
+                            break;
+                        case "DELIVERED":
+                            await HandleDeliverOrder(order, orderId);
+                            break;
+                        case "CANCELLED":
+                            await HandleCancelOrder(order, adminUserId, currentStatus, request);
+                            break;
+                    }
 
-            // Update status
-            await _orderRepo.SetOrderStatusAsync(orderId, newStatus);
-            order.UpdatedAt = DateTime.UtcNow;
-            await _orderRepo.UpdateOrderAsync(order);
+                    // Update status
+                    await _orderRepo.SetOrderStatusAsync(orderId, newStatus);
+                    order.UpdatedAt = DateTime.UtcNow;
+                    await _orderRepo.UpdateOrderAsync(order);
 
-            await transaction.CommitAsync();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return ApiResponse<AdminOrderDetailResponse>.ErrorResponse($"Failed to update order status: {ex.Message}");
         }
 
