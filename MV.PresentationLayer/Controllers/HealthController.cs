@@ -88,6 +88,7 @@ public class HealthController : ControllerBase
     /// Chỉ trả về 200 OK, không check database.
     /// </summary>
     [HttpGet("ping")]
+    [HttpHead("ping")]
     [AllowAnonymous]
     [SwaggerOperation(Summary = "Ping - Minimal keep-alive endpoint")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]
