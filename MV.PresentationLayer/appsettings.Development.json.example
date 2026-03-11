@@ -1,0 +1,31 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=ecommerce_db;Username=postgres;Password=YOUR_PASSWORD;TrustServerCertificate=true",
+    "RedisConnection": "localhost:6379",
+    "SupabaseConnection": ""
+  },
+  "Jwt": {
+    "Key": "YOUR_JWT_KEY_MIN_32_CHARS"
+  },
+  "SePay": {
+    "AccountNumber": "YOUR_ACCOUNT_NUMBER",
+    "AccountName": "YOUR_ACCOUNT_NAME",
+    "ApiToken": "YOUR_SEPAY_API_TOKEN",
+    "WebhookSecret": "YOUR_WEBHOOK_SECRET",
+    "MerchantId": "YOUR_MERCHANT_ID",
+    "SecretKey": "YOUR_SEPAY_SECRET_KEY"
+  },
+  "Cloudinary": {
+    "CloudName": "YOUR_CLOUD_NAME",
+    "ApiKey": "YOUR_API_KEY",
+    "ApiSecret": "YOUR_API_SECRET"
+  },
+  "Smtp": {
+    "Username": "YOUR_EMAIL@gmail.com",
+    "Password": "YOUR_APP_PASSWORD",
+    "SenderEmail": "YOUR_EMAIL@gmail.com"
+  },
+  "Groq": {
+    "ApiKey": "YOUR_GROQ_API_KEY"
+  }
+}
