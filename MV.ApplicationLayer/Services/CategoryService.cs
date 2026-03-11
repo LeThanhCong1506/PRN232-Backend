@@ -31,6 +31,7 @@ public class CategoryService : ICategoryService
             {
                 CategoryId = c.CategoryId,
                 Name = c.Name,
+                ImageUrl = c.ImageUrl,
                 ProductCount = c.Products.Count
             }).ToList();
 
@@ -57,6 +58,7 @@ public class CategoryService : ICategoryService
             {
                 CategoryId = category.CategoryId,
                 Name = category.Name,
+                ImageUrl = category.ImageUrl,
                 TotalProducts = category.Products.Count,
                 InStockProducts = category.Products.Count(p => p.StockQuantity > 0),
                 AveragePrice = category.Products.Any() ? category.Products.Average(p => p.Price) : null,
@@ -85,7 +87,8 @@ public class CategoryService : ICategoryService
 
             var category = new Category
             {
-                Name = request.Name
+                Name = request.Name,
+                ImageUrl = request.ImageUrl
             };
 
             var createdCategory = await _categoryRepository.CreateCategoryAsync(category);
@@ -94,6 +97,7 @@ public class CategoryService : ICategoryService
             {
                 CategoryId = createdCategory.CategoryId,
                 Name = createdCategory.Name,
+                ImageUrl = createdCategory.ImageUrl,
                 ProductCount = 0
             };
 
@@ -124,6 +128,7 @@ public class CategoryService : ICategoryService
             }
 
             category.Name = request.Name;
+            category.ImageUrl = request.ImageUrl;
 
             await _categoryRepository.UpdateCategoryAsync(category);
 
@@ -131,6 +136,7 @@ public class CategoryService : ICategoryService
             {
                 CategoryId = category.CategoryId,
                 Name = category.Name,
+                ImageUrl = category.ImageUrl,
                 ProductCount = category.Products.Count
             };
 

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Login.Request;
 using MV.DomainLayer.DTOs.Login.Response;
+using MV.DomainLayer.DTOs.ResponseModels;
+using MV.InfrastructureLayer.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -13,10 +15,17 @@ namespace MV.PresentationLayer.Controllers
     public class UsersController : Controller
     {
         private readonly IUserService _service;
+        private readonly ICloudinaryService _cloudinaryService;
+        private readonly IUserRepository _userRepository;
 
-        public UsersController(IUserService service)
+        public UsersController(
+            IUserService service,
+            ICloudinaryService cloudinaryService,
+            IUserRepository userRepository)
         {
             _service = service;
+            _cloudinaryService = cloudinaryService;
+            _userRepository = userRepository;
         }
 
         [HttpPost("register")]
@@ -70,6 +79,9 @@ namespace MV.PresentationLayer.Controllers
             if (user == null)
                 return NotFound("User không tồn tại");
 
+            // Get avatar from entity
+            var entity = await _userRepository.GetByIdAsync(userId);
+
             return Ok(new
             {
                 id = user.UserId,
@@ -79,7 +91,7 @@ namespace MV.PresentationLayer.Controllers
                 fullName = user.FullName,
                 phone = user.Phone,
                 address = user.Address,
-                avatarUrl = (string?)null,
+                avatarUrl = entity?.AvatarUrl,
                 city = user.City,
                 district = user.District,
                 ward = user.Ward,
@@ -101,6 +113,7 @@ namespace MV.PresentationLayer.Controllers
             if (result == true)
             {
                 var updatedUser = await _service.GetByIdAsync(userId);
+                var entity = await _userRepository.GetByIdAsync(userId);
                 return Ok(new
                 {
                     id = updatedUser!.UserId,
@@ -110,7 +123,7 @@ namespace MV.PresentationLayer.Controllers
                     fullName = updatedUser.FullName,
                     phone = updatedUser.Phone,
                     address = updatedUser.Address,
-                    avatarUrl = (string?)null,
+                    avatarUrl = entity?.AvatarUrl,
                     city = updatedUser.City,
                     district = updatedUser.District,
                     ward = updatedUser.Ward,
@@ -120,6 +133,43 @@ namespace MV.PresentationLayer.Controllers
             else
             {
                 return BadRequest("Cập nhật thất bại");
+            }
+        }
+
+        /// <summary>
+        /// Upload avatar image via Cloudinary
+        /// </summary>
+        [HttpPost("me/avatar")]
+        [Authorize]
+        public async Task<IActionResult> UploadAvatar([FromForm] IFormFile file)
+        {
+            var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!int.TryParse(sub, out var userId))
+                return Unauthorized();
+
+            if (file == null || file.Length == 0)
+                return BadRequest(ApiResponse<string>.ErrorResponse("No file provided"));
+
+            var entity = await _userRepository.GetByIdAsync(userId);
+            if (entity == null)
+                return NotFound(ApiResponse<string>.ErrorResponse("User not found"));
+
+            try
+            {
+                var (imageUrl, _) = await _cloudinaryService.UploadImageAsync(file, "avatars");
+                entity.AvatarUrl = imageUrl;
+                await _userRepository.UpdateAsync(entity);
+
+                return Ok(ApiResponse<object>.SuccessResponse(
+                    new { avatarUrl = imageUrl },
+                    "Avatar uploaded successfully"
+                ));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<string>.ErrorResponse($"Upload failed: {ex.Message}"));
             }
         }
 
@@ -142,15 +192,6 @@ namespace MV.PresentationLayer.Controllers
                 return Ok("Update thành công");
             else
                 return BadRequest(result);
-            //try
-            //{
-            //    await _service.UpdateAsync(id, dto);
-            //    return Ok("Update thành công");
-            //}
-            //catch (Exception ex)
-            //{
-            //    return BadRequest(ex.Message);
-            //}
         }
     }
 }

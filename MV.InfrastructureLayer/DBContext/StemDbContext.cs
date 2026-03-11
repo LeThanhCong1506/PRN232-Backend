@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using MV.DomainLayer.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -150,6 +150,9 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.Name)
                 .HasMaxLength(100)
                 .HasColumnName("name");
+            entity.Property(e => e.ImageUrl)
+                .HasMaxLength(255)
+                .HasColumnName("image_url");
         });
 
         modelBuilder.Entity<Coupon>(entity =>
@@ -867,6 +870,9 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.Ward)
                 .HasMaxLength(50)
                 .HasColumnName("ward");
+            entity.Property(e => e.AvatarUrl)
+                .HasMaxLength(255)
+                .HasColumnName("avatar_url");
 
             entity.HasOne(d => d.Role).WithMany(p => p.Users)
                 .HasForeignKey(d => d.RoleId)
