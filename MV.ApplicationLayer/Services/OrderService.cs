@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Order.Request;
@@ -126,147 +127,151 @@ public class OrderService : IOrderService
         // 7. Build shipping address
         var shippingAddress = $"{request.StreetAddress}, {request.Ward}, {request.District}, {request.Province}";
 
-        // 8. Transaction
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        // 8. Transaction — wrapped in ExecutionStrategy for NpgsqlRetryingExecutionStrategy compatibility
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            // 8a. Create OrderHeader
-            var order = new OrderHeader
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                UserId = userId,
-                CouponId = coupon?.CouponId,
-                OrderNumber = orderNumber,
-                ShippingFee = shippingFee,
-                SubtotalAmount = subtotal,
-                DiscountAmount = discountAmount,
-                TotalAmount = totalAmount,
-                ShippingAddress = shippingAddress,
-                CustomerName = request.CustomerName,
-                CustomerEmail = request.CustomerEmail,
-                CustomerPhone = request.CustomerPhone,
-                Province = request.Province,
-                District = request.District,
-                Ward = request.Ward,
-                StreetAddress = request.StreetAddress,
-                Notes = request.Notes,
-                CreatedAt = DateTime.Now,
-                UpdatedAt = DateTime.Now
-            };
-            await _orderRepo.CreateOrderAsync(order);
-
-            // 8b. Set order status
-            await _orderRepo.SetOrderStatusAsync(order.OrderId, OrderStatusEnum.PENDING.ToString());
-
-            // 8c. Create OrderItems with product snapshot
-            var orderItems = cart.CartItems.Select(ci => new OrderItem
-            {
-                OrderId = order.OrderId,
-                ProductId = ci.ProductId,
-                Quantity = ci.Quantity ?? 1,
-                UnitPrice = ci.Product.Price,
-                Subtotal = (ci.Quantity ?? 1) * ci.Product.Price,
-                ProductName = ci.Product.Name,
-                ProductSku = ci.Product.Sku,
-                ProductImageUrl = ci.Product.ProductImages?.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
-                CreatedAt = DateTime.Now
-            }).ToList();
-            await _orderRepo.CreateOrderItemsAsync(orderItems);
-
-            // 8d. Decrement stock (check rows affected to prevent overselling)
-            foreach (var ci in cart.CartItems)
-            {
-                var rowsAffected = await _orderRepo.DecrementStockAsync(ci.ProductId, ci.Quantity ?? 1);
-                if (rowsAffected == 0)
+                // 8a. Create OrderHeader
+                var order = new OrderHeader
                 {
-                    throw new InvalidOperationException(
-                        $"The product '{ci.Product.Name}' is out of stock.");
-                }
-            }
+                    UserId = userId,
+                    CouponId = coupon?.CouponId,
+                    OrderNumber = orderNumber,
+                    ShippingFee = shippingFee,
+                    SubtotalAmount = subtotal,
+                    DiscountAmount = discountAmount,
+                    TotalAmount = totalAmount,
+                    ShippingAddress = shippingAddress,
+                    CustomerName = request.CustomerName,
+                    CustomerEmail = request.CustomerEmail,
+                    CustomerPhone = request.CustomerPhone,
+                    Province = request.Province,
+                    District = request.District,
+                    Ward = request.Ward,
+                    StreetAddress = request.StreetAddress,
+                    Notes = request.Notes,
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                };
+                await _orderRepo.CreateOrderAsync(order);
 
-            // 8e. Increment coupon used count
-            if (coupon != null)
-            {
-                await _orderRepo.IncrementCouponUsedCountAsync(coupon.CouponId);
-            }
+                // 8b. Set order status
+                await _orderRepo.SetOrderStatusAsync(order.OrderId, OrderStatusEnum.PENDING.ToString());
 
-            // 8f. Create Payment
-            var payment = new Payment
-            {
-                OrderId = order.OrderId,
-                Amount = totalAmount,
-                CreatedAt = DateTime.Now
-            };
-
-            string? checkoutUrl = null;
-            if (paymentMethod == PaymentMethodEnum.SEPAY)
-            {
-                // Nội dung chuyển khoản
-                payment.PaymentReference = "SEVQR" + orderNumber.Substring(3);
-                payment.ExpiredAt = DateTime.Now.AddMinutes(10);
-
-                var sepayConfig = _configuration.GetSection("SePay");
-
-                // Generate QR Code URL (hiển thị QR trực tiếp trên frontend)
-                // VietQR format: https://img.vietqr.io/image/{BankBIN}-{AccountNo}-{template}.jpg?amount=X&addInfo=Y
-                var accountNumber = sepayConfig["AccountNumber"] ?? "0344171575";
-                var bankBin = sepayConfig["BankName"] ?? "970422";
-                payment.QrCodeUrl = $"https://img.vietqr.io/image/{bankBin}-{accountNumber}-compact.jpg" +
-                                    $"?amount={totalAmount:F0}&addInfo={payment.PaymentReference}";
-            }
-
-            // CreatePaymentAsync giờ INSERT kèm luôn payment_method và status (PostgreSQL enum)
-            await _orderRepo.CreatePaymentAsync(payment, paymentMethod.ToString(), PaymentStatusEnum.PENDING.ToString());
-
-            // 8h. Clear cart
-            await _cartRepo.ClearCartAsync(cart.CartId);
-
-            await transaction.CommitAsync();
-
-            // 9. Generate checkout URL (trỏ về endpoint backend sẽ auto-POST form đến SePay)
-            if (paymentMethod == PaymentMethodEnum.SEPAY)
-            {
-                var sepayConfig = _configuration.GetSection("SePay");
-                var merchantId = sepayConfig["MerchantId"];
-                var secretKey = sepayConfig["SecretKey"];
-
-                if (!string.IsNullOrEmpty(merchantId) && merchantId != "YOUR_MERCHANT_ID_HERE"
-                    && !string.IsNullOrEmpty(secretKey) && secretKey != "YOUR_SECRET_KEY_HERE")
+                // 8c. Create OrderItems with product snapshot
+                var orderItems = cart.CartItems.Select(ci => new OrderItem
                 {
-                    // URL đến endpoint GET /api/Payment/{orderId}/checkout
-                    // Endpoint này sẽ render HTML form auto-submit POST đến SePay
-                    checkoutUrl = $"/api/Payment/{order.OrderId}/checkout";
+                    OrderId = order.OrderId,
+                    ProductId = ci.ProductId,
+                    Quantity = ci.Quantity ?? 1,
+                    UnitPrice = ci.Product.Price,
+                    Subtotal = (ci.Quantity ?? 1) * ci.Product.Price,
+                    ProductName = ci.Product.Name,
+                    ProductSku = ci.Product.Sku,
+                    ProductImageUrl = ci.Product.ProductImages?.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
+                    CreatedAt = DateTime.Now
+                }).ToList();
+                await _orderRepo.CreateOrderItemsAsync(orderItems);
+
+                // 8d. Decrement stock (check rows affected to prevent overselling)
+                foreach (var ci in cart.CartItems)
+                {
+                    var rowsAffected = await _orderRepo.DecrementStockAsync(ci.ProductId, ci.Quantity ?? 1);
+                    if (rowsAffected == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"The product '{ci.Product.Name}' is out of stock.");
+                    }
                 }
+
+                // 8e. Increment coupon used count
+                if (coupon != null)
+                {
+                    await _orderRepo.IncrementCouponUsedCountAsync(coupon.CouponId);
+                }
+
+                // 8f. Create Payment
+                var payment = new Payment
+                {
+                    OrderId = order.OrderId,
+                    Amount = totalAmount,
+                    CreatedAt = DateTime.Now
+                };
+
+                string? checkoutUrl = null;
+                if (paymentMethod == PaymentMethodEnum.SEPAY)
+                {
+                    // Nội dung chuyển khoản
+                    payment.PaymentReference = "SEVQR" + orderNumber.Substring(3);
+                    payment.ExpiredAt = DateTime.Now.AddMinutes(10);
+
+                    var sepayConfig = _configuration.GetSection("SePay");
+
+                    // Generate QR Code URL (hiển thị QR trực tiếp trên frontend)
+                    // VietQR format: https://img.vietqr.io/image/{BankBIN}-{AccountNo}-{template}.jpg?amount=X&addInfo=Y
+                    var accountNumber = sepayConfig["AccountNumber"] ?? "0344171575";
+                    var bankBin = sepayConfig["BankName"] ?? "970422";
+                    payment.QrCodeUrl = $"https://img.vietqr.io/image/{bankBin}-{accountNumber}-compact.jpg" +
+                                        $"?amount={totalAmount:F0}&addInfo={payment.PaymentReference}";
+                }
+
+                // CreatePaymentAsync giờ INSERT kèm luôn payment_method và status (PostgreSQL enum)
+                await _orderRepo.CreatePaymentAsync(payment, paymentMethod.ToString(), PaymentStatusEnum.PENDING.ToString());
+
+                // 8h. Clear cart
+                await _cartRepo.ClearCartAsync(cart.CartId);
+
+                await transaction.CommitAsync();
+
+                // 9. Generate checkout URL (trỏ về endpoint backend sẽ auto-POST form đến SePay)
+                if (paymentMethod == PaymentMethodEnum.SEPAY)
+                {
+                    var sepayConfig = _configuration.GetSection("SePay");
+                    var merchantId = sepayConfig["MerchantId"];
+                    var secretKey = sepayConfig["SecretKey"];
+
+                    if (!string.IsNullOrEmpty(merchantId) && merchantId != "YOUR_MERCHANT_ID_HERE"
+                        && !string.IsNullOrEmpty(secretKey) && secretKey != "YOUR_SECRET_KEY_HERE")
+                    {
+                        // URL đến endpoint GET /api/Payment/{orderId}/checkout
+                        // Endpoint này sẽ render HTML form auto-submit POST đến SePay
+                        checkoutUrl = $"/api/Payment/{order.OrderId}/checkout";
+                    }
+                }
+
+                // 10. Return response
+                var response = new CheckoutResponse
+                {
+                    OrderId = order.OrderId,
+                    OrderNumber = orderNumber,
+                    Status = OrderStatusEnum.PENDING.ToString(),
+                    TotalAmount = totalAmount,
+                    PaymentMethod = paymentMethod.ToString(),
+                    PaymentStatus = PaymentStatusEnum.PENDING.ToString(),
+                    PaymentReference = payment.PaymentReference,
+                    QrCodeUrl = payment.QrCodeUrl,
+                    CheckoutUrl = checkoutUrl,
+                    PaymentExpiredAt = payment.ExpiredAt,
+                    Message = paymentMethod == PaymentMethodEnum.COD
+                        ? "Order successful. Payment upon delivery."
+                        : "Order successful. Redirect to checkoutUrl to complete payment."
+                };
+
+                return ApiResponse<CheckoutResponse>.SuccessResponse(response, "Order placed successfully.");
             }
-
-            // 10. Return response
-            var response = new CheckoutResponse
+            catch (Exception ex)
             {
-                OrderId = order.OrderId,
-                OrderNumber = orderNumber,
-                Status = OrderStatusEnum.PENDING.ToString(),
-                TotalAmount = totalAmount,
-                PaymentMethod = paymentMethod.ToString(),
-                PaymentStatus = PaymentStatusEnum.PENDING.ToString(),
-                PaymentReference = payment.PaymentReference,
-                QrCodeUrl = payment.QrCodeUrl,
-                CheckoutUrl = checkoutUrl,
-                PaymentExpiredAt = payment.ExpiredAt,
-                Message = paymentMethod == PaymentMethodEnum.COD
-                    ? "Order successful. Payment upon delivery."
-                    : "Order successful. Redirect to checkoutUrl to complete payment."
-            };
-
-            return ApiResponse<CheckoutResponse>.SuccessResponse(response, "Order placed successfully.");
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            Console.WriteLine($"[CHECKOUT ERROR] {ex.GetType().Name}: {ex.Message}");
-            if (ex.InnerException != null)
-                Console.WriteLine($"[CHECKOUT INNER] {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
-            Console.WriteLine($"[CHECKOUT STACK] {ex.StackTrace}");
-            return ApiResponse<CheckoutResponse>.ErrorResponse($"Order error: {ex.Message}");
-        }
+                await transaction.RollbackAsync();
+                Console.WriteLine($"[CHECKOUT ERROR] {ex.GetType().Name}: {ex.Message}");
+                if (ex.InnerException != null)
+                    Console.WriteLine($"[CHECKOUT INNER] {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                Console.WriteLine($"[CHECKOUT STACK] {ex.StackTrace}");
+                return ApiResponse<CheckoutResponse>.ErrorResponse($"Order error: {ex.Message}");
+            }
+        });
     }
 
     // ==================== GET MY ORDERS ====================
@@ -410,44 +415,48 @@ public class OrderService : IOrderService
             return ApiResponse<object>.ErrorResponse("Orders can only be canceled if they are in the PENDING status.");
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            // Set cancelled
-            order.CancelledAt = DateTime.Now;
-            order.CancelledBy = userId;
-            order.CancelReason = request.CancelReason;
-            order.UpdatedAt = DateTime.Now;
-            await _orderRepo.UpdateOrderAsync(order);
-            await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
-
-            // Set payment failed
-            await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.FAILED.ToString());
-
-            // Restore stock
-            foreach (var item in order.OrderItems)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
-            }
+                // Set cancelled
+                order.CancelledAt = DateTime.Now;
+                order.CancelledBy = userId;
+                order.CancelReason = request.CancelReason;
+                order.UpdatedAt = DateTime.Now;
+                await _orderRepo.UpdateOrderAsync(order);
+                await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
 
-            // Restore coupon
-            if (order.CouponId.HasValue)
+                // Set payment failed
+                await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.FAILED.ToString());
+
+                // Restore stock
+                foreach (var item in order.OrderItems)
+                {
+                    await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+                }
+
+                // Restore coupon
+                if (order.CouponId.HasValue)
+                {
+                    await _orderRepo.DecrementCouponUsedCountAsync(order.CouponId.Value);
+                }
+
+                await transaction.CommitAsync();
+
+                // Notify realtime: order cancelled
+                try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, "CANCELLED"); } catch { }
+
+                return ApiResponse<object>.SuccessResponse(null!, "Order cancelled successfully.");
+            }
+            catch (Exception ex)
             {
-                await _orderRepo.DecrementCouponUsedCountAsync(order.CouponId.Value);
+                await transaction.RollbackAsync();
+                return ApiResponse<object>.ErrorResponse($"Error when canceling order: {ex.Message}");
             }
-
-            await transaction.CommitAsync();
-
-            // Notify realtime: order cancelled
-            try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, "CANCELLED"); } catch { }
-
-            return ApiResponse<object>.SuccessResponse(null!, "Order cancelled successfully.");
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            return ApiResponse<object>.ErrorResponse($"Error when canceling order: {ex.Message}");
-        }
+        });
     }
 
     // ==================== PRIVATE HELPERS ====================
