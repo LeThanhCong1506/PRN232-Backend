@@ -59,31 +59,62 @@ public class SepayRepository : ISepayRepository
     /// <summary>
     /// Tìm các order có payment SEPAY đã hết hạn mà vẫn PENDING
     /// Dùng raw SQL vì payment_method và status là PostgreSQL custom enum
+    /// Có retry logic để handle transient connection failures
     /// </summary>
     public async Task<List<int>> GetExpiredPendingSepayOrderIdsAsync()
     {
-        var orderIds = new List<int>();
+        const int maxRetries = 3;
+        int attempt = 0;
 
-        var connStr = _connectionString;
-        using (var conn = new NpgsqlConnection(connStr))
+        while (attempt < maxRetries)
         {
-            await conn.OpenAsync();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT p.order_id
-                FROM payment p
-                WHERE p.status = 'PENDING'::payment_status_enum
-                  AND p.payment_method = 'SEPAY'::payment_method_enum
-                  AND p.expired_at IS NOT NULL
-                  AND p.expired_at < NOW()";
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            attempt++;
+            try
             {
-                orderIds.Add(reader.GetInt32(0));
+                var orderIds = new List<int>();
+
+                var connStr = _connectionString;
+                if (!connStr.Contains("Keepalive", StringComparison.OrdinalIgnoreCase))
+                {
+                    connStr += ";Keepalive=30;Timeout=30;Connection Idle Lifetime=60";
+                }
+
+                using (var conn = new NpgsqlConnection(connStr))
+                {
+                    await conn.OpenAsync();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT p.order_id
+                        FROM payment p
+                        WHERE p.status = 'PENDING'::payment_status_enum
+                          AND p.payment_method = 'SEPAY'::payment_method_enum
+                          AND p.expired_at IS NOT NULL
+                          AND p.expired_at < NOW()";
+
+                    using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        orderIds.Add(reader.GetInt32(0));
+                    }
+                }
+
+                return orderIds;
+            }
+            catch (NpgsqlException ex) when (attempt < maxRetries && IsTransientError(ex))
+            {
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                await Task.Delay(delay);
             }
         }
 
-        return orderIds;
+        return new List<int>();
+    }
+
+    private bool IsTransientError(NpgsqlException ex)
+    {
+        return ex.IsTransient ||
+               ex.Message.Contains("Exception while reading from stream", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
+               ex.InnerException is System.IO.EndOfStreamException;
     }
 }

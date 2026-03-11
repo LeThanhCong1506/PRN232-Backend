@@ -206,15 +206,26 @@ namespace MV.PresentationLayer
             // Register DbContext with connection string from appsettings
             // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
             // Maximum Pool Size=20: giới hạn số connection để không vượt quá max_connections của PostgreSQL
+            // Keepalive=30: gửi keepalive packet mỗi 30s để tránh stale connections
+            // Connection Idle Lifetime=60: recycle connections sau 60s idle để tránh zombie connections
+            // Timeout=30: timeout cho connection attempts
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (!connectionString!.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
-                connectionString += ";Maximum Pool Size=20;Minimum Pool Size=1;Connection Idle Lifetime=60";
+                connectionString += ";Maximum Pool Size=20;Minimum Pool Size=1;Connection Idle Lifetime=60;Keepalive=30;Timeout=30";
 
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(connectionString,
                     npgsqlOptions =>
                     {
                         npgsqlOptions.MigrationsAssembly("MV.InfrastructureLayer");
+
+                        // Enable automatic retry on transient failures
+                        // maxRetryCount: 5 attempts, maxRetryDelay: wait max 30s between retries
+                        npgsqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorCodesToAdd: null);
+
                         npgsqlOptions.MapEnum<MV.DomainLayer.Enums.ProductTypeEnum>(
                             "product_type_enum",
                             schemaName: null,
@@ -225,6 +236,14 @@ namespace MV.PresentationLayer
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             //builder.Services.AddSwaggerGen();
+
+            // Health checks - để monitoring và keep-alive
+            builder.Services.AddHealthChecks()
+                .AddNpgSql(
+                    connectionString: connectionString,
+                    name: "postgresql",
+                    timeout: TimeSpan.FromSeconds(10),
+                    tags: new[] { "db", "sql", "postgresql" });
 
             var app = builder.Build();
 
@@ -269,6 +288,32 @@ namespace MV.PresentationLayer
             app.UseAuthorization();
 
             app.MapControllers();
+
+            // Health check endpoints
+            // /health - simple health check (200 OK if healthy)
+            // /health/detail - detailed health check with DB status
+            app.MapHealthChecks("/health");
+            app.MapHealthChecks("/health/detail", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+            {
+                ResponseWriter = async (context, report) =>
+                {
+                    context.Response.ContentType = "application/json";
+                    var result = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        status = report.Status.ToString(),
+                        timestamp = DateTime.UtcNow,
+                        checks = report.Entries.Select(e => new
+                        {
+                            name = e.Key,
+                            status = e.Value.Status.ToString(),
+                            duration = e.Value.Duration,
+                            description = e.Value.Description,
+                            exception = e.Value.Exception?.Message
+                        })
+                    });
+                    await context.Response.WriteAsync(result);
+                }
+            });
 
             // SignalR Hub endpoints
             app.MapHub<NotificationHub>("/hubs/notification");

@@ -131,7 +131,20 @@ public class SepayPollingBackgroundService : BackgroundService
         var paymentService = scope.ServiceProvider.GetRequiredService<IPaymentService>();
 
         // Kiểm tra có pending orders không - nếu không có thì skip để tiết kiệm resource
-        var pendingOrders = await orderRepo.GetPendingSepayOrdersAsync();
+        // Thêm retry logic cho DB operations
+        List<MV.DomainLayer.Entities.OrderHeader> pendingOrders;
+        try
+        {
+            pendingOrders = await RetryDbOperationAsync(
+                async () => await orderRepo.GetPendingSepayOrdersAsync(),
+                "GetPendingSepayOrdersAsync");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get pending orders after retries - skipping this poll cycle");
+            return;
+        }
+
         if (pendingOrders.Count == 0)
         {
             // Không có order PENDING → chỉ cập nhật lastProcessedId rồi skip
@@ -308,6 +321,42 @@ public class SepayPollingBackgroundService : BackgroundService
         if (!digits.All(char.IsDigit)) return null;
 
         return reference;
+    }
+
+    /// <summary>
+    /// Retry DB operations để handle transient connection failures
+    /// </summary>
+    private async Task<T> RetryDbOperationAsync<T>(Func<Task<T>> operation, string operationName, int maxRetries = 3)
+    {
+        int attempt = 0;
+        while (attempt < maxRetries)
+        {
+            attempt++;
+            try
+            {
+                return await operation();
+            }
+            catch (Exception ex) when (attempt < maxRetries && IsTransientException(ex))
+            {
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt));
+                _logger.LogWarning(ex, 
+                    "DB operation '{Operation}' failed (attempt {Attempt}/{MaxRetries}) - retrying in {Delay}s", 
+                    operationName, attempt, maxRetries, delay.TotalSeconds);
+                await Task.Delay(delay);
+            }
+        }
+
+        throw new InvalidOperationException($"DB operation '{operationName}' failed after {maxRetries} retries");
+    }
+
+    private bool IsTransientException(Exception ex)
+    {
+        var message = ex.Message.ToLower();
+        return message.Contains("exception while reading from stream") ||
+               message.Contains("connection") ||
+               message.Contains("transient") ||
+               ex.InnerException is System.IO.EndOfStreamException ||
+               ex.InnerException is System.Net.Sockets.SocketException;
     }
 
     public override void Dispose()
