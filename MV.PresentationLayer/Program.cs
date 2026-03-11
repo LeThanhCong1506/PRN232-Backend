@@ -187,6 +187,9 @@ namespace MV.PresentationLayer
             // Cloudinary
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 
+            // AI Chatbot (Groq)
+            builder.Services.AddSingleton<IChatbotService, ChatbotService>();
+
             // SignalR + Realtime Notification
             builder.Services.AddSignalR();
             builder.Services.AddSingleton<INotificationService, SignalRNotificationService>();
@@ -208,7 +211,7 @@ namespace MV.PresentationLayer
             // Maximum Pool Size=20: giới hạn số connection để không vượt quá max_connections của PostgreSQL
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (!connectionString!.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
-                connectionString += ";Maximum Pool Size=20;Minimum Pool Size=1;Connection Idle Lifetime=60";
+                connectionString += ";Maximum Pool Size=300;Minimum Pool Size=1;Connection Idle Lifetime=60";
 
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(connectionString,

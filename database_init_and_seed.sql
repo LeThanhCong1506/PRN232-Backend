@@ -1,12 +1,12 @@
 -- ============================================
--- TẠO DATABASE VÀ SEED DATA (GỘP FINAL V6 HOÀN CHỈNH)
--- E-COMMERCE DATABASE FOR STEM PRODUCTS
+-- DATABASE HOÀN CHỈNH - ECOMMERCE STEM STORE
+-- Version: V7 (Category Image + Chat Message)
 -- ============================================
 -- 
 -- HƯỚNG DẪN CHẠY:
 -- 1. Tạo database: CREATE DATABASE ecommerce_db WITH ENCODING 'UTF8';
 -- 2. Kết nối: \c ecommerce_db
--- 3. Chạy file này: \i database_init_and_seed_final.sql
+-- 3. Chạy file này: \i database_init_and_seed.sql
 -- ============================================
 
 -- Xóa database nếu đã tồn tại (CẨN THẬN!)
@@ -53,6 +53,7 @@ CREATE TABLE "USER" (
     district VARCHAR(50),
     ward VARCHAR(50),
     street_address VARCHAR(200),
+    avatar_url VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_role FOREIGN KEY (role_id) REFERENCES ROLE(role_id) ON DELETE RESTRICT
@@ -67,7 +68,8 @@ CREATE TABLE BRAND (
 
 CREATE TABLE CATEGORY (
     category_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
+    name VARCHAR(100) NOT NULL,
+    image_url VARCHAR(255)
 );
 
 CREATE TABLE WARRANTY_POLICY (
@@ -357,9 +359,27 @@ CREATE TABLE SEPAY_TRANSACTION (
     CONSTRAINT fk_sepay_order FOREIGN KEY (order_id) REFERENCES ORDER_HEADER(order_id) ON DELETE SET NULL
 );
 
+-- CHAT MESSAGE (Real-time chat Customer <-> Admin/Staff)
+CREATE TABLE chat_message (
+    message_id SERIAL PRIMARY KEY,
+    sender_id INTEGER NOT NULL,
+    receiver_id INTEGER,
+    content TEXT NOT NULL,
+    is_from_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    sent_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_chat_message_sender FOREIGN KEY (sender_id) REFERENCES "USER" (user_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_chat_message_receiver FOREIGN KEY (receiver_id) REFERENCES "USER" (user_id) ON DELETE RESTRICT
+);
+
 -- COMMENTS
 COMMENT ON TABLE SEPAY_CONFIG IS 'Cấu hình tài khoản ngân hàng cho SePay';
 COMMENT ON TABLE SEPAY_TRANSACTION IS 'Log tất cả giao dịch nhận được từ SePay webhook';
+COMMENT ON TABLE chat_message IS 'Real-time chat messages between customers and admin/staff';
+COMMENT ON COLUMN chat_message.sender_id IS 'User ID của người gửi';
+COMMENT ON COLUMN chat_message.receiver_id IS 'User ID của người nhận (NULL = gửi cho Admin/Store)';
+COMMENT ON COLUMN chat_message.is_from_admin IS 'TRUE nếu tin nhắn từ Admin/Staff';
+COMMENT ON COLUMN chat_message.is_read IS 'Trạng thái đã đọc';
 COMMENT ON COLUMN PAYMENT.payment_reference IS 'Mã tham chiếu thanh toán - nội dung chuyển khoản';
 COMMENT ON COLUMN ORDER_HEADER.customer_name IS 'Snapshot tên khách hàng tại thời điểm đặt hàng';
 COMMENT ON COLUMN WARRANTY_CLAIM.contact_phone IS 'SĐT liên hệ khách hàng khi gửi yêu cầu bảo hành';
@@ -403,6 +423,11 @@ CREATE INDEX idx_sepay_config_active ON SEPAY_CONFIG(is_active);
 CREATE INDEX idx_sepay_trans_order ON SEPAY_TRANSACTION(order_id);
 CREATE INDEX idx_sepay_trans_code ON SEPAY_TRANSACTION(code);
 CREATE INDEX idx_sepay_trans_processed ON SEPAY_TRANSACTION(is_processed);
+
+CREATE INDEX idx_chat_message_sender_id ON chat_message (sender_id);
+CREATE INDEX idx_chat_message_receiver_id ON chat_message (receiver_id);
+CREATE INDEX idx_chat_message_sent_at ON chat_message (sent_at DESC);
+CREATE INDEX idx_chat_message_is_read ON chat_message (is_read) WHERE is_read = FALSE;
 
 -- ============================================
 -- 4. TẠO FUNCTIONS & TRIGGERS
@@ -550,10 +575,17 @@ INSERT INTO BRAND (brand_id, name, logo_url) VALUES
 (7, 'STMicroelectronics', '/images/brands/stm.png'),
 (8, 'Texas Instruments', '/images/brands/ti.png');
 
-INSERT INTO CATEGORY (category_id, name) VALUES
-(1, 'Microcontrollers'), (2, 'Sensors'), (3, 'Actuators'), (4, 'Power Supply'),
-(5, 'Communication Modules'), (6, 'Development Kits'), (7, 'Tools & Accessories'),
-(8, 'Displays'), (9, 'Storage'), (10, 'Cables & Connectors');
+INSERT INTO CATEGORY (category_id, name, image_url) VALUES
+(1, 'Microcontrollers', 'https://images.unsplash.com/photo-1553406830-ef2513450d76?w=300&h=300&fit=crop&q=80'),
+(2, 'Sensors', 'https://images.unsplash.com/photo-1580584126903-c17d41830450?w=300&h=300&fit=crop&q=80'),
+(3, 'Actuators', 'https://images.unsplash.com/photo-1535378620166-273708d44e4c?w=300&h=300&fit=crop&q=80'),
+(4, 'Power Supply', 'https://images.unsplash.com/photo-1609692814858-f7cd2f0afa4f?w=300&h=300&fit=crop&q=80'),
+(5, 'Communication Modules', 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?w=300&h=300&fit=crop&q=80'),
+(6, 'Development Kits', 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=300&h=300&fit=crop&q=80'),
+(7, 'Tools & Accessories', 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=300&h=300&fit=crop&q=80'),
+(8, 'Displays', 'https://images.unsplash.com/photo-1601445638532-3c6f6c3aa1d6?w=300&h=300&fit=crop&q=80'),
+(9, 'Storage', 'https://images.unsplash.com/photo-1563770660941-20978e870e26?w=300&h=300&fit=crop&q=80'),
+(10, 'Cables & Connectors', 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?w=300&h=300&fit=crop&q=80');
 
 INSERT INTO "USER" (user_id, role_id, username, full_name, email, password_hash, phone, address, is_active, created_at) VALUES
 (1, 1, 'admin', 'admin', 'admin@stemstore.vn', '$2a$10$abcdefghijklmnopqrstuvwxyz1234567890', '0901234567', '123 Nguyen Hue, Q.1, TP.HCM', TRUE, '2025-01-01 08:00:00'),
@@ -818,5 +850,6 @@ SELECT setval('payment_payment_id_seq', (SELECT MAX(payment_id) FROM PAYMENT));
 SELECT setval('warranty_warranty_id_seq', (SELECT MAX(warranty_id) FROM WARRANTY));
 SELECT setval('warranty_claim_claim_id_seq', (SELECT MAX(claim_id) FROM WARRANTY_CLAIM));
 SELECT setval('sepay_config_config_id_seq', (SELECT MAX(config_id) FROM SEPAY_CONFIG));
+SELECT setval('chat_message_message_id_seq', COALESCE((SELECT MAX(message_id) FROM chat_message), 0));
 
-SELECT 'DATABASE INITIALIZATION & FULL SEED COMPLETED SUCCESSFULLY!' AS status;
+SELECT 'DATABASE INITIALIZATION & FULL SEED V7 COMPLETED SUCCESSFULLY!' AS status;
