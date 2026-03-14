@@ -124,40 +124,48 @@ public class PaymentService : IPaymentService
             }
 
             // 8. Complete payment in a transaction
+            // Dùng tracked entities + single SaveChangesAsync để đảm bảo atomic
             var strategy = _context.Database.CreateExecutionStrategy();
             await strategy.ExecuteAsync(async () =>
             {
                 using var dbTransaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    // Update Payment record
+                    // Update Payment record (payment đã tracked từ GetPaymentByReferenceAsync với AsTracking)
                     payment.PaymentDate = DateTime.Now;
                     payment.ReceivedAmount = request.TransferAmount;
                     payment.TransactionId = sepayId;
                     payment.BankCode = request.Gateway;
                     payment.GatewayResponse = JsonSerializer.Serialize(request);
                     payment.UpdatedAt = DateTime.Now;
-                    await _orderRepo.UpdatePaymentAsync(payment);
 
-                    // Set payment status to COMPLETED
-                    await _orderRepo.SetPaymentStatusByOrderIdAsync(payment.OrderId, PaymentStatusEnum.COMPLETED.ToString());
+                    // Set payment status to COMPLETED via raw SQL (enlist trong transaction tự động qua EF)
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "UPDATE payment SET status = {0}::payment_status_enum WHERE order_id = {1}",
+                        PaymentStatusEnum.COMPLETED.ToString(), payment.OrderId);
 
                     // Auto-confirm the order (payment received → order confirmed)
                     var currentOrderStatus = await _orderRepo.GetOrderStatusAsync(payment.OrderId);
                     if (currentOrderStatus == OrderStatusEnum.PENDING.ToString())
                     {
-                        await _orderRepo.SetOrderStatusAsync(payment.OrderId, OrderStatusEnum.CONFIRMED.ToString());
-                        payment.Order.ConfirmedAt = DateTime.Now;
-                        payment.Order.UpdatedAt = DateTime.Now;
-                        await _orderRepo.UpdateOrderAsync(payment.Order);
+                        await _context.Database.ExecuteSqlRawAsync(
+                            "UPDATE order_header SET status = {0}::order_status_enum WHERE order_id = {1}",
+                            OrderStatusEnum.CONFIRMED.ToString(), payment.OrderId);
+
+                        if (payment.Order != null)
+                        {
+                            payment.Order.ConfirmedAt = DateTime.Now;
+                            payment.Order.UpdatedAt = DateTime.Now;
+                        }
                     }
 
                     // Mark SePay transaction as processed
                     sepayTransaction.IsProcessed = true;
                     sepayTransaction.ProcessedAt = DateTime.Now;
                     sepayTransaction.OrderId = payment.OrderId;
-                    await _sepayRepo.UpdateTransactionAsync(sepayTransaction);
 
+                    // Single SaveChangesAsync cho tất cả tracked entity changes
+                    await _context.SaveChangesAsync();
                     await dbTransaction.CommitAsync();
 
                     _logger.LogInformation(
@@ -165,7 +173,10 @@ public class PaymentService : IPaymentService
                         payment.OrderId, request.TransferAmount);
 
                     // Notify realtime: payment confirmed
-                    try { await _notificationService.SendPaymentConfirmedAsync(payment.Order.UserId, payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
+                    if (payment.Order != null)
+                    {
+                        try { await _notificationService.SendPaymentConfirmedAsync(payment.Order.UserId, payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
+                    }
                 }
                 catch (Exception ex)
                 {

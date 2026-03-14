@@ -135,6 +135,9 @@ namespace MV.PresentationLayer
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
                 {
+                    // CRITICAL: SePay webhook gửi JSON có thể khác case (TransferAmount vs transferAmount)
+                    // System.Text.Json mặc định case-sensitive → model binding fail → 400 trước khi vào controller
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
                     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
                 })
                 .ConfigureApiBehaviorOptions(options =>

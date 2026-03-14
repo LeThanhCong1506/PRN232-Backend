@@ -42,6 +42,9 @@ public class PaymentController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SepayWebhook([FromBody] SepayWebhookRequest request)
     {
+        // Debug log TRƯỚC try - nếu thấy dòng này = request đã vào controller thành công
+        _logger.LogWarning("=== WEBHOOK HIT === Content={Content}, Amount={Amount}, TransferType={Type}",
+            request?.Content, request?.TransferAmount, request?.TransferType);
         try
         {
             // Verify webhook authentication from Authorization header
