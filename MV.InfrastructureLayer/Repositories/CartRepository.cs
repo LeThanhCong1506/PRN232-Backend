@@ -22,7 +22,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Thêm AsSplitQuery cho multiple Include
             return await _context.Carts
                 .AsNoTracking()
-                .AsSplitQuery()
+                .AsSingleQuery()
                 .Include(c => c.CartItems)
                     .ThenInclude(ci => ci.Product)
                         .ThenInclude(p => p.ProductImages) // Include ảnh để hiển thị

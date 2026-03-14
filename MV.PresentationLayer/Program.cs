@@ -135,6 +135,9 @@ namespace MV.PresentationLayer
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
                 {
+                    // CRITICAL: SePay webhook gửi JSON có thể khác case (TransferAmount vs transferAmount)
+                    // System.Text.Json mặc định case-sensitive → model binding fail → 400 trước khi vào controller
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
                     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
                 })
                 .ConfigureApiBehaviorOptions(options =>
@@ -191,28 +194,17 @@ namespace MV.PresentationLayer
             builder.Services.AddSignalR();
             builder.Services.AddSingleton<INotificationService, SignalRNotificationService>();
 
-            // Background service: auto-expire overdue SEPAY payments every 60 seconds
-            builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
-
-            // Background service: polling SePay API (bật cho local dev)
-            builder.Services.AddHostedService<SepayPollingBackgroundService>();
-
-            // Prevent background service exceptions from crashing the host
-            builder.Services.Configure<HostOptions>(options =>
-            {
-                options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
-            });
-
             // Register DbContext with connection string from appsettings
-            // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
-            // Maximum Pool Size=10: giới hạn số connection tránh exhaust trên free tier database
-            // Keepalive=15: gửi keepalive packet mỗi 15s để tránh stale connections
-            // Connection Idle Lifetime=30: recycle connections sau 30s idle để tránh zombie connections
-            // Timeout=15: timeout cho connection attempts
-            // Command Timeout=30: timeout cho command execution
+            // Connection pool settings tự động theo environment:
+            // - Production (Render free tier): pool nhỏ vì max_connections giới hạn
+            // - Development (local PostgreSQL): pool lớn hơn vì max_connections=100
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (!connectionString!.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
-                connectionString += ";Maximum Pool Size=10;Minimum Pool Size=1;Connection Idle Lifetime=30;Keepalive=15;Timeout=15;Command Timeout=30";
+            {
+                var isProduction = builder.Environment.IsProduction();
+                var poolSize = isProduction ? 10 : 30;
+                connectionString += $";Maximum Pool Size={poolSize};Minimum Pool Size=0;Connection Idle Lifetime=60;Timeout=15;Command Timeout=30";
+            }
 
             builder.Services.AddDbContext<StemDbContext>(options =>
                 options.UseNpgsql(connectionString,
@@ -227,9 +219,9 @@ namespace MV.PresentationLayer
                             maxRetryDelay: TimeSpan.FromSeconds(30),
                             errorCodesToAdd: null);
 
-                        // PERFORMANCE FIX: Use QuerySplittingBehavior.SplitQuery để tránh Cartesian Explosion
-                        // khi query có nhiều Include() relationships
-                        npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                        // SingleQuery (default) — dùng 1 connection per query thay vì N connections cho N Include
+                        // Chỉ dùng .AsSplitQuery() explicit khi thực sự cần (large result sets)
+                        npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery);
 
                         npgsqlOptions.MapEnum<MV.DomainLayer.Enums.ProductTypeEnum>(
                             "product_type_enum",
