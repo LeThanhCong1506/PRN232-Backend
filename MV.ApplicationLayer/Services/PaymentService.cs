@@ -211,6 +211,16 @@ public class PaymentService : IPaymentService
         var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId) ?? "COD";
         var paymentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId) ?? "PENDING";
 
+        // Lazy expiry: nếu PENDING + SEPAY + hết hạn → expire inline
+        if (paymentStatus == PaymentStatusEnum.PENDING.ToString()
+            && paymentMethod == PaymentMethodEnum.SEPAY.ToString()
+            && payment.ExpiredAt.HasValue
+            && payment.ExpiredAt.Value < DateTime.Now)
+        {
+            if (await TryExpireSinglePaymentAsync(orderId))
+                paymentStatus = PaymentStatusEnum.EXPIRED.ToString();
+        }
+
         var isPaid = paymentStatus == PaymentStatusEnum.COMPLETED.ToString();
         var remainingSeconds = 0;
         if (payment.ExpiredAt.HasValue && !isPaid)
@@ -463,83 +473,105 @@ public class PaymentService : IPaymentService
         }
     }
 
-    // ==================== EXPIRE OVERDUE PAYMENTS ====================
+    // ==================== LAZY EXPIRY ====================
 
-    public async Task ExpireOverduePaymentsAsync()
+    public async Task<string> CheckAndGetPaymentStatusAsync(int orderId)
     {
+        // Single query: lấy status + method + expired_at cùng lúc thay vì 4 queries riêng lẻ
+        var paymentInfo = await _context.Payments
+            .Where(p => p.OrderId == orderId)
+            .Select(p => new { p.ExpiredAt })
+            .FirstOrDefaultAsync();
+
+        var paymentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
+        if (paymentStatus == null || paymentInfo == null) return paymentStatus ?? "UNKNOWN";
+
+        // Chỉ check expiry nếu PENDING + đã hết hạn
+        if (paymentStatus == PaymentStatusEnum.PENDING.ToString()
+            && paymentInfo.ExpiredAt.HasValue
+            && paymentInfo.ExpiredAt.Value < DateTime.Now)
+        {
+            // Verify payment method is SEPAY trước khi expire
+            var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
+            if (paymentMethod == PaymentMethodEnum.SEPAY.ToString())
+            {
+                if (await TryExpireSinglePaymentAsync(orderId))
+                    return PaymentStatusEnum.EXPIRED.ToString();
+            }
+        }
+
+        return paymentStatus;
+    }
+
+    /// <summary>
+    /// Expire single payment: set EXPIRED, cancel order, restore stock + coupon.
+    /// Returns true nếu đã expire thành công.
+    /// </summary>
+    private async Task<bool> TryExpireSinglePaymentAsync(int orderId)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
         try
         {
-            var expiredOrderIds = await _sepayRepo.GetExpiredPendingSepayOrderIdsAsync();
-
-            if (!expiredOrderIds.Any())
-                return;
-
-            _logger.LogInformation("Found {Count} expired SEPAY payments to process", expiredOrderIds.Count);
-
-            foreach (var orderId in expiredOrderIds)
+            await strategy.ExecuteAsync(async () =>
             {
-                var strategy = _context.Database.CreateExecutionStrategy();
+                using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    await strategy.ExecuteAsync(async () =>
+                    var order = await _orderRepo.GetOrderByIdAsync(orderId);
+                    if (order == null) return;
+
+                    // Double-check: vẫn PENDING không (tránh race condition)
+                    var currentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
+                    if (currentStatus != PaymentStatusEnum.PENDING.ToString()) return;
+
+                    // Set payment status to EXPIRED
+                    await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.EXPIRED.ToString());
+
+                    if (order.Payment != null)
                     {
-                        using var transaction = await _context.Database.BeginTransactionAsync();
-                        try
-                        {
-                            var order = await _orderRepo.GetOrderByIdAsync(orderId);
-                            if (order == null) return;
+                        order.Payment.UpdatedAt = DateTime.Now;
+                        await _orderRepo.UpdatePaymentAsync(order.Payment);
+                    }
 
-                            // Set payment status to EXPIRED
-                            await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.EXPIRED.ToString());
+                    // Cancel the order
+                    await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
+                    order.CancelledAt = DateTime.Now;
+                    order.CancelReason = "Hết hạn thanh toán SEPAY";
+                    order.UpdatedAt = DateTime.Now;
+                    await _orderRepo.UpdateOrderAsync(order);
 
-                            if (order.Payment != null)
-                            {
-                                order.Payment.UpdatedAt = DateTime.Now;
-                                await _orderRepo.UpdatePaymentAsync(order.Payment);
-                            }
+                    // Restore stock
+                    foreach (var item in order.OrderItems)
+                    {
+                        await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+                    }
 
-                            // Cancel the order
-                            await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
-                            order.CancelledAt = DateTime.Now;
-                            order.CancelReason = "Hết hạn thanh toán SEPAY (30 phút)";
-                            order.UpdatedAt = DateTime.Now;
-                            await _orderRepo.UpdateOrderAsync(order);
+                    // Restore coupon
+                    if (order.CouponId.HasValue)
+                    {
+                        await _orderRepo.DecrementCouponUsedCountAsync(order.CouponId.Value);
+                    }
 
-                            // Restore stock
-                            foreach (var item in order.OrderItems)
-                            {
-                                await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
-                            }
+                    await transaction.CommitAsync();
 
-                            // Restore coupon
-                            if (order.CouponId.HasValue)
-                            {
-                                await _orderRepo.DecrementCouponUsedCountAsync(order.CouponId.Value);
-                            }
+                    // Notify realtime: payment expired
+                    try { await _notificationService.SendPaymentExpiredAsync(order.UserId, orderId, order.OrderNumber); } catch { }
 
-                            await transaction.CommitAsync();
-
-                            // Notify realtime: payment expired
-                            try { await _notificationService.SendPaymentExpiredAsync(order.UserId, orderId, order.OrderNumber); } catch { }
-
-                            _logger.LogInformation("Expired and cancelled order: OrderId={OrderId}", orderId);
-                        }
-                        catch
-                        {
-                            await transaction.RollbackAsync();
-                            throw;
-                        }
-                    });
+                    _logger.LogInformation("Lazy expiry: expired and cancelled OrderId={OrderId}", orderId);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    _logger.LogError(ex, "Error expiring payment for OrderId={OrderId}", orderId);
+                    await transaction.RollbackAsync();
+                    throw;
                 }
-            }
+            });
+
+            return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in ExpireOverduePaymentsAsync");
+            _logger.LogError(ex, "Error in lazy expiry for OrderId={OrderId}", orderId);
+            return false;
         }
     }
 

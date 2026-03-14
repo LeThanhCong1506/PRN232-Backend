@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Payment.Request;
@@ -20,12 +21,14 @@ public class PaymentController : ControllerBase
     private readonly IPaymentService _paymentService;
     private readonly IOrderRepository _orderRepo;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<PaymentController> _logger;
 
-    public PaymentController(IPaymentService paymentService, IOrderRepository orderRepo, IConfiguration configuration)
+    public PaymentController(IPaymentService paymentService, IOrderRepository orderRepo, IConfiguration configuration, ILogger<PaymentController> logger)
     {
         _paymentService = paymentService;
         _orderRepo = orderRepo;
         _configuration = configuration;
+        _logger = logger;
     }
 
     /// <summary>
@@ -39,28 +42,38 @@ public class PaymentController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SepayWebhook([FromBody] SepayWebhookRequest request)
     {
-        // Verify webhook authentication from Authorization header
-        // SePay sends: "Apikey YOUR_API_KEY" in the Authorization header
-        var authHeader = Request.Headers["Authorization"].FirstOrDefault();
-        var webhookSecret = _configuration["SePay:WebhookSecret"];
-
-        if (!string.IsNullOrEmpty(webhookSecret))
+        try
         {
-            var providedSecret = authHeader?
-                .Replace("Apikey ", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase)
-                .Trim();
+            // Verify webhook authentication from Authorization header
+            // SePay sends: "Apikey YOUR_API_KEY" in the Authorization header
+            var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+            var webhookSecret = _configuration["SePay:WebhookSecret"];
 
-            if (providedSecret != webhookSecret)
+            if (!string.IsNullOrEmpty(webhookSecret))
             {
-                return Unauthorized(new { success = false, message = "Invalid webhook secret" });
+                var providedSecret = authHeader?
+                    .Replace("Apikey ", "", StringComparison.OrdinalIgnoreCase)
+                    .Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase)
+                    .Trim();
+
+                if (providedSecret != webhookSecret)
+                {
+                    return Unauthorized(new { success = false, message = "Invalid webhook secret" });
+                }
             }
+
+            var result = await _paymentService.ProcessWebhookAsync(request);
+
+            // SePay requires: { "success": true } with HTTP 200
+            return Ok(new { success = true });
         }
-
-        var result = await _paymentService.ProcessWebhookAsync(request);
-
-        // SePay requires: { "success": true } with HTTP 200
-        return Ok(new { success = true });
+        catch (Exception ex)
+        {
+            // Always return 200 to SePay to prevent infinite retries
+            // Log the error for debugging
+            _logger.LogError(ex, "Webhook endpoint error");
+            return Ok(new { success = true });
+        }
     }
 
     /// <summary>
@@ -127,7 +140,7 @@ public class PaymentController : ControllerBase
     [ApiExplorerSettings(IgnoreApi = true)] // Ẩn khỏi Swagger
     public async Task<IActionResult> PollPaymentStatus(int orderId)
     {
-        var paymentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
+        var paymentStatus = await _paymentService.CheckAndGetPaymentStatusAsync(orderId);
         return Ok(new { status = paymentStatus });
     }
 
@@ -181,10 +194,11 @@ public class PaymentController : ControllerBase
 
         var finalCancelUrl = cancelUrl ?? "http://localhost:3000/payment/cancel";
 
-        // Check expired
-        if (paymentStatus == PaymentStatusEnum.EXPIRED.ToString() || 
+        // Check expired - lazy expiry: cập nhật DB nếu đã hết hạn
+        if (paymentStatus == PaymentStatusEnum.EXPIRED.ToString() ||
             (payment.ExpiredAt.HasValue && payment.ExpiredAt.Value < DateTime.Now))
         {
+            await _paymentService.CheckAndGetPaymentStatusAsync(orderId);
             return Content($@"
                 <html><head><meta http-equiv='refresh' content='3;url={finalCancelUrl}'></head>
                 <body style='font-family: Arial; text-align: center; padding: 50px;'>

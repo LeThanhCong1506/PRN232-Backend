@@ -63,7 +63,7 @@ namespace MV.InfrastructureLayer.Repositories
             // Bước 4: Load full data với AsSplitQuery
             var items = await _context.Products
                 .AsNoTracking()
-                .AsSplitQuery()
+                .AsSingleQuery()
                 .Include(p => p.Brand)
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)
@@ -116,7 +116,7 @@ namespace MV.InfrastructureLayer.Repositories
             // Bước 4: Load full data với AsSplitQuery
             var items = await _context.Products
                 .AsNoTracking()
-                .AsSplitQuery()
+                .AsSingleQuery()
                 .Include(p => p.Brand)
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)
@@ -184,7 +184,7 @@ namespace MV.InfrastructureLayer.Repositories
             // Load product với basic includes (không include Reviews)
             var product = await _context.Products
                 .AsNoTracking()
-                .AsSplitQuery()
+                .AsSingleQuery()
                 .Include(p => p.Brand)
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)

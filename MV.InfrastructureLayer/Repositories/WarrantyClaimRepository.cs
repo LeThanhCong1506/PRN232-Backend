@@ -101,7 +101,7 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
         // Bước 2: Load full data với AsSplitQuery cho các IDs đã lọc
         return await _context.WarrantyClaims
             .AsNoTracking()
-            .AsSplitQuery()
+            .AsSingleQuery()
             .Include(c => c.Warranty)
                 .ThenInclude(w => w.SerialNumberNavigation)
                     .ThenInclude(pi => pi.Product)

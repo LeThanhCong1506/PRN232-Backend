@@ -19,7 +19,7 @@ public class WarrantyRepository : IWarrantyRepository
         // PERFORMANCE FIX: Thêm AsSplitQuery cho deep Include để tránh Cartesian explosion
         return await _context.Warranties
             .AsNoTracking()
-            .AsSplitQuery()
+            .AsSingleQuery()
             .Include(w => w.WarrantyPolicy)
             .Include(w => w.SerialNumberNavigation)
                 .ThenInclude(pi => pi.Product)
@@ -134,7 +134,7 @@ public class WarrantyRepository : IWarrantyRepository
         // Query 2: Load full data với AsSplitQuery cho các IDs đã lọc
         return await _context.Warranties
             .AsNoTracking()
-            .AsSplitQuery() // Split thành nhiều query nhỏ
+            .AsSingleQuery()
             .Include(w => w.WarrantyPolicy)
             .Include(w => w.SerialNumberNavigation)
                 .ThenInclude(pi => pi.Product)
