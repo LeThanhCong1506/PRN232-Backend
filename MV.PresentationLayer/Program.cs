@@ -206,7 +206,9 @@ namespace MV.PresentationLayer
                 connectionString += $";Maximum Pool Size={poolSize};Minimum Pool Size=0;Connection Idle Lifetime=60;Timeout=15;Command Timeout=30";
             }
 
-            builder.Services.AddDbContext<StemDbContext>(options =>
+            // MEMORY FIX: AddDbContextPool tái sử dụng DbContext instances thay vì tạo mới mỗi request
+            // Tránh OOM do EF Core tích lũy internal service providers không được giải phóng
+            builder.Services.AddDbContextPool<StemDbContext>(options =>
                 options.UseNpgsql(connectionString,
                     npgsqlOptions =>
                     {
@@ -229,8 +231,8 @@ namespace MV.PresentationLayer
                             nameTranslator: new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
                     })
                 // PERFORMANCE FIX: Set default NoTracking cho read-only queries
-                .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
-                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)));
+                .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking),
+                poolSize: 32);
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
