@@ -4,7 +4,9 @@ Standalone API test runner for PRN232-Backend Swagger endpoints.
 
 Usage:
     python run_api_tests.py
+    python run_api_tests.py --user-email user@example.com --user-password Pass@123
     python run_api_tests.py --admin-email admin@example.com --admin-password Admin@123
+    python run_api_tests.py --user-email u@e.com --user-password P@123 --admin-email a@e.com --admin-password A@123
     python run_api_tests.py --base-url https://prn232-backend-production.up.railway.app
 
 Requirements:
@@ -382,7 +384,24 @@ class ApiTester:
     # Run all + summary
     # ------------------------------------------------------------------
 
-    def run(self, admin_email: Optional[str] = None, admin_password: Optional[str] = None):
+    def _login(self, email: str, password: str) -> Optional[str]:
+        """Login and return token, or None if failed."""
+        try:
+            r = self._req("POST", "/api/users/login",
+                          json={"email": email, "password": password})
+            if r.status_code == 200:
+                d = r.json().get("data", r.json())
+                token = d.get("token") or d.get("accessToken")
+                user  = d.get("user") or {}
+                if not self.test_user_id:
+                    self.test_user_id = user.get("id") or user.get("userId")
+                return token
+        except Exception:
+            pass
+        return None
+
+    def run(self, user_email: Optional[str] = None, user_password: Optional[str] = None,
+            admin_email: Optional[str] = None, admin_password: Optional[str] = None):
         print(f"\n{BOLD}{CYAN}{'='*62}{RESET}")
         print(f"{BOLD}{CYAN}  PRN232-Backend  ·  Swagger API Test Suite{RESET}")
         print(f"{BOLD}{CYAN}  {self.base_url}{RESET}")
@@ -394,18 +413,23 @@ class ApiTester:
               f"brand_id={self.brand_id}  "
               f"category_id={self.category_id}{RESET}")
 
-        # Optional: pre-supply admin token
+        # Pre-supply user token from provided credentials (skip auto-register)
+        if user_email and user_password:
+            token = self._login(user_email, user_password)
+            if token:
+                self.user_token = token
+                print(f"\n  {GREEN}User token obtained  ({user_email}){RESET}")
+            else:
+                print(f"\n  {RED}User login failed  ({user_email}){RESET}")
+
+        # Pre-supply admin token
         if admin_email and admin_password:
-            try:
-                r = self._req("POST", "/api/users/login",
-                              json={"email": admin_email, "password": admin_password})
-                if r.status_code == 200:
-                    d = r.json().get("data", r.json())
-                    self.admin_token = d.get("token") or d.get("accessToken")
-                    if self.admin_token:
-                        print(f"\n  {GREEN}Admin token obtained  ({admin_email}){RESET}")
-            except Exception:
-                pass
+            token = self._login(admin_email, admin_password)
+            if token:
+                self.admin_token = token
+                print(f"  {GREEN}Admin token obtained  ({admin_email}){RESET}")
+            else:
+                print(f"  {RED}Admin login failed  ({admin_email}){RESET}")
 
         self.test_health()
         self.test_store()
@@ -464,11 +488,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="PRN232-Backend Swagger API test runner"
     )
-    parser.add_argument("--base-url",       default=BASE_URL)
-    parser.add_argument("--admin-email",    default=None)
-    parser.add_argument("--admin-password", default=None)
+    parser.add_argument("--base-url",        default=BASE_URL)
+    parser.add_argument("--user-email",      default=None, help="Existing user email")
+    parser.add_argument("--user-password",   default=None, help="Existing user password")
+    parser.add_argument("--admin-email",     default=None, help="Admin email")
+    parser.add_argument("--admin-password",  default=None, help="Admin password")
     args = parser.parse_args()
 
     tester = ApiTester(args.base_url)
-    ok = tester.run(admin_email=args.admin_email, admin_password=args.admin_password)
+    ok = tester.run(
+        user_email=args.user_email,
+        user_password=args.user_password,
+        admin_email=args.admin_email,
+        admin_password=args.admin_password,
+    )
     sys.exit(0 if ok else 1)

@@ -1,12 +1,29 @@
 """
 Pytest configuration and shared fixtures for PRN232-Backend API tests.
+
+Pass existing credentials via environment variables to skip auto-registration:
+    set TEST_USER_EMAIL=your@email.com
+    set TEST_USER_PASSWORD=YourPass123
+    set TEST_ADMIN_EMAIL=admin@email.com
+    set TEST_ADMIN_PASSWORD=AdminPass123
+    pytest tests/test_swagger_api.py -v
+
+Or on Linux/Mac:
+    TEST_USER_EMAIL=your@email.com TEST_USER_PASSWORD=Pass123 pytest tests/ -v
 """
+import os
 import random
 import string
 import pytest
 import requests
 
 BASE_URL = "https://prn232-backend-production.up.railway.app"
+
+# Read from environment variables (optional — override auto-register)
+ENV_USER_EMAIL    = os.environ.get("TEST_USER_EMAIL")
+ENV_USER_PASSWORD = os.environ.get("TEST_USER_PASSWORD")
+ENV_ADMIN_EMAIL   = os.environ.get("TEST_ADMIN_EMAIL")
+ENV_ADMIN_PASSWORD= os.environ.get("TEST_ADMIN_PASSWORD")
 
 
 def random_suffix(length: int = 8) -> str:
@@ -38,7 +55,19 @@ def test_user_credentials():
 
 @pytest.fixture(scope="session")
 def registered_user(api_session, base_url, test_user_credentials):
-    """Register a test user. Returns None if registration fails (e.g. server error)."""
+    """
+    Return user credentials.
+    - If TEST_USER_EMAIL env var is set → use that existing account (skip register).
+    - Otherwise → auto-register a new test account.
+    Returns None if both options fail.
+    """
+    if ENV_USER_EMAIL and ENV_USER_PASSWORD:
+        # Use existing account from env
+        return {"credentials": {"email": ENV_USER_EMAIL, "password": ENV_USER_PASSWORD,
+                                "username": ENV_USER_EMAIL.split("@")[0]},
+                "data": {}}
+
+    # Auto-register
     resp = api_session.post(
         f"{base_url}/api/users/register",
         json=test_user_credentials,
@@ -52,7 +81,7 @@ def registered_user(api_session, base_url, test_user_credentials):
 
 @pytest.fixture(scope="session")
 def user_token(api_session, base_url, registered_user):
-    """Login test user and return JWT token. Returns None if login fails."""
+    """Login and return JWT token. Returns None if login fails."""
     if registered_user is None:
         return None
     creds = registered_user["credentials"]
