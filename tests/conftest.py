@@ -10,8 +10,15 @@ Pass existing credentials via environment variables to skip auto-registration:
 
 Or on Linux/Mac:
     TEST_USER_EMAIL=your@email.com TEST_USER_PASSWORD=Pass123 pytest tests/ -v
+
+API response formats (confirmed via live testing):
+    - Login/Register: { "userId", "username", "email", "role", "accessToken" }  (no "data" wrapper)
+    - Products:       { "success", "message", "data": { "items": [...], "pagination": {...} } }
+    - Brands:         { "items": [...], "pagination": {...} }  (no "data" wrapper)
+    - Categories:     { "items": [...], "pagination": {...} }  (no "data" wrapper)
 """
 import os
+import uuid
 import random
 import string
 import pytest
@@ -25,9 +32,27 @@ ENV_USER_PASSWORD = os.environ.get("TEST_USER_PASSWORD")
 ENV_ADMIN_EMAIL   = os.environ.get("TEST_ADMIN_EMAIL")
 ENV_ADMIN_PASSWORD= os.environ.get("TEST_ADMIN_PASSWORD")
 
+# Valid Vietnamese mobile prefixes (Viettel, Mobifone, Vinaphone, Vietnamobile, Gmobile)
+_VN_PHONE_PREFIXES = [
+    "032", "033", "034", "035", "036", "037", "038", "039",  # Viettel
+    "096", "097", "098",                                       # Viettel
+    "070", "076", "077", "078", "079", "089", "090", "093",   # Mobifone
+    "081", "082", "083", "084", "085", "086",                  # Vinaphone
+    "056", "058",                                              # Vietnamobile
+    "059",                                                     # Gmobile
+]
+
 
 def random_suffix(length: int = 8) -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
+
+
+def _unique_phone() -> str:
+    """Generate a unique Vietnamese phone number using UUID-based suffix."""
+    prefix = random.choice(_VN_PHONE_PREFIXES)
+    # Use UUID to ensure global uniqueness across test runs
+    tail = str(uuid.uuid4().int)[:7]
+    return prefix + tail
 
 
 @pytest.fixture(scope="session")
@@ -46,13 +71,12 @@ def api_session() -> requests.Session:
 @pytest.fixture(scope="session")
 def test_user_credentials():
     suffix = random_suffix()
-    phone_digits = "".join(random.choices(string.digits, k=8))
     return {
         "email": f"testuser_{suffix}@example.com",
-        "password": f"Test{suffix}Pass1",
+        "password": f"Test{suffix}Pass1!",
         "username": f"testuser_{suffix}",
         "fullName": f"Test User {suffix}",
-        "phone": f"09{phone_digits}",
+        "phone": _unique_phone(),
     }
 
 
@@ -95,9 +119,24 @@ def user_token(api_session, base_url, registered_user):
     )
     if resp.status_code != 200:
         return None
+    # API returns token directly (no "data" wrapper): { "accessToken": "..." }
     data = resp.json().get("data", resp.json())
-    return (data.get("token") or data.get("accessToken")
-            or data.get("Token") or data.get("AccessToken"))
+    return (data.get("accessToken") or data.get("token")
+            or data.get("AccessToken") or data.get("Token"))
+
+
+def _extract_items(resp_json: dict) -> list:
+    """
+    Handle both wrapped and unwrapped list responses:
+      - Wrapped:   { "data": { "items": [...] } }
+      - Unwrapped: { "items": [...] }
+    """
+    inner = resp_json.get("data", resp_json)
+    if isinstance(inner, dict):
+        items = inner.get("items", [])
+        if isinstance(items, list):
+            return items
+    return []
 
 
 @pytest.fixture(scope="session")
@@ -106,37 +145,35 @@ def first_product_id(api_session, base_url):
     resp = api_session.get(f"{base_url}/api/product?pageSize=1", timeout=30)
     if resp.status_code != 200:
         return None
-    data = resp.json().get("data", {})
-    items = data.get("items", data) if isinstance(data, dict) else data
-    if isinstance(items, list) and items:
-        item = items[0]
-        return item.get("productId") or item.get("id")
+    items = _extract_items(resp.json())
+    if items:
+        return items[0].get("productId") or items[0].get("id")
     return None
 
 
 @pytest.fixture(scope="session")
 def first_brand_id(api_session, base_url):
-    """Fetch the first available brand ID."""
+    """Fetch the first available brand ID.
+    Brands endpoint returns { "items": [...] } without a "data" wrapper.
+    """
     resp = api_session.get(f"{base_url}/api/brands?pageSize=1", timeout=30)
     if resp.status_code != 200:
         return None
-    data = resp.json().get("data", {})
-    items = data.get("items", data) if isinstance(data, dict) else data
-    if isinstance(items, list) and items:
-        item = items[0]
-        return item.get("brandId") or item.get("id")
+    items = _extract_items(resp.json())
+    if items:
+        return items[0].get("brandId") or items[0].get("id")
     return None
 
 
 @pytest.fixture(scope="session")
 def first_category_id(api_session, base_url):
-    """Fetch the first available category ID."""
+    """Fetch the first available category ID.
+    Categories endpoint returns { "items": [...] } without a "data" wrapper.
+    """
     resp = api_session.get(f"{base_url}/api/categories?pageSize=1", timeout=30)
     if resp.status_code != 200:
         return None
-    data = resp.json().get("data", {})
-    items = data.get("items", data) if isinstance(data, dict) else data
-    if isinstance(items, list) and items:
-        item = items[0]
-        return item.get("categoryId") or item.get("id")
+    items = _extract_items(resp.json())
+    if items:
+        return items[0].get("categoryId") or items[0].get("id")
     return None
