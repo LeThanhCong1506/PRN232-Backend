@@ -4,8 +4,8 @@ API: https://prn232-backend-production.up.railway.app
 
 Run:
     pip install -r requirements-test.txt
-    pytest test_swagger_api.py -v
-    pytest test_swagger_api.py -v --html=report.html   # with HTML report
+    py -m pytest tests/test_swagger_api.py -v
+    py -m pytest tests/test_swagger_api.py -v --html=report.html --self-contained-html
 
 Sections:
     TestHealth          - /api/health/*
