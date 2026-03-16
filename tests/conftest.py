@@ -10,15 +10,9 @@ Pass existing credentials via environment variables to skip auto-registration:
 
 Or on Linux/Mac:
     TEST_USER_EMAIL=your@email.com TEST_USER_PASSWORD=Pass123 pytest tests/ -v
-
-API response formats (confirmed via live testing):
-    - Login/Register: { "userId", "username", "email", "role", "accessToken" }  (no "data" wrapper)
-    - Products:       { "success", "message", "data": { "items": [...], "pagination": {...} } }
-    - Brands:         { "items": [...], "pagination": {...} }  (no "data" wrapper)
-    - Categories:     { "items": [...], "pagination": {...} }  (no "data" wrapper)
 """
 import os
-import uuid
+import time
 import random
 import string
 import pytest
@@ -32,27 +26,16 @@ ENV_USER_PASSWORD = os.environ.get("TEST_USER_PASSWORD")
 ENV_ADMIN_EMAIL   = os.environ.get("TEST_ADMIN_EMAIL")
 ENV_ADMIN_PASSWORD= os.environ.get("TEST_ADMIN_PASSWORD")
 
-# Valid Vietnamese mobile prefixes (Viettel, Mobifone, Vinaphone, Vietnamobile, Gmobile)
-_VN_PHONE_PREFIXES = [
-    "032", "033", "034", "035", "036", "037", "038", "039",  # Viettel
-    "096", "097", "098",                                       # Viettel
-    "070", "076", "077", "078", "079", "089", "090", "093",   # Mobifone
-    "081", "082", "083", "084", "085", "086",                  # Vinaphone
-    "056", "058",                                              # Vietnamobile
-    "059",                                                     # Gmobile
-]
-
 
 def random_suffix(length: int = 8) -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 
 def _unique_phone() -> str:
-    """Generate a unique Vietnamese phone number using UUID-based suffix."""
-    prefix = random.choice(_VN_PHONE_PREFIXES)
-    # Use UUID to ensure global uniqueness across test runs
-    tail = str(uuid.uuid4().int)[:7]
-    return prefix + tail
+    """Generate a unique Vietnamese phone number using timestamp."""
+    # Use last 7 digits of timestamp (milliseconds) → unique per test run
+    tail = str(int(time.time() * 1000))[-7:]
+    return f"034{tail}"
 
 
 @pytest.fixture(scope="session")
