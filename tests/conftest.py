@@ -96,7 +96,8 @@ def user_token(api_session, base_url, registered_user):
     if resp.status_code != 200:
         return None
     data = resp.json().get("data", resp.json())
-    return data.get("token") or data.get("accessToken")
+    return (data.get("token") or data.get("accessToken")
+            or data.get("Token") or data.get("AccessToken"))
 
 
 @pytest.fixture(scope="session")
