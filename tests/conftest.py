@@ -46,10 +46,13 @@ def api_session() -> requests.Session:
 @pytest.fixture(scope="session")
 def test_user_credentials():
     suffix = random_suffix()
+    phone_digits = "".join(random.choices(string.digits, k=8))
     return {
         "email": f"testuser_{suffix}@example.com",
-        "password": f"Test@{suffix}Pass1!",
+        "password": f"Test{suffix}Pass1",
         "username": f"testuser_{suffix}",
+        "fullName": f"Test User {suffix}",
+        "phone": f"09{phone_digits}",
     }
 
 
@@ -73,7 +76,7 @@ def registered_user(api_session, base_url, test_user_credentials):
         json=test_user_credentials,
         timeout=30,
     )
-    if resp.status_code != 201:
+    if resp.status_code not in (200, 201):
         return None
     data = resp.json().get("data", resp.json())
     return {"credentials": test_user_credentials, "data": data}
