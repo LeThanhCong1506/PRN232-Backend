@@ -44,7 +44,10 @@ namespace MV.PresentationLayer
                         "http://localhost:5175",
                         "http://127.0.0.1:3000",
                         "http://localhost:5255",  // Swagger Docker
-                        "http://127.0.0.1:5255"
+                        "http://127.0.0.1:5255",
+                        // Production FE domain
+                        "https://prn232.store",
+                        "https://www.prn232.store"
                     }.Concat(extraOrigins).Distinct().ToArray();
 
                     policy.WithOrigins(origins)
