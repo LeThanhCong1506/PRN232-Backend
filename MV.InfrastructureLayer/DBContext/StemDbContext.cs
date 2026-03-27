@@ -66,6 +66,8 @@ public partial class StemDbContext : DbContext
 
     public virtual DbSet<ChatMessage> ChatMessages { get; set; }
 
+    public virtual DbSet<Notification> Notifications { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder

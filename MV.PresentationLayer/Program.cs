@@ -172,6 +172,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IOrderRepository, OrderRepository>();
             builder.Services.AddScoped<ISepayRepository, SepayRepository>();
             builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+            builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
             builder.Services.AddScoped<IRoleService, RoleService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
@@ -265,10 +266,26 @@ namespace MV.PresentationLayer
                     {
                         db.Database.ExecuteSqlRaw("ALTER TYPE claim_status_enum ADD VALUE IF NOT EXISTS 'UNRESOLVED';");
                         Console.WriteLine("[DB INIT] Added UNRESOLVED to claim_status_enum successfully.");
+
+                        // Bổ sung tạo bảng Notification nếu chưa có
+                        db.Database.ExecuteSqlRaw(@"
+                            CREATE TABLE IF NOT EXISTS notification (
+                                notification_id SERIAL PRIMARY KEY,
+                                user_id INT NOT NULL,
+                                title VARCHAR(255) NOT NULL,
+                                message TEXT NOT NULL,
+                                type VARCHAR(50) NOT NULL,
+                                is_read BOOLEAN DEFAULT false,
+                                link_url VARCHAR(500),
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES ""user""(user_id) ON DELETE CASCADE
+                            );
+                        ");
+                        Console.WriteLine("[DB INIT] Checked/Created notification table successfully.");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[DB INIT] Note: Could not alter claim_status_enum: {ex.Message}");
+                        Console.WriteLine($"[DB INIT] Note: Could not alter schema: {ex.Message}");
                     }
                 }
             }
