@@ -78,7 +78,9 @@ namespace MV.InfrastructureLayer.Repositories
         {
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
-            var baseQuery = _context.Products.AsQueryable();
+            var baseQuery = _context.Products
+                .Where(p => p.IsDeleted != true)
+                .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.Search))
             {
