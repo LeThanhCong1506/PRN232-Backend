@@ -123,4 +123,36 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
 
         return await _context.WarrantyClaims.CountAsync();
     }
+
+    public async Task<List<WarrantyClaim>> GetByUserIdAsync(int userId, int page, int pageSize)
+    {
+        var baseQuery = _context.WarrantyClaims.Where(c => c.UserId == userId);
+        
+        var claimIds = await baseQuery
+            .AsNoTracking()
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => c.ClaimId)
+            .ToListAsync();
+
+        if (claimIds.Count == 0)
+            return new List<WarrantyClaim>();
+
+        return await _context.WarrantyClaims
+            .AsNoTracking()
+            .AsSingleQuery()
+            .Include(c => c.Warranty)
+                .ThenInclude(w => w.SerialNumberNavigation)
+                    .ThenInclude(pi => pi.Product)
+            .Include(c => c.User)
+            .Where(c => claimIds.Contains(c.ClaimId))
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<int> CountByUserIdAsync(int userId)
+    {
+        return await _context.WarrantyClaims.CountAsync(c => c.UserId == userId);
+    }
 }

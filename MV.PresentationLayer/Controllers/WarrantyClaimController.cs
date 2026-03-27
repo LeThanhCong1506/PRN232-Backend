@@ -53,6 +53,30 @@ public class WarrantyClaimController : ControllerBase
     }
 
     /// <summary>
+    /// [Customer] Lấy danh sách các warranty claims của mình
+    /// </summary>
+    [HttpGet("/api/warranties/claims")]
+    [Authorize]
+    [SwaggerOperation(Summary = "[Customer] Get my warranty claims")]
+    public async Task<IActionResult> GetMyClaims(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        var userId = GetUserId();
+        if (userId == 0)
+        {
+            return Unauthorized();
+        }
+
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+        if (pageSize > 50) pageSize = 50;
+
+        var result = await _warrantyClaimService.GetMyClaimsAsync(userId, page, pageSize);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// [Admin] Lấy danh sách tất cả warranty claims có phân trang và filter
     /// </summary>
     /// <param name="status">Filter theo status: SUBMITTED, APPROVED, REJECTED, RESOLVED</param>

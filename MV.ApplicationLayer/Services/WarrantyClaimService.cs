@@ -210,4 +210,40 @@ public class WarrantyClaimService : IWarrantyClaimService
 
         return ApiResponse<ResolveWarrantyClaimResponse>.SuccessResponse(response, $"Warranty claim {newStatus.ToLower()} successfully.");
     }
+
+    /// <summary>
+    /// Customer get my claims
+    /// </summary>
+    public async Task<ApiResponse<AdminWarrantyClaimPagedResponse>> GetMyClaimsAsync(int userId, int page, int pageSize)
+    {
+        var totalItems = await _claimRepository.CountByUserIdAsync(userId);
+        var claims = await _claimRepository.GetByUserIdAsync(userId, page, pageSize);
+
+        var items = claims.Select(c => new AdminWarrantyClaimResponse
+        {
+            ClaimId = c.ClaimId,
+            Status = c.Status ?? "SUBMITTED",
+            Product = new ClaimProductInfo
+            {
+                ProductId = c.Warranty?.SerialNumberNavigation?.ProductId ?? 0,
+                Name = c.Warranty?.SerialNumberNavigation?.Product?.Name ?? "Unknown"
+            },
+            IssueDescription = c.IssueDescription,
+            ContactPhone = c.ContactPhone,
+            ResolutionNote = c.ResolutionNote,
+            SubmittedAt = c.CreatedAt ?? DateTime.MinValue,
+            ResolvedDate = c.ResolvedDate
+        }).ToList();
+
+        var response = new AdminWarrantyClaimPagedResponse
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = totalItems > 0 ? (int)Math.Ceiling((double)totalItems / pageSize) : 0
+        };
+
+        return ApiResponse<AdminWarrantyClaimPagedResponse>.SuccessResponse(response);
+    }
 }
