@@ -35,7 +35,9 @@ public class ChatHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, $"chat_user_{userId}");
 
             // Admin/Staff join admin group
-            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+                ?? Context.User?.FindFirst("role")?.Value;
+                
             if (role == "Admin" || role == "Staff")
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, "chat_admins");
@@ -54,7 +56,9 @@ public class ChatHub : Hub
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"chat_user_{userId}");
 
-            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+                ?? Context.User?.FindFirst("role")?.Value;
+                
             if (role == "Admin" || role == "Staff")
             {
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, "chat_admins");
@@ -74,9 +78,12 @@ public class ChatHub : Hub
         var senderId = GetUserId();
         if (senderId == 0 || string.IsNullOrWhiteSpace(content)) return;
 
-        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+            ?? Context.User?.FindFirst("role")?.Value;
+            
         var isAdmin = role == "Admin" || role == "Staff";
-        var senderName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+        var senderName = Context.User?.FindFirst(ClaimTypes.Name)?.Value 
+            ?? Context.User?.FindFirst("name")?.Value ?? "Unknown";
 
         var message = new ChatMessage
         {
@@ -146,7 +153,9 @@ public class ChatHub : Hub
 
     private int GetUserId()
     {
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? Context.User?.FindFirst("sub")?.Value;
+            
         return int.TryParse(userIdStr, out var userId) ? userId : 0;
     }
 }
