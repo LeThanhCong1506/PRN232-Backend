@@ -277,8 +277,7 @@ namespace MV.PresentationLayer
                                 type VARCHAR(50) NOT NULL,
                                 is_read BOOLEAN DEFAULT false,
                                 link_url VARCHAR(500),
-                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES ""user""(user_id) ON DELETE CASCADE
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                             );
                         ");
                         Console.WriteLine("[DB INIT] Checked/Created notification table successfully.");

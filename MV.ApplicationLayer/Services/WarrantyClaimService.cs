@@ -11,11 +11,16 @@ public class WarrantyClaimService : IWarrantyClaimService
 {
     private readonly IWarrantyClaimRepository _claimRepository;
     private readonly IWarrantyRepository _warrantyRepository;
+    private readonly INotificationService _notificationService;
 
-    public WarrantyClaimService(IWarrantyClaimRepository claimRepository, IWarrantyRepository warrantyRepository)
+    public WarrantyClaimService(
+        IWarrantyClaimRepository claimRepository,
+        IWarrantyRepository warrantyRepository,
+        INotificationService notificationService)
     {
         _claimRepository = claimRepository;
         _warrantyRepository = warrantyRepository;
+        _notificationService = notificationService;
     }
 
     // State machine: định nghĩa các transition hợp lệ
@@ -208,6 +213,15 @@ public class WarrantyClaimService : IWarrantyClaimService
             ResolutionNote = claim.ResolutionNote,
             ResolvedDate = claim.ResolvedDate ?? DateOnly.FromDateTime(DateTime.UtcNow.Date)
         };
+
+        // Fire-and-forget notification (don't block the response)
+        var ownerUserId = claim.Warranty?.SerialNumberNavigation?.OrderItem?.Order?.UserId;
+        var productName = claim.Warranty?.SerialNumberNavigation?.Product?.Name ?? "your product";
+        if (ownerUserId.HasValue)
+        {
+            _ = _notificationService.SendWarrantyClaimStatusChangedAsync(
+                ownerUserId.Value, claim.ClaimId, productName, newStatus);
+        }
 
         return ApiResponse<ResolveWarrantyClaimResponse>.SuccessResponse(response, $"Warranty claim {newStatus.ToLower()} successfully.");
     }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
+using MV.InfrastructureLayer.Interfaces;
 using System.Security.Claims;
 
 namespace MV.PresentationLayer.Hubs;
@@ -17,11 +18,13 @@ public class ChatHub : Hub
 {
     private readonly StemDbContext _context;
     private readonly ILogger<ChatHub> _logger;
+    private readonly INotificationService _notificationService;
 
-    public ChatHub(StemDbContext context, ILogger<ChatHub> logger)
+    public ChatHub(StemDbContext context, ILogger<ChatHub> logger, INotificationService notificationService)
     {
         _context = context;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     public override async Task OnConnectedAsync()
@@ -106,6 +109,8 @@ public class ChatHub : Hub
             await Clients.Group($"chat_user_{receiverId.Value}").SendAsync("ReceiveMessage", messageDto);
             // Cũng gửi lại cho chính admin (confirm)
             await Clients.Caller.SendAsync("ReceiveMessage", messageDto);
+            // Gửi Notification bell cho customer
+            _ = _notificationService.SendNewChatMessageAsync(receiverId.Value, senderName, content.Trim());
         }
         else
         {

@@ -37,7 +37,8 @@ public class SignalRNotificationService : INotificationService
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "CartUpdated",
-            IsRead = false
+            IsRead = false,
+            LinkUrl = dbNotif?.LinkUrl
         };
 
         await SendToUserAsync(userId, "CartUpdated", data);
@@ -58,7 +59,8 @@ public class SignalRNotificationService : INotificationService
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "OrderStatusChanged",
-            IsRead = false
+            IsRead = false,
+            LinkUrl = dbNotif?.LinkUrl
         };
 
         await SendToUserAsync(userId, "OrderStatusChanged", data);
@@ -80,7 +82,8 @@ public class SignalRNotificationService : INotificationService
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "PaymentConfirmed",
-            IsRead = false
+            IsRead = false,
+            LinkUrl = dbNotif?.LinkUrl
         };
 
         await SendToUserAsync(userId, "PaymentConfirmed", data);
@@ -101,7 +104,8 @@ public class SignalRNotificationService : INotificationService
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "PaymentExpired",
-            IsRead = false
+            IsRead = false,
+            LinkUrl = dbNotif?.LinkUrl
         };
 
         await SendToUserAsync(userId, "PaymentExpired", data);
@@ -111,6 +115,62 @@ public class SignalRNotificationService : INotificationService
     public async Task SendNotificationAsync(int userId, string eventType, object data)
     {
         await SendToUserAsync(userId, eventType, data);
+    }
+
+    public async Task SendWarrantyClaimStatusChangedAsync(int userId, int claimId, string productName, string newStatus)
+    {
+        var statusMessages = new Dictionary<string, string>
+        {
+            { "APPROVED", $"Your warranty claim for '{productName}' has been approved and is being processed." },
+            { "REJECTED", $"Your warranty claim for '{productName}' has been rejected. Please check the details." },
+            { "RESOLVED", $"Your warranty claim for '{productName}' has been resolved successfully!" },
+            { "UNRESOLVED", $"Your warranty claim for '{productName}' could not be resolved. Device has been returned." },
+        };
+
+        var msg = statusMessages.TryGetValue(newStatus, out var m) ? m : $"Your warranty claim status changed to {newStatus}.";
+        var title = $"Warranty Claim {newStatus.Substring(0, 1)}{newStatus.Substring(1).ToLower()}";
+
+        var dbNotif = await SaveNotificationAsync(userId, "WarrantyClaimStatus", title, msg, $"/warranties/claims");
+
+        var data = new
+        {
+            Id = dbNotif?.NotificationId ?? 0,
+            ClaimId = claimId,
+            ProductName = productName,
+            Status = newStatus,
+            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Title = dbNotif?.Title,
+            Message = dbNotif?.Message,
+            Type = "WarrantyClaimStatus",
+            IsRead = false,
+            LinkUrl = dbNotif?.LinkUrl
+        };
+
+        await SendToUserAsync(userId, "WarrantyClaimStatus", data);
+        _logger.LogInformation("WarrantyClaimStatus sent to user {UserId}: Claim {ClaimId} -> {Status}", userId, claimId, newStatus);
+    }
+
+    public async Task SendNewChatMessageAsync(int userId, string senderName, string messagePreview)
+    {
+        var dbNotif = await SaveNotificationAsync(userId, "NewChatMessage", $"New message from {senderName}",
+            messagePreview.Length > 80 ? messagePreview.Substring(0, 77) + "..." : messagePreview,
+            "/chat");
+
+        var data = new
+        {
+            Id = dbNotif?.NotificationId ?? 0,
+            SenderName = senderName,
+            MessagePreview = messagePreview,
+            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Title = dbNotif?.Title,
+            Message = dbNotif?.Message,
+            Type = "NewChatMessage",
+            IsRead = false,
+            LinkUrl = dbNotif?.LinkUrl
+        };
+
+        await SendToUserAsync(userId, "NewChatMessage", data);
+        _logger.LogInformation("NewChatMessage notification sent to user {UserId} from {SenderName}", userId, senderName);
     }
 
     private async Task<Notification?> SaveNotificationAsync(int userId, string type, string title, string message, string? linkUrl = null)
