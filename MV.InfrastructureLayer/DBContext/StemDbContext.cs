@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using MV.DomainLayer.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -69,7 +69,7 @@ public partial class StemDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
-            .HasPostgresEnum("claim_status_enum", new[] { "SUBMITTED", "APPROVED", "REJECTED", "RESOLVED" })
+            .HasPostgresEnum("claim_status_enum", new[] { "SUBMITTED", "APPROVED", "REJECTED", "RESOLVED", "UNRESOLVED" })
             .HasPostgresEnum("difficulty_level_enum", new[] { "beginner", "intermediate", "advanced" })
             .HasPostgresEnum("discount_type_enum", new[] { "FIXED_AMOUNT", "PERCENTAGE" })
             .HasPostgresEnum("instance_status_enum", new[] { "IN_STOCK", "SOLD", "WARRANTY", "DEFECTIVE", "RETURNED" })

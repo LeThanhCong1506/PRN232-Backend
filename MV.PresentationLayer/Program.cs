@@ -259,7 +259,18 @@ namespace MV.PresentationLayer
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<StemDbContext>();
-                db.Database.CanConnect(); // chỉ kiểm tra kết nối, không thay đổi schema
+                if (db.Database.CanConnect())
+                {
+                    try
+                    {
+                        db.Database.ExecuteSqlRaw("ALTER TYPE claim_status_enum ADD VALUE IF NOT EXISTS 'UNRESOLVED';");
+                        Console.WriteLine("[DB INIT] Added UNRESOLVED to claim_status_enum successfully.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[DB INIT] Note: Could not alter claim_status_enum: {ex.Message}");
+                    }
+                }
             }
 
             // Configure the HTTP request pipeline.

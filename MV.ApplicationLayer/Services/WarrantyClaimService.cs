@@ -22,9 +22,10 @@ public class WarrantyClaimService : IWarrantyClaimService
     private static readonly Dictionary<string, List<string>> AllowedTransitions = new()
     {
         { "SUBMITTED", new List<string> { "APPROVED", "REJECTED" } },
-        { "APPROVED",  new List<string> { "RESOLVED", "REJECTED" } },
+        { "APPROVED",  new List<string> { "RESOLVED", "UNRESOLVED" } },
         { "REJECTED",  new List<string>() }, // terminal
-        { "RESOLVED",  new List<string>() }  // terminal
+        { "RESOLVED",  new List<string>() }, // terminal
+        { "UNRESOLVED", new List<string>() } // terminal
     };
 
     /// <summary>
@@ -143,7 +144,7 @@ public class WarrantyClaimService : IWarrantyClaimService
     /// Side effects (W2):
     /// - APPROVED:  warranty.IsActive = false (đang sửa)
     /// - RESOLVED:  warranty.IsActive = true  (sửa xong)
-    /// - REJECTED từ APPROVED: warranty.IsActive = true (hoàn lại bảo hành)
+    /// - UNRESOLVED: warranty.IsActive = true (không sửa được, trả lại)
     /// - REJECTED từ SUBMITTED: warranty không đổi
     /// </summary>
     public async Task<ApiResponse<ResolveWarrantyClaimResponse>> ResolveClaimAsync(int claimId, ResolveWarrantyClaimRequest request)
@@ -190,11 +191,11 @@ public class WarrantyClaimService : IWarrantyClaimService
                 claim.Warranty.Notes = "REPAIRED - Claim resolved successfully";
                 await _warrantyRepository.UpdateAsync(claim.Warranty);
             }
-            else if (newStatus == "REJECTED" && currentStatus == "APPROVED")
+            else if (newStatus == "UNRESOLVED")
             {
-                // (W2) REJECTED từ APPROVED: warranty đang bị tắt → cần bật lại
+                // (W2) UNRESOLVED từ APPROVED: không sửa được, hoàn trả lại máy => activate lại warranty
                 claim.Warranty.IsActive = true;
-                claim.Warranty.Notes = "WARRANTY RESTORED - Claim rejected after approval";
+                claim.Warranty.Notes = "IRREPARABLE - Claim unresolved, device returned as is";
                 await _warrantyRepository.UpdateAsync(claim.Warranty);
             }
             // REJECTED từ SUBMITTED: không thay đổi warranty
