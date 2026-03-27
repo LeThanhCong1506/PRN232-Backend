@@ -586,6 +586,39 @@ public class PaymentService : IPaymentService
         }
     }
 
+    // ==================== BACKGROUND JOB: EXPIRE OVERDUE PAYMENTS ====================
+
+    public async Task ExpireOverduePaymentsAsync()
+    {
+        // Lấy tất cả orderId có payment PENDING + SEPAY + đã quá hạn
+        var overdueOrderIds = await _context.Payments
+            .Where(p => p.ExpiredAt.HasValue && p.ExpiredAt.Value < DateTime.UtcNow)
+            .Select(p => p.OrderId)
+            .ToListAsync();
+
+        if (!overdueOrderIds.Any()) return;
+
+        // Lọc những cái còn PENDING payment status (dùng raw SQL vì status là enum)
+        var pendingOverdue = new List<int>();
+        foreach (var orderId in overdueOrderIds)
+        {
+            var status = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
+            var method = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
+            if (status == PaymentStatusEnum.PENDING.ToString()
+                && method == PaymentMethodEnum.SEPAY.ToString())
+            {
+                pendingOverdue.Add(orderId);
+            }
+        }
+
+        _logger.LogInformation("PaymentExpiryJob: Found {Count} overdue SEPAY payments to expire.", pendingOverdue.Count);
+
+        foreach (var orderId in pendingOverdue)
+        {
+            await TryExpireSinglePaymentAsync(orderId);
+        }
+    }
+
     // ==================== PRIVATE HELPERS ====================
 
     /// <summary>

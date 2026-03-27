@@ -190,6 +190,9 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
 
+            // Background Services
+            builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
+
             // Cloudinary
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 

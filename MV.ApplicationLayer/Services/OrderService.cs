@@ -19,19 +19,22 @@ public class OrderService : IOrderService
     private readonly StemDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly INotificationService _notificationService;
+    private readonly IProductBundleRepository _bundleRepo;
 
     public OrderService(
         IOrderRepository orderRepo,
         ICartRepository cartRepo,
         StemDbContext context,
         IConfiguration configuration,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IProductBundleRepository bundleRepo)
     {
         _orderRepo = orderRepo;
         _cartRepo = cartRepo;
         _context = context;
         _configuration = configuration;
         _notificationService = notificationService;
+        _bundleRepo = bundleRepo;
     }
 
     // ==================== CHECKOUT ====================
@@ -51,10 +54,22 @@ public class OrderService : IOrderService
             return ApiResponse<CheckoutResponse>.ErrorResponse("Shopping cart is empty.");
         }
 
-        // 3. Validate stock
+        // 3. Validate stock (KIT tính từ components, sản phẩm thường lấy StockQuantity)
         foreach (var item in cart.CartItems)
         {
-            var stock = item.Product.StockQuantity ?? 0;
+            int stock;
+            if (item.Product.ProductType == ProductTypeEnum.KIT.ToString())
+            {
+                var components = await _bundleRepo.GetBundleComponentsAsync(item.Product.ProductId);
+                stock = components.Any()
+                    ? components.Min(c => (c.ChildProduct.StockQuantity ?? 0) / (c.Quantity ?? 1))
+                    : 0;
+            }
+            else
+            {
+                stock = item.Product.StockQuantity ?? 0;
+            }
+
             var qty = item.Quantity ?? 1;
             if (stock < qty)
             {
@@ -75,8 +90,8 @@ public class OrderService : IOrderService
                 return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code does not exist.");
             }
 
-            var now = DateTime.Now;
-            if (now < coupon.StartDate || now > coupon.EndDate)
+            var now = DateTime.UtcNow;
+            if (now < coupon.StartDate.ToUniversalTime() || now > coupon.EndDate.ToUniversalTime())
             {
                 return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code has expired or has not started.");
             }
@@ -84,6 +99,12 @@ public class OrderService : IOrderService
             if (coupon.UsageLimit.HasValue && (coupon.UsedCount ?? 0) >= coupon.UsageLimit.Value)
             {
                 return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code has expired.");
+            }
+
+            // Kiểm tra user đã dùng coupon này chưa
+            if (await _orderRepo.HasUserUsedCouponAsync(userId, coupon.CouponId))
+            {
+                return ApiResponse<CheckoutResponse>.ErrorResponse("You have already used this coupon code.");
             }
         }
 
@@ -122,7 +143,7 @@ public class OrderService : IOrderService
 
         // 6. Generate order number
         var todayCount = await _orderRepo.GetTodayOrderCountAsync();
-        var orderNumber = $"ORD{DateTime.Now:yyyyMMdd}{(todayCount + 1):D3}";
+        var orderNumber = $"ORD{DateTime.UtcNow:yyyyMMdd}{(todayCount + 1):D3}";
 
         // 7. Build shipping address
         var shippingAddress = $"{request.StreetAddress}, {request.Ward}, {request.District}, {request.Province}";
@@ -153,8 +174,8 @@ public class OrderService : IOrderService
                     Ward = request.Ward,
                     StreetAddress = request.StreetAddress,
                     Notes = request.Notes,
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
                 await _orderRepo.CreateOrderAsync(order);
 
@@ -172,18 +193,32 @@ public class OrderService : IOrderService
                     ProductName = ci.Product.Name,
                     ProductSku = ci.Product.Sku,
                     ProductImageUrl = ci.Product.ProductImages?.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
-                    CreatedAt = DateTime.Now
+                    CreatedAt = DateTime.UtcNow
                 }).ToList();
                 await _orderRepo.CreateOrderItemsAsync(orderItems);
 
-                // 8d. Decrement stock (check rows affected to prevent overselling)
+                // 8d. Decrement stock (KIT trừ từng component, sản phẩm thường trừ trực tiếp)
                 foreach (var ci in cart.CartItems)
                 {
-                    var rowsAffected = await _orderRepo.DecrementStockAsync(ci.ProductId, ci.Quantity ?? 1);
-                    if (rowsAffected == 0)
+                    if (ci.Product.ProductType == ProductTypeEnum.KIT.ToString())
                     {
-                        throw new InvalidOperationException(
-                            $"The product '{ci.Product.Name}' is out of stock.");
+                        // Trừ stock của từng component theo số lượng KIT đặt
+                        var components = await _bundleRepo.GetBundleComponentsAsync(ci.ProductId);
+                        foreach (var comp in components)
+                        {
+                            var deductQty = (comp.Quantity ?? 1) * (ci.Quantity ?? 1);
+                            var rows = await _orderRepo.DecrementStockAsync(comp.ChildProductId, deductQty);
+                            if (rows == 0)
+                                throw new InvalidOperationException(
+                                    $"Component '{comp.ChildProduct?.Name ?? comp.ChildProductId.ToString()}' is out of stock.");
+                        }
+                    }
+                    else
+                    {
+                        var rowsAffected = await _orderRepo.DecrementStockAsync(ci.ProductId, ci.Quantity ?? 1);
+                        if (rowsAffected == 0)
+                            throw new InvalidOperationException(
+                                $"The product '{ci.Product.Name}' is out of stock.");
                     }
                 }
 
@@ -198,7 +233,7 @@ public class OrderService : IOrderService
                 {
                     OrderId = order.OrderId,
                     Amount = totalAmount,
-                    CreatedAt = DateTime.Now
+                    CreatedAt = DateTime.UtcNow
                 };
 
                 string? checkoutUrl = null;
@@ -206,7 +241,7 @@ public class OrderService : IOrderService
                 {
                     // Nội dung chuyển khoản
                     payment.PaymentReference = "SEVQR" + orderNumber.Substring(3);
-                    payment.ExpiredAt = DateTime.Now.AddMinutes(10);
+                    payment.ExpiredAt = DateTime.UtcNow.AddMinutes(10);
 
                     var sepayConfig = _configuration.GetSection("SePay");
 
@@ -348,7 +383,7 @@ public class OrderService : IOrderService
         switch (newStatus)
         {
             case OrderStatusEnum.CONFIRMED:
-                order.ConfirmedAt = DateTime.Now;
+                order.ConfirmedAt = DateTime.UtcNow;
                 order.ConfirmedBy = adminUserId;
                 break;
 
@@ -357,7 +392,7 @@ public class OrderService : IOrderService
                 {
                     return ApiResponse<OrderDetailResponse>.ErrorResponse("Tracking number is required when switching to SHIPPED.");
                 }
-                order.ShippedAt = DateTime.Now;
+                order.ShippedAt = DateTime.UtcNow;
                 order.ShippedBy = adminUserId;
                 order.TrackingNumber = request.TrackingNumber;
                 order.Carrier = request.Carrier;
@@ -365,7 +400,7 @@ public class OrderService : IOrderService
                 break;
 
             case OrderStatusEnum.DELIVERED:
-                order.DeliveredAt = DateTime.Now;
+                order.DeliveredAt = DateTime.UtcNow;
                 // If COD, mark payment as completed
                 var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
                 if (paymentMethod == PaymentMethodEnum.COD.ToString())
@@ -373,14 +408,16 @@ public class OrderService : IOrderService
                     await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.COMPLETED.ToString());
                     if (order.Payment != null)
                     {
-                        order.Payment.PaymentDate = DateTime.Now;
+                        order.Payment.PaymentDate = DateTime.UtcNow;
                         order.Payment.ReceivedAmount = order.TotalAmount;
                     }
                 }
+                // Tạo warranty records cho các sản phẩm có warranty policy
+                await _orderRepo.CreateWarrantiesForDeliveredOrderAsync(orderId);
                 break;
         }
 
-        order.UpdatedAt = DateTime.Now;
+        order.UpdatedAt = DateTime.UtcNow;
         await _orderRepo.UpdateOrderAsync(order);
         await _orderRepo.SetOrderStatusAsync(orderId, newStatus.ToString());
 
@@ -422,20 +459,32 @@ public class OrderService : IOrderService
             try
             {
                 // Set cancelled
-                order.CancelledAt = DateTime.Now;
+                order.CancelledAt = DateTime.UtcNow;
                 order.CancelledBy = userId;
                 order.CancelReason = request.CancelReason;
-                order.UpdatedAt = DateTime.Now;
+                order.UpdatedAt = DateTime.UtcNow;
                 await _orderRepo.UpdateOrderAsync(order);
                 await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
 
                 // Set payment failed
                 await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.FAILED.ToString());
 
-                // Restore stock
+                // Restore stock (KIT restore từng component, sản phẩm thường restore trực tiếp)
                 foreach (var item in order.OrderItems)
                 {
-                    await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+                    if (item.Product?.ProductType == ProductTypeEnum.KIT.ToString())
+                    {
+                        var components = await _bundleRepo.GetBundleComponentsAsync(item.ProductId);
+                        foreach (var comp in components)
+                        {
+                            var restoreQty = (comp.Quantity ?? 1) * item.Quantity;
+                            await _orderRepo.IncrementStockAsync(comp.ChildProductId, restoreQty);
+                        }
+                    }
+                    else
+                    {
+                        await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+                    }
                 }
 
                 // Restore coupon

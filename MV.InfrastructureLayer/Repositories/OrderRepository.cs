@@ -213,8 +213,23 @@ public class OrderRepository : IOrderRepository
                 JOIN order_item oi ON oh.order_id = oi.order_id
                 WHERE oh.user_id = {0}
                   AND oi.product_id = {1}
-                  AND oh.status IN ('CONFIRMED'::order_status_enum, 'SHIPPED'::order_status_enum, 'DELIVERED'::order_status_enum)
+                  AND oh.status = 'DELIVERED'::order_status_enum
                 LIMIT 1", userId, productId)
+            .FirstOrDefaultAsync();
+        return result == 1;
+    }
+
+    public async Task<bool> HasUserUsedCouponAsync(int userId, int couponId)
+    {
+        // Kiểm tra user đã dùng coupon này trong đơn hàng nào chưa (trừ đơn CANCELLED)
+        var result = await _context.Database
+            .SqlQueryRaw<int>(@"
+                SELECT 1 AS ""Value""
+                FROM order_header
+                WHERE user_id = {0}
+                  AND coupon_id = {1}
+                  AND status != 'CANCELLED'::order_status_enum
+                LIMIT 1", userId, couponId)
             .FirstOrDefaultAsync();
         return result == 1;
     }

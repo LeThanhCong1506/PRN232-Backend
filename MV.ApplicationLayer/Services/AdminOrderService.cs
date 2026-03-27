@@ -4,6 +4,7 @@ using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Enums;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -15,6 +16,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly IProductRepository _productRepo;
     private readonly IUserRepository _userRepo;
     private readonly StemDbContext _context;
+    private readonly IProductBundleRepository _bundleRepo;
 
     private static readonly Dictionary<string, List<string>> AllowedTransitions = new()
     {
@@ -29,12 +31,14 @@ public class AdminOrderService : IAdminOrderService
         IOrderRepository orderRepo,
         IProductRepository productRepo,
         IUserRepository userRepo,
-        StemDbContext context)
+        StemDbContext context,
+        IProductBundleRepository bundleRepo)
     {
         _orderRepo = orderRepo;
         _productRepo = productRepo;
         _userRepo = userRepo;
         _context = context;
+        _bundleRepo = bundleRepo;
     }
 
     public async Task<ApiResponse<AdminOrderListResult>> GetAdminOrdersAsync(AdminOrderFilter filter)
@@ -388,10 +392,22 @@ public class AdminOrderService : IAdminOrderService
         order.CancelledBy = adminUserId;
         order.CancelReason = request.Note ?? "Cancelled by admin";
 
-        // Restore stock for each order item
+        // Restore stock (KIT restore từng component, sản phẩm thường restore trực tiếp)
         foreach (var item in order.OrderItems)
         {
-            await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+            if (item.Product?.ProductType == ProductTypeEnum.KIT.ToString())
+            {
+                var components = await _bundleRepo.GetBundleComponentsAsync(item.ProductId);
+                foreach (var comp in components)
+                {
+                    var restoreQty = (comp.Quantity ?? 1) * item.Quantity;
+                    await _orderRepo.IncrementStockAsync(comp.ChildProductId, restoreQty);
+                }
+            }
+            else
+            {
+                await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+            }
         }
 
         // Restore coupon usage if applicable

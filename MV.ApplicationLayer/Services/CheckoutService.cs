@@ -200,7 +200,11 @@ public class CheckoutService : ICheckoutService
 
                 if (isValid)
                 {
-                    discount = coupon.DiscountValue;
+                    // Tính đúng theo loại coupon (PERCENTAGE hoặc FIXED)
+                    var discountType = await _couponRepository.GetCouponDiscountTypeAsync(coupon.CouponId);
+                    discount = discountType == "PERCENTAGE"
+                        ? subtotal * coupon.DiscountValue / 100
+                        : coupon.DiscountValue;
 
                     // Ensure discount doesn't exceed subtotal
                     if (discount > subtotal)
