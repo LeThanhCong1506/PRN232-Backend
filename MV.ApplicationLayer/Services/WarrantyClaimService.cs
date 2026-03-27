@@ -214,14 +214,13 @@ public class WarrantyClaimService : IWarrantyClaimService
             ResolvedDate = claim.ResolvedDate ?? DateOnly.FromDateTime(DateTime.UtcNow.Date)
         };
 
-        // Fire-and-forget notification (don't block the response)
-        var ownerUserId = claim.Warranty?.SerialNumberNavigation?.OrderItem?.Order?.UserId;
-        var productName = claim.Warranty?.SerialNumberNavigation?.Product?.Name ?? "your product";
-        if (ownerUserId.HasValue)
+        try
         {
-            _ = _notificationService.SendWarrantyClaimStatusChangedAsync(
-                ownerUserId.Value, claim.ClaimId, productName, newStatus);
+            var productName = claim.Warranty?.SerialNumberNavigation?.Product?.Name ?? "your product";
+            await _notificationService.SendWarrantyClaimStatusChangedAsync(
+                claim.UserId, claim.ClaimId, productName, newStatus);
         }
+        catch { }
 
         return ApiResponse<ResolveWarrantyClaimResponse>.SuccessResponse(response, $"Warranty claim {newStatus.ToLower()} successfully.");
     }

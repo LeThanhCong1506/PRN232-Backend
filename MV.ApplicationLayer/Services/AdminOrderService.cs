@@ -17,6 +17,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly IUserRepository _userRepo;
     private readonly StemDbContext _context;
     private readonly IProductBundleRepository _bundleRepo;
+    private readonly INotificationService _notificationService;
 
     private static readonly Dictionary<string, List<string>> AllowedTransitions = new()
     {
@@ -32,13 +33,15 @@ public class AdminOrderService : IAdminOrderService
         IProductRepository productRepo,
         IUserRepository userRepo,
         StemDbContext context,
-        IProductBundleRepository bundleRepo)
+        IProductBundleRepository bundleRepo,
+        INotificationService notificationService)
     {
         _orderRepo = orderRepo;
         _productRepo = productRepo;
         _userRepo = userRepo;
         _context = context;
         _bundleRepo = bundleRepo;
+        _notificationService = notificationService;
     }
 
     public async Task<ApiResponse<AdminOrderListResult>> GetAdminOrdersAsync(AdminOrderFilter filter)
@@ -219,6 +222,13 @@ public class AdminOrderService : IAdminOrderService
                     await _orderRepo.UpdateOrderAsync(order);
 
                     await transaction.CommitAsync();
+
+                    // Send Real-time Notification
+                    try 
+                    { 
+                        await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus); 
+                    } 
+                    catch { }
                 }
                 catch
                 {

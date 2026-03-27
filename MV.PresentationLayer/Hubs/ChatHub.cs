@@ -117,7 +117,14 @@ public class ChatHub : Hub
             // Cũng gửi lại cho chính admin (confirm)
             await Clients.Caller.SendAsync("ReceiveMessage", messageDto);
             // Gửi Notification bell cho customer
-            _ = _notificationService.SendNewChatMessageAsync(receiverId.Value, senderName, content.Trim());
+            try
+            {
+                await _notificationService.SendNewChatMessageAsync(receiverId.Value, senderName, content.Trim());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send notification for chat message.");
+            }
         }
         else
         {
