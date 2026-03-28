@@ -4,6 +4,7 @@ using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.DTOs.WarrantyClaim.Request;
 using MV.DomainLayer.DTOs.WarrantyClaim.Response;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.ApplicationLayer.Services;
@@ -62,7 +63,7 @@ public class WarrantyClaimService : IWarrantyClaimService
         }
 
         // 3. Kiểm tra warranty còn ACTIVE (isActive = true và chưa hết hạn)
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        var today = DateTimeHelper.VietnamTodayDateOnly();
         if (warranty.IsActive != true || warranty.EndDate < today)
         {
             return ApiResponse<SubmitWarrantyClaimResponse>.ErrorResponse("Warranty is not active or has expired.");
@@ -86,7 +87,7 @@ public class WarrantyClaimService : IWarrantyClaimService
             IssueDescription = request.IssueDescription,
             ContactPhone = request.ContactPhone,
             Status = "SUBMITTED",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeHelper.VietnamNow()
         };
 
         var created = await _claimRepository.CreateAsync(claim);
@@ -95,7 +96,7 @@ public class WarrantyClaimService : IWarrantyClaimService
         {
             ClaimId = created.ClaimId,
             Status = "SUBMITTED",
-            SubmittedAt = created.CreatedAt ?? DateTime.UtcNow
+            SubmittedAt = created.CreatedAt ?? DateTimeHelper.VietnamNow()
         };
 
         return ApiResponse<SubmitWarrantyClaimResponse>.SuccessResponse(response, "Warranty claim submitted successfully");
@@ -179,7 +180,7 @@ public class WarrantyClaimService : IWarrantyClaimService
         claim.Status = newStatus;
         claim.Resolution = newStatus;
         claim.ResolutionNote = request.ResolutionNote;
-        claim.ResolvedDate = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        claim.ResolvedDate = DateTimeHelper.VietnamTodayDateOnly();
 
         await _claimRepository.UpdateAsync(claim);
 
@@ -215,7 +216,7 @@ public class WarrantyClaimService : IWarrantyClaimService
             ClaimId = claim.ClaimId,
             Status = claim.Status!,
             ResolutionNote = claim.ResolutionNote,
-            ResolvedDate = claim.ResolvedDate ?? DateOnly.FromDateTime(DateTime.UtcNow.Date)
+            ResolvedDate = claim.ResolvedDate ?? DateTimeHelper.VietnamTodayDateOnly()
         };
 
         try

@@ -8,6 +8,7 @@ using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Payment.Request;
 using MV.DomainLayer.DTOs.Payment.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Enums;
 using MV.InfrastructureLayer.Interfaces;
 using Swashbuckle.AspNetCore.Annotations;
@@ -199,7 +200,7 @@ public class PaymentController : ControllerBase
 
         // Check expired - lazy expiry: cập nhật DB nếu đã hết hạn
         if (paymentStatus == PaymentStatusEnum.EXPIRED.ToString() ||
-            (payment.ExpiredAt.HasValue && payment.ExpiredAt.Value < DateTime.Now))
+            (payment.ExpiredAt.HasValue && payment.ExpiredAt.Value < DateTimeHelper.VietnamNow()))
         {
             await _paymentService.CheckAndGetPaymentStatusAsync(orderId);
             return Content($@"
@@ -216,7 +217,7 @@ public class PaymentController : ControllerBase
         var accountNumber = sepayConfig["AccountNumber"];
         var accountName = sepayConfig["AccountName"];
 
-        var remainingSeconds = payment.ExpiredAt.HasValue ? Math.Max(0, (int)(payment.ExpiredAt.Value - DateTime.Now).TotalSeconds) : 0;
+        var remainingSeconds = payment.ExpiredAt.HasValue ? Math.Max(0, (int)(payment.ExpiredAt.Value - DateTimeHelper.VietnamNow()).TotalSeconds) : 0;
         var minutes = remainingSeconds / 60;
         var seconds = remainingSeconds % 60;
 

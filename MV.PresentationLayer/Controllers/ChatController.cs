@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using MV.PresentationLayer.Hubs;
@@ -105,7 +106,7 @@ public class ChatController : ControllerBase
             ReceiverId = isAdmin ? dto.ReceiverId : null,
             Content = dto.Content.Trim(),
             IsFromAdmin = isAdmin,
-            SentAt = DateTime.UtcNow,
+            SentAt = DateTimeHelper.VietnamNow(),
             IsRead = false
         };
 

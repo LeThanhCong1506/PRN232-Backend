@@ -3,6 +3,7 @@ using MV.DomainLayer.DTOs.Checkout.Request;
 using MV.DomainLayer.DTOs.Checkout.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -174,7 +175,7 @@ public class CheckoutService : ICheckoutService
 
             if (coupon != null)
             {
-                var now = DateTime.UtcNow;
+                var now = DateTimeHelper.VietnamNow();
                 bool isValid = true;
 
                 // Check expiration

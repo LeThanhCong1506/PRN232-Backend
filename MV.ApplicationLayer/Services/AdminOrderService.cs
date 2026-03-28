@@ -6,6 +6,7 @@ using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
 using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -222,7 +223,7 @@ public class AdminOrderService : IAdminOrderService
 
                     // Update status
                     await _orderRepo.SetOrderStatusAsync(orderId, newStatus);
-                    order.UpdatedAt = DateTime.UtcNow;
+                    order.UpdatedAt = DateTimeHelper.VietnamNow();
                     await _orderRepo.UpdateOrderAsync(order);
 
                     await transaction.CommitAsync();
@@ -271,7 +272,7 @@ public class AdminOrderService : IAdminOrderService
         if (!string.IsNullOrEmpty(request.Note))
         {
             order.Payment.Notes = request.Note;
-            order.Payment.UpdatedAt = DateTime.UtcNow;
+            order.Payment.UpdatedAt = DateTimeHelper.VietnamNow();
             await _orderRepo.UpdatePaymentAsync(order.Payment);
         }
 
@@ -287,7 +288,7 @@ public class AdminOrderService : IAdminOrderService
         var totalRevenue = await _orderRepo.GetDeliveredRevenueAsync(DateTime.MinValue, DateTime.MaxValue);
 
         // Monthly revenue
-        var monthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+        var monthStart = new DateTime(DateTimeHelper.VietnamNow().Year, DateTimeHelper.VietnamNow().Month, 1);
         var monthEnd = monthStart.AddMonths(1).AddTicks(-1);
         var monthlyRevenue = await _orderRepo.GetDeliveredRevenueAsync(monthStart, monthEnd);
 
@@ -364,7 +365,7 @@ public class AdminOrderService : IAdminOrderService
         if (paymentStatus == "FAILED")
             throw new InvalidOperationException("Cannot confirm order with FAILED payment.");
 
-        order.ConfirmedAt = DateTime.UtcNow;
+        order.ConfirmedAt = DateTimeHelper.VietnamNow();
         order.ConfirmedBy = adminUserId;
 
         // Update ProductInstance status to SOLD (if serial tracking)
@@ -377,7 +378,7 @@ public class AdminOrderService : IAdminOrderService
         if (string.IsNullOrEmpty(request.TrackingNumber))
             throw new InvalidOperationException("Tracking number is required for SHIPPED status.");
 
-        order.ShippedAt = DateTime.UtcNow;
+        order.ShippedAt = DateTimeHelper.VietnamNow();
         order.ShippedBy = adminUserId;
         order.TrackingNumber = request.TrackingNumber;
         order.Carrier = request.Carrier;
@@ -385,7 +386,7 @@ public class AdminOrderService : IAdminOrderService
 
     private async Task HandleDeliverOrder(OrderHeader order, int orderId)
     {
-        order.DeliveredAt = DateTime.UtcNow;
+        order.DeliveredAt = DateTimeHelper.VietnamNow();
 
         // Auto-complete COD payment
         var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
@@ -394,7 +395,7 @@ public class AdminOrderService : IAdminOrderService
             await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, "COMPLETED");
             if (order.Payment != null)
             {
-                order.Payment.PaymentDate = DateTime.UtcNow;
+                order.Payment.PaymentDate = DateTimeHelper.VietnamNow();
                 order.Payment.ReceivedAmount = order.Payment.Amount;
             }
         }
@@ -405,7 +406,7 @@ public class AdminOrderService : IAdminOrderService
 
     private async Task HandleCancelOrder(OrderHeader order, int adminUserId, string currentStatus, AdminUpdateOrderStatusRequest request)
     {
-        order.CancelledAt = DateTime.UtcNow;
+        order.CancelledAt = DateTimeHelper.VietnamNow();
         order.CancelledBy = adminUserId;
         order.CancelReason = request.Note ?? "Cancelled by admin";
 

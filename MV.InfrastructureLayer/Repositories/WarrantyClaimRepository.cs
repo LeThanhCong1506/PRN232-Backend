@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -33,7 +34,7 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
         var pIssue = new Npgsql.NpgsqlParameter("p3", claim.IssueDescription);
         var pStatus = new Npgsql.NpgsqlParameter("p4", (object)(claim.Status ?? "SUBMITTED"));
         var pPhone = new Npgsql.NpgsqlParameter("p5", (object?)claim.ContactPhone ?? DBNull.Value);
-        var pCreatedAt = new Npgsql.NpgsqlParameter("p6", (object)(claim.CreatedAt ?? DateTime.Now));
+        var pCreatedAt = new Npgsql.NpgsqlParameter("p6", (object)(claim.CreatedAt ?? DateTimeHelper.VietnamNow()));
 
         await _context.Database.ExecuteSqlRawAsync(
             @"INSERT INTO warranty_claim (warranty_id, user_id, claim_date, issue_description, status, contact_phone, created_at)

@@ -7,6 +7,7 @@ using MV.DomainLayer.DTOs.Payment.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
 using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using System.Text.Json;
@@ -78,7 +79,7 @@ public class PaymentService : IPaymentService
                 Description = request.Description,
                 IsProcessed = false,
                 RawData = JsonSerializer.Serialize(request),
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTimeHelper.VietnamNow()
             };
             await _sepayRepo.CreateTransactionAsync(sepayTransaction);
 
@@ -105,7 +106,7 @@ public class PaymentService : IPaymentService
                 _logger.LogInformation("Payment already processed: OrderId={OrderId}, Status={Status}",
                     payment.OrderId, currentPaymentStatus);
                 sepayTransaction.IsProcessed = true;
-                sepayTransaction.ProcessedAt = DateTime.Now;
+                sepayTransaction.ProcessedAt = DateTimeHelper.VietnamNow();
                 sepayTransaction.OrderId = payment.OrderId;
                 await _sepayRepo.UpdateTransactionAsync(sepayTransaction);
                 return ApiResponse<object>.SuccessResponse(null!, "Payment already processed");
@@ -132,12 +133,12 @@ public class PaymentService : IPaymentService
                 try
                 {
                     // Update Payment record (payment đã tracked từ GetPaymentByReferenceAsync với AsTracking)
-                    payment.PaymentDate = DateTime.Now;
+                    payment.PaymentDate = DateTimeHelper.VietnamNow();
                     payment.ReceivedAmount = request.TransferAmount;
                     payment.TransactionId = sepayId;
                     payment.BankCode = request.Gateway;
                     payment.GatewayResponse = JsonSerializer.Serialize(request);
-                    payment.UpdatedAt = DateTime.Now;
+                    payment.UpdatedAt = DateTimeHelper.VietnamNow();
 
                     // Set payment status to COMPLETED via raw SQL (enlist trong transaction tự động qua EF)
                     await _context.Database.ExecuteSqlRawAsync(
@@ -154,14 +155,14 @@ public class PaymentService : IPaymentService
 
                         if (payment.Order != null)
                         {
-                            payment.Order.ConfirmedAt = DateTime.Now;
-                            payment.Order.UpdatedAt = DateTime.Now;
+                            payment.Order.ConfirmedAt = DateTimeHelper.VietnamNow();
+                            payment.Order.UpdatedAt = DateTimeHelper.VietnamNow();
                         }
                     }
 
                     // Mark SePay transaction as processed
                     sepayTransaction.IsProcessed = true;
-                    sepayTransaction.ProcessedAt = DateTime.Now;
+                    sepayTransaction.ProcessedAt = DateTimeHelper.VietnamNow();
                     sepayTransaction.OrderId = payment.OrderId;
 
                     // Single SaveChangesAsync cho tất cả tracked entity changes
@@ -226,7 +227,7 @@ public class PaymentService : IPaymentService
         if (paymentStatus == PaymentStatusEnum.PENDING.ToString()
             && paymentMethod == PaymentMethodEnum.SEPAY.ToString()
             && payment.ExpiredAt.HasValue
-            && payment.ExpiredAt.Value < DateTime.Now)
+            && payment.ExpiredAt.Value < DateTimeHelper.VietnamNow())
         {
             if (await TryExpireSinglePaymentAsync(orderId))
                 paymentStatus = PaymentStatusEnum.EXPIRED.ToString();
@@ -236,7 +237,7 @@ public class PaymentService : IPaymentService
         var remainingSeconds = 0;
         if (payment.ExpiredAt.HasValue && !isPaid)
         {
-            remainingSeconds = Math.Max(0, (int)(payment.ExpiredAt.Value - DateTime.Now).TotalSeconds);
+            remainingSeconds = Math.Max(0, (int)(payment.ExpiredAt.Value - DateTimeHelper.VietnamNow()).TotalSeconds);
         }
 
         var response = new PaymentStatusResponse
@@ -299,11 +300,11 @@ public class PaymentService : IPaymentService
                 try
                 {
                     // Update payment
-                    payment.PaymentDate = DateTime.Now;
+                    payment.PaymentDate = DateTimeHelper.VietnamNow();
                     payment.ReceivedAmount = payment.Amount;
                     payment.VerifiedBy = adminUserId;
-                    payment.VerifiedAt = DateTime.Now;
-                    payment.UpdatedAt = DateTime.Now;
+                    payment.VerifiedAt = DateTimeHelper.VietnamNow();
+                    payment.UpdatedAt = DateTimeHelper.VietnamNow();
                     payment.Notes = "Xác nhận thủ công bởi Admin";
                     await _orderRepo.UpdatePaymentAsync(payment);
 
@@ -315,9 +316,9 @@ public class PaymentService : IPaymentService
                     if (orderStatus == OrderStatusEnum.PENDING.ToString())
                     {
                         await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CONFIRMED.ToString());
-                        order.ConfirmedAt = DateTime.Now;
+                        order.ConfirmedAt = DateTimeHelper.VietnamNow();
                         order.ConfirmedBy = adminUserId;
-                        order.UpdatedAt = DateTime.Now;
+                        order.UpdatedAt = DateTimeHelper.VietnamNow();
                         await _orderRepo.UpdateOrderAsync(order);
                     }
 
@@ -420,9 +421,9 @@ public class PaymentService : IPaymentService
                     try
                     {
                         // Update payment record
-                        payment.PaymentDate = DateTime.Now;
+                        payment.PaymentDate = DateTimeHelper.VietnamNow();
                         payment.ReceivedAmount = payment.Amount; // SePay đã xác nhận thanh toán thành công
-                        payment.UpdatedAt = DateTime.Now;
+                        payment.UpdatedAt = DateTimeHelper.VietnamNow();
                         payment.Notes = "Automatic confirmation from SePay success callback.";
                         await _orderRepo.UpdatePaymentAsync(payment);
 
@@ -434,8 +435,8 @@ public class PaymentService : IPaymentService
                         if (orderStatus == OrderStatusEnum.PENDING.ToString())
                         {
                             await _orderRepo.SetOrderStatusAsync(order.OrderId, OrderStatusEnum.CONFIRMED.ToString());
-                            order.ConfirmedAt = DateTime.Now;
-                            order.UpdatedAt = DateTime.Now;
+                            order.ConfirmedAt = DateTimeHelper.VietnamNow();
+                            order.UpdatedAt = DateTimeHelper.VietnamNow();
                             await _orderRepo.UpdateOrderAsync(order);
                         }
 
@@ -500,7 +501,7 @@ public class PaymentService : IPaymentService
         // Chỉ check expiry nếu PENDING + đã hết hạn
         if (paymentStatus == PaymentStatusEnum.PENDING.ToString()
             && paymentInfo.ExpiredAt.HasValue
-            && paymentInfo.ExpiredAt.Value < DateTime.Now)
+            && paymentInfo.ExpiredAt.Value < DateTimeHelper.VietnamNow())
         {
             // Verify payment method is SEPAY trước khi expire
             var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
@@ -540,15 +541,15 @@ public class PaymentService : IPaymentService
 
                     if (order.Payment != null)
                     {
-                        order.Payment.UpdatedAt = DateTime.Now;
+                        order.Payment.UpdatedAt = DateTimeHelper.VietnamNow();
                         await _orderRepo.UpdatePaymentAsync(order.Payment);
                     }
 
                     // Cancel the order
                     await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
-                    order.CancelledAt = DateTime.Now;
+                    order.CancelledAt = DateTimeHelper.VietnamNow();
                     order.CancelReason = "Hết hạn thanh toán SEPAY";
-                    order.UpdatedAt = DateTime.Now;
+                    order.UpdatedAt = DateTimeHelper.VietnamNow();
                     await _orderRepo.UpdateOrderAsync(order);
 
                     // Restore stock
@@ -592,7 +593,7 @@ public class PaymentService : IPaymentService
     {
         // Lấy tất cả orderId có payment PENDING + SEPAY + đã quá hạn
         var overdueOrderIds = await _context.Payments
-            .Where(p => p.ExpiredAt.HasValue && p.ExpiredAt.Value < DateTime.UtcNow)
+            .Where(p => p.ExpiredAt.HasValue && p.ExpiredAt.Value < DateTimeHelper.VietnamNow())
             .Select(p => p.OrderId)
             .ToListAsync();
 

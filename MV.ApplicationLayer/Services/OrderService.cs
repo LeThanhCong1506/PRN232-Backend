@@ -6,6 +6,7 @@ using MV.DomainLayer.DTOs.Order.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
 using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
@@ -90,7 +91,7 @@ public class OrderService : IOrderService
                 return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code does not exist.");
             }
 
-            var now = DateTime.UtcNow;
+            var now = DateTimeHelper.VietnamNow();
             if (now < coupon.StartDate.ToUniversalTime() || now > coupon.EndDate.ToUniversalTime())
             {
                 return ApiResponse<CheckoutResponse>.ErrorResponse("The coupon code has expired or has not started.");
@@ -143,7 +144,7 @@ public class OrderService : IOrderService
 
         // 6. Generate order number
         var todayCount = await _orderRepo.GetTodayOrderCountAsync();
-        var orderNumber = $"ORD{DateTime.UtcNow:yyyyMMdd}{(todayCount + 1):D3}";
+        var orderNumber = $"ORD{DateTimeHelper.VietnamNow():yyyyMMdd}{(todayCount + 1):D3}";
 
         // 7. Build shipping address
         var shippingAddress = $"{request.StreetAddress}, {request.Ward}, {request.District}, {request.Province}";
@@ -174,8 +175,8 @@ public class OrderService : IOrderService
                     Ward = request.Ward,
                     StreetAddress = request.StreetAddress,
                     Notes = request.Notes,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    CreatedAt = DateTimeHelper.VietnamNow(),
+                    UpdatedAt = DateTimeHelper.VietnamNow()
                 };
                 await _orderRepo.CreateOrderAsync(order);
 
@@ -193,7 +194,7 @@ public class OrderService : IOrderService
                     ProductName = ci.Product.Name,
                     ProductSku = ci.Product.Sku,
                     ProductImageUrl = ci.Product.ProductImages?.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTimeHelper.VietnamNow()
                 }).ToList();
                 await _orderRepo.CreateOrderItemsAsync(orderItems);
 
@@ -233,7 +234,7 @@ public class OrderService : IOrderService
                 {
                     OrderId = order.OrderId,
                     Amount = totalAmount,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTimeHelper.VietnamNow()
                 };
 
                 string? checkoutUrl = null;
@@ -241,7 +242,7 @@ public class OrderService : IOrderService
                 {
                     // Nội dung chuyển khoản
                     payment.PaymentReference = "SEVQR" + orderNumber.Substring(3);
-                    payment.ExpiredAt = DateTime.UtcNow.AddMinutes(10);
+                    payment.ExpiredAt = DateTimeHelper.VietnamNow().AddMinutes(10);
 
                     var sepayConfig = _configuration.GetSection("SePay");
 
@@ -383,7 +384,7 @@ public class OrderService : IOrderService
         switch (newStatus)
         {
             case OrderStatusEnum.CONFIRMED:
-                order.ConfirmedAt = DateTime.UtcNow;
+                order.ConfirmedAt = DateTimeHelper.VietnamNow();
                 order.ConfirmedBy = adminUserId;
                 break;
 
@@ -392,7 +393,7 @@ public class OrderService : IOrderService
                 {
                     return ApiResponse<OrderDetailResponse>.ErrorResponse("Tracking number is required when switching to SHIPPED.");
                 }
-                order.ShippedAt = DateTime.UtcNow;
+                order.ShippedAt = DateTimeHelper.VietnamNow();
                 order.ShippedBy = adminUserId;
                 order.TrackingNumber = request.TrackingNumber;
                 order.Carrier = request.Carrier;
@@ -400,7 +401,7 @@ public class OrderService : IOrderService
                 break;
 
             case OrderStatusEnum.DELIVERED:
-                order.DeliveredAt = DateTime.UtcNow;
+                order.DeliveredAt = DateTimeHelper.VietnamNow();
                 // If COD, mark payment as completed
                 var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
                 if (paymentMethod == PaymentMethodEnum.COD.ToString())
@@ -408,7 +409,7 @@ public class OrderService : IOrderService
                     await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.COMPLETED.ToString());
                     if (order.Payment != null)
                     {
-                        order.Payment.PaymentDate = DateTime.UtcNow;
+                        order.Payment.PaymentDate = DateTimeHelper.VietnamNow();
                         order.Payment.ReceivedAmount = order.TotalAmount;
                     }
                 }
@@ -417,7 +418,7 @@ public class OrderService : IOrderService
                 break;
         }
 
-        order.UpdatedAt = DateTime.UtcNow;
+        order.UpdatedAt = DateTimeHelper.VietnamNow();
         await _orderRepo.UpdateOrderAsync(order);
         await _orderRepo.SetOrderStatusAsync(orderId, newStatus.ToString());
 
@@ -459,10 +460,10 @@ public class OrderService : IOrderService
             try
             {
                 // Set cancelled
-                order.CancelledAt = DateTime.UtcNow;
+                order.CancelledAt = DateTimeHelper.VietnamNow();
                 order.CancelledBy = userId;
                 order.CancelReason = request.CancelReason;
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTimeHelper.VietnamNow();
                 await _orderRepo.UpdateOrderAsync(order);
                 await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
 

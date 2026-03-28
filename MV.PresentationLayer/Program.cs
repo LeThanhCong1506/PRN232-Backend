@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MV.ApplicationLayer.Interfaces;
 using MV.ApplicationLayer.Services;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
@@ -353,7 +354,7 @@ namespace MV.PresentationLayer
                     var result = System.Text.Json.JsonSerializer.Serialize(new
                     {
                         status = report.Status.ToString(),
-                        timestamp = DateTime.UtcNow,
+                        timestamp = DateTimeHelper.VietnamNow(),
                         checks = report.Entries.Select(e => new
                         {
                             name = e.Key,

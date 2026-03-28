@@ -3,6 +3,7 @@ using MV.DomainLayer.DTOs.Admin.Product.Request;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -208,7 +209,7 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<Product> CreateAsync(Product product)
         {
-            product.CreatedAt = DateTime.UtcNow;
+            product.CreatedAt = DateTimeHelper.VietnamNow();
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
             return product;

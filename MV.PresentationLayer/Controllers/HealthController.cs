@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Diagnostics;
@@ -34,7 +35,7 @@ public class HealthController : ControllerBase
         return Ok(new
         {
             status = "healthy",
-            timestamp = DateTime.UtcNow,
+            timestamp = DateTimeHelper.VietnamNow(),
             service = "PRN232 Backend API"
         });
     }
@@ -67,7 +68,7 @@ public class HealthController : ControllerBase
         var response = new
         {
             status = overallHealthy ? "Healthy" : "Unhealthy",
-            timestamp = DateTime.UtcNow,
+            timestamp = DateTimeHelper.VietnamNow(),
             totalDuration = $"{stopwatch.ElapsedMilliseconds}ms",
             service = "PRN232 Backend API",
             checks = checks
@@ -97,7 +98,7 @@ public class HealthController : ControllerBase
         return Ok(new
         {
             status = "pong",
-            timestamp = DateTime.UtcNow
+            timestamp = DateTimeHelper.VietnamNow()
         });
     }
 
@@ -120,7 +121,7 @@ public class HealthController : ControllerBase
             buildDate = buildDate,
             environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
             framework = ".NET 8",
-            timestamp = DateTime.UtcNow
+            timestamp = DateTimeHelper.VietnamNow()
         });
     }
 
@@ -216,7 +217,7 @@ public class HealthController : ControllerBase
         }
         catch
         {
-            return DateTime.UtcNow;
+            return DateTimeHelper.VietnamNow();
         }
     }
 }

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.SignalR;
+using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.Interfaces;
 using MV.PresentationLayer.Hubs;
-
-using MV.DomainLayer.Entities;
 
 namespace MV.PresentationLayer.Services;
 
@@ -33,7 +33,7 @@ public class SignalRNotificationService : INotificationService
         {
             Id = dbNotif?.NotificationId ?? 0,
             TotalItems = totalItems,
-            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Timestamp = dbNotif?.CreatedAt ?? DateTimeHelper.VietnamNow(),
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "CartUpdated",
@@ -55,7 +55,7 @@ public class SignalRNotificationService : INotificationService
             OrderId = orderId,
             OrderNumber = orderNumber,
             Status = newStatus,
-            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Timestamp = dbNotif?.CreatedAt ?? DateTimeHelper.VietnamNow(),
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "OrderStatusChanged",
@@ -78,7 +78,7 @@ public class SignalRNotificationService : INotificationService
             OrderNumber = orderNumber,
             Amount = amount,
             Status = "COMPLETED",
-            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Timestamp = dbNotif?.CreatedAt ?? DateTimeHelper.VietnamNow(),
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "PaymentConfirmed",
@@ -100,7 +100,7 @@ public class SignalRNotificationService : INotificationService
             OrderId = orderId,
             OrderNumber = orderNumber,
             Status = "EXPIRED",
-            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Timestamp = dbNotif?.CreatedAt ?? DateTimeHelper.VietnamNow(),
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "PaymentExpired",
@@ -138,7 +138,7 @@ public class SignalRNotificationService : INotificationService
             ClaimId = claimId,
             ProductName = productName,
             Status = newStatus,
-            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Timestamp = dbNotif?.CreatedAt ?? DateTimeHelper.VietnamNow(),
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "WarrantyClaimStatus",
@@ -161,7 +161,7 @@ public class SignalRNotificationService : INotificationService
             Id = dbNotif?.NotificationId ?? 0,
             SenderName = senderName,
             MessagePreview = messagePreview,
-            Timestamp = dbNotif?.CreatedAt ?? DateTime.UtcNow,
+            Timestamp = dbNotif?.CreatedAt ?? DateTimeHelper.VietnamNow(),
             Title = dbNotif?.Title,
             Message = dbNotif?.Message,
             Type = "NewChatMessage",
@@ -188,7 +188,7 @@ public class SignalRNotificationService : INotificationService
                 Message = message,
                 LinkUrl = linkUrl,
                 IsRead = false,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTimeHelper.VietnamNow()
             };
             var saved = await repo.CreateAsync(newNotif);
             _logger.LogInformation("[NotifSave] SUCCESS: NotificationId={NotifId} for UserId={UserId}", saved.NotificationId, userId);

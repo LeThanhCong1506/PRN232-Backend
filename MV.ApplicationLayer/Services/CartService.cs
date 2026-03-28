@@ -2,6 +2,7 @@
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -328,7 +329,7 @@ namespace MV.ApplicationLayer.Services
             }
 
             // 3. Check thời gian hiệu lực (start_date <= NOW <= end_date)
-            var now = DateTime.UtcNow;
+            var now = DateTimeHelper.VietnamNow();
             if (now < coupon.StartDate || now > coupon.EndDate)
             {
                 return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");

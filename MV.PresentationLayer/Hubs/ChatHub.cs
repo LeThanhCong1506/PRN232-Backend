@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using System.Security.Claims;
@@ -91,7 +92,7 @@ public class ChatHub : Hub
             ReceiverId = isAdmin ? receiverId : null,
             Content = content.Trim(),
             IsFromAdmin = isAdmin,
-            SentAt = DateTime.UtcNow,
+            SentAt = DateTimeHelper.VietnamNow(),
             IsRead = false
         };
 

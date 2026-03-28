@@ -1,3 +1,5 @@
+using MV.DomainLayer.Helpers;
+
 namespace MV.DomainLayer.DTOs.Chatbot;
 
 public class ChatbotRequest
@@ -14,5 +16,5 @@ public class ChatbotResponse
     /// </summary>
     public string Source { get; set; } = null!;
     
-    public DateTime Timestamp { get; set; } = DateTime.Now;
+    public DateTime Timestamp { get; set; } = DateTimeHelper.VietnamNow();
 }
