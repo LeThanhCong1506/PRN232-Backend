@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.DTOs.WarrantyClaim.Request;
@@ -12,15 +13,18 @@ public class WarrantyClaimService : IWarrantyClaimService
     private readonly IWarrantyClaimRepository _claimRepository;
     private readonly IWarrantyRepository _warrantyRepository;
     private readonly INotificationService _notificationService;
+    private readonly ILogger<WarrantyClaimService> _logger;
 
     public WarrantyClaimService(
         IWarrantyClaimRepository claimRepository,
         IWarrantyRepository warrantyRepository,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        ILogger<WarrantyClaimService> logger)
     {
         _claimRepository = claimRepository;
         _warrantyRepository = warrantyRepository;
         _notificationService = notificationService;
+        _logger = logger;
     }
 
     // State machine: định nghĩa các transition hợp lệ
@@ -220,7 +224,10 @@ public class WarrantyClaimService : IWarrantyClaimService
             await _notificationService.SendWarrantyClaimStatusChangedAsync(
                 claim.UserId, claim.ClaimId, productName, newStatus);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send warranty claim notification for claim {ClaimId}", claim.ClaimId);
+        }
 
         return ApiResponse<ResolveWarrantyClaimResponse>.SuccessResponse(response, $"Warranty claim {newStatus.ToLower()} successfully.");
     }

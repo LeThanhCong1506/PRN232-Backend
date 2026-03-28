@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Admin.Order.Response;
@@ -18,6 +19,7 @@ public class AdminOrderService : IAdminOrderService
     private readonly StemDbContext _context;
     private readonly IProductBundleRepository _bundleRepo;
     private readonly INotificationService _notificationService;
+    private readonly ILogger<AdminOrderService> _logger;
 
     private static readonly Dictionary<string, List<string>> AllowedTransitions = new()
     {
@@ -34,7 +36,8 @@ public class AdminOrderService : IAdminOrderService
         IUserRepository userRepo,
         StemDbContext context,
         IProductBundleRepository bundleRepo,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        ILogger<AdminOrderService> logger)
     {
         _orderRepo = orderRepo;
         _productRepo = productRepo;
@@ -42,6 +45,7 @@ public class AdminOrderService : IAdminOrderService
         _context = context;
         _bundleRepo = bundleRepo;
         _notificationService = notificationService;
+        _logger = logger;
     }
 
     public async Task<ApiResponse<AdminOrderListResult>> GetAdminOrdersAsync(AdminOrderFilter filter)
@@ -222,13 +226,6 @@ public class AdminOrderService : IAdminOrderService
                     await _orderRepo.UpdateOrderAsync(order);
 
                     await transaction.CommitAsync();
-
-                    // Send Real-time Notification
-                    try 
-                    { 
-                        await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus); 
-                    } 
-                    catch { }
                 }
                 catch
                 {
@@ -240,6 +237,16 @@ public class AdminOrderService : IAdminOrderService
         catch (Exception ex)
         {
             return ApiResponse<AdminOrderDetailResponse>.ErrorResponse($"Failed to update order status: {ex.Message}");
+        }
+
+        // Send Real-time Notification — outside execution strategy to avoid duplicate sends on retry
+        try
+        {
+            await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send order status notification for order {OrderId}", orderId);
         }
 
         return await GetAdminOrderDetailAsync(orderId);

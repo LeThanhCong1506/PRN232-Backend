@@ -1237,6 +1237,7 @@ public partial class StemDbContext : DbContext
             entity.ToTable("notification");
 
             entity.Property(e => e.NotificationId)
+                .ValueGeneratedOnAdd()
                 .HasColumnName("notification_id");
 
             entity.Property(e => e.UserId).HasColumnName("user_id");

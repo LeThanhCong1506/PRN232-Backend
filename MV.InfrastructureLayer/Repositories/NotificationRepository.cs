@@ -16,9 +16,13 @@ public class NotificationRepository : INotificationRepository
 
     public async Task<Notification> CreateAsync(Notification notification)
     {
-        _context.Notifications.Add(notification);
-        await _context.SaveChangesAsync();
-        return notification;
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            _context.Notifications.Add(notification);
+            await _context.SaveChangesAsync();
+            return notification;
+        });
     }
 
     public async Task<List<Notification>> GetUserNotificationsAsync(int userId, int page = 1, int pageSize = 20)

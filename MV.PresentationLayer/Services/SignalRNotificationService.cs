@@ -175,6 +175,7 @@ public class SignalRNotificationService : INotificationService
 
     private async Task<Notification?> SaveNotificationAsync(int userId, string type, string title, string message, string? linkUrl = null)
     {
+        _logger.LogInformation("[NotifSave] Attempting: UserId={UserId}, Type={Type}, Title={Title}", userId, type, title);
         try
         {
             using var scope = _scopeFactory.CreateScope();
@@ -189,11 +190,14 @@ public class SignalRNotificationService : INotificationService
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
-            return await repo.CreateAsync(newNotif);
+            var saved = await repo.CreateAsync(newNotif);
+            _logger.LogInformation("[NotifSave] SUCCESS: NotificationId={NotifId} for UserId={UserId}", saved.NotificationId, userId);
+            return saved;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to save notification to DB for user {UserId}", userId);
+            _logger.LogError(ex, "[NotifSave] FAILED for UserId={UserId}, Type={Type}. Error: {Msg}. Inner: {Inner}",
+                userId, type, ex.Message, ex.InnerException?.Message ?? "none");
             return null; // Don't crash SignalR if DB fails
         }
     }

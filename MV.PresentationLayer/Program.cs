@@ -281,6 +281,24 @@ namespace MV.PresentationLayer
                             );
                         ");
                         Console.WriteLine("[DB INIT] Checked/Created notification table successfully.");
+
+                        // Thêm FK constraint nếu chưa có (align DB với EF model)
+                        db.Database.ExecuteSqlRaw(@"
+                            DO $$
+                            BEGIN
+                                IF NOT EXISTS (
+                                    SELECT 1 FROM information_schema.table_constraints
+                                    WHERE constraint_name = 'fk_notification_user'
+                                    AND table_name = 'notification'
+                                ) THEN
+                                    ALTER TABLE notification
+                                    ADD CONSTRAINT fk_notification_user
+                                    FOREIGN KEY (user_id) REFERENCES ""user""(user_id)
+                                    ON DELETE RESTRICT;
+                                END IF;
+                            END $$;
+                        ");
+                        Console.WriteLine("[DB INIT] FK constraint fk_notification_user ensured.");
                     }
                     catch (Exception ex)
                     {
