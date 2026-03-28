@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
+using MV.InfrastructureLayer.Interfaces;
 using MV.PresentationLayer.Hubs;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
@@ -22,11 +23,16 @@ public class ChatController : ControllerBase
 {
     private readonly StemDbContext _context;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<ChatController> _logger;
 
-    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext)
+    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext,
+        INotificationService notificationService, ILogger<ChatController> logger)
     {
         _context = context;
         _hubContext = hubContext;
+        _notificationService = notificationService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -85,6 +91,16 @@ public class ChatController : ControllerBase
         {
             await _hubContext.Clients.Group($"chat_user_{dto.ReceiverId.Value}")
                 .SendAsync("ReceiveMessage", messageDto);
+
+            // Gửi notification bell cho customer — giống ChatHub.SendMessage
+            try
+            {
+                await _notificationService.SendNewChatMessageAsync(dto.ReceiverId.Value, senderName, dto.Content.Trim());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send chat notification for receiver {ReceiverId}", dto.ReceiverId.Value);
+            }
         }
         else
         {

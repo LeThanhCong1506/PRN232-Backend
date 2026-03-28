@@ -283,6 +283,7 @@ namespace MV.PresentationLayer
                         Console.WriteLine("[DB INIT] Checked/Created notification table successfully.");
 
                         // Thêm FK constraint nếu chưa có (align DB với EF model)
+                        // Lưu ý: tên bảng user trong DB là "USER" (uppercase)
                         db.Database.ExecuteSqlRaw(@"
                             DO $$
                             BEGIN
@@ -293,7 +294,7 @@ namespace MV.PresentationLayer
                                 ) THEN
                                     ALTER TABLE notification
                                     ADD CONSTRAINT fk_notification_user
-                                    FOREIGN KEY (user_id) REFERENCES ""user""(user_id)
+                                    FOREIGN KEY (user_id) REFERENCES ""USER""(user_id)
                                     ON DELETE RESTRICT;
                                 END IF;
                             END $$;

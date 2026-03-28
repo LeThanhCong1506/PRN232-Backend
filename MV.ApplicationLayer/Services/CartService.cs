@@ -307,9 +307,6 @@ namespace MV.ApplicationLayer.Services
             // 3. Xóa tất cả cart items (giữ lại cart record)
             await _cartRepository.ClearCartAsync(cart.CartId);
 
-            // Notify realtime: cart cleared
-            await _notificationService.SendCartUpdatedAsync(userId, 0);
-
             // 4. Trả về thành công
             return new ApiResponse<object>
             {
@@ -408,18 +405,10 @@ namespace MV.ApplicationLayer.Services
         /// <summary>
         /// Helper: tính tổng items trong cart rồi gửi notification realtime
         /// </summary>
-        private async Task NotifyCartUpdatedAsync(int userId)
+        private Task NotifyCartUpdatedAsync(int userId)
         {
-            try
-            {
-                var cart = await _cartRepository.GetCartByUserIdAsync(userId);
-                var totalItems = cart?.CartItems?.Sum(ci => ci.Quantity ?? 0) ?? 0;
-                await _notificationService.SendCartUpdatedAsync(userId, totalItems);
-            }
-            catch
-            {
-                // Notification failure should not break the cart operation
-            }
+            // Cart update notifications disabled — không cần thiết cho UX
+            return Task.CompletedTask;
         }
     }
 }
