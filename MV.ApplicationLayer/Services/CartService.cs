@@ -397,11 +397,12 @@ namespace MV.ApplicationLayer.Services
             {
                 CouponId = coupon.CouponId,
                 Code = coupon.Code,
+                DiscountType = discountType,
                 DiscountValue = coupon.DiscountValue,
                 CalculatedDiscount = calculatedDiscount,
                 CartSubtotal = cartSubtotal,
                 NewTotal = newTotal,
-                Message = $"Coupon applied: {coupon.DiscountValue:N0} VND off."
+                Message = $"Coupon applied: {calculatedDiscount:N0} VND off."
             };
 
             return ApiResponse<ValidateCouponResponseDto>.SuccessResponse(responseData, "Coupon applied successfully.");
