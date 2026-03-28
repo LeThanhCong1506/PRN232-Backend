@@ -130,6 +130,9 @@ public class OrderService : IOrderService
             if (discountType == DiscountTypeEnum.PERCENTAGE.ToString())
             {
                 discountAmount = subtotal * coupon.DiscountValue / 100;
+                // Cap theo MaxDiscountAmount nếu coupon có giới hạn tối đa
+                if (coupon.MaxDiscountAmount.HasValue && discountAmount > coupon.MaxDiscountAmount.Value)
+                    discountAmount = coupon.MaxDiscountAmount.Value;
             }
             else
             {
@@ -252,6 +255,11 @@ public class OrderService : IOrderService
                     var bankBin = sepayConfig["BankName"] ?? "970422";
                     payment.QrCodeUrl = $"https://img.vietqr.io/image/{bankBin}-{accountNumber}-compact.jpg" +
                                         $"?amount={totalAmount:F0}&addInfo={payment.PaymentReference}";
+                }
+                else if (paymentMethod == PaymentMethodEnum.COD)
+                {
+                    // Đơn COD nếu không được admin xác nhận trong 48h sẽ tự động hủy
+                    payment.ExpiredAt = DateTimeHelper.VietnamNow().AddHours(48);
                 }
 
                 // CreatePaymentAsync giờ INSERT kèm luôn payment_method và status (PostgreSQL enum)
@@ -448,9 +456,10 @@ public class OrderService : IOrderService
         }
 
         var currentStatus = await _orderRepo.GetOrderStatusAsync(orderId);
-        if (currentStatus != OrderStatusEnum.PENDING.ToString())
+        var cancellableStatuses = new[] { OrderStatusEnum.PENDING.ToString(), OrderStatusEnum.CONFIRMED.ToString() };
+        if (!cancellableStatuses.Contains(currentStatus))
         {
-            return ApiResponse<object>.ErrorResponse("Orders can only be canceled if they are in the PENDING status.");
+            return ApiResponse<object>.ErrorResponse("Orders can only be cancelled when in PENDING or CONFIRMED status.");
         }
 
         var strategy = _context.Database.CreateExecutionStrategy();
@@ -492,6 +501,13 @@ public class OrderService : IOrderService
                 if (order.CouponId.HasValue)
                 {
                     await _orderRepo.DecrementCouponUsedCountAsync(order.CouponId.Value);
+                }
+
+                // Nếu đơn đang CONFIRMED thì restore ProductInstance về IN_STOCK
+                if (currentStatus == OrderStatusEnum.CONFIRMED.ToString())
+                {
+                    var orderItemIds = order.OrderItems.Select(oi => oi.OrderItemId).ToList();
+                    await _orderRepo.SetProductInstanceStatusByOrderItemIdsAsync(orderItemIds, "IN_STOCK");
                 }
 
                 await transaction.CommitAsync();

@@ -380,6 +380,10 @@ namespace MV.ApplicationLayer.Services
                 ? cartSubtotal * coupon.DiscountValue / 100
                 : coupon.DiscountValue;
 
+            // Cap theo MaxDiscountAmount nếu coupon có giới hạn tối đa
+            if (discountType == "PERCENTAGE" && coupon.MaxDiscountAmount.HasValue && calculatedDiscount > coupon.MaxDiscountAmount.Value)
+                calculatedDiscount = coupon.MaxDiscountAmount.Value;
+
             // Đảm bảo discount không vượt quá subtotal
             if (calculatedDiscount > cartSubtotal)
             {

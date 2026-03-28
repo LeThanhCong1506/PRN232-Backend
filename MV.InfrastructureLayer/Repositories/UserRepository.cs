@@ -83,5 +83,10 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(x => x.Role)
                 .FirstOrDefaultAsync(x => x.ExternalProvider == provider && x.ExternalId == externalId && x.IsActive == true);
         }
+
+        public Task<Role?> GetRoleByNameAsync(string roleName)
+        {
+            return _context.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
+        }
     }
 }

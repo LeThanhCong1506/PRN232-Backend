@@ -178,6 +178,7 @@ CREATE TABLE COUPON (
     discount_type discount_type_enum NOT NULL DEFAULT 'FIXED_AMOUNT',
     discount_value NUMERIC(10, 2) NOT NULL,
     min_order_value NUMERIC(12, 2) DEFAULT 0,
+    max_discount_amount NUMERIC(12, 2) DEFAULT NULL,
     start_date TIMESTAMP NOT NULL,
     end_date TIMESTAMP NOT NULL,
     usage_limit INTEGER,

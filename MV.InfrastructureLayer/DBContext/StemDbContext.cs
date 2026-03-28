@@ -183,6 +183,9 @@ public partial class StemDbContext : DbContext
                 .HasPrecision(12, 2)
                 .HasDefaultValueSql("0")
                 .HasColumnName("min_order_value");
+            entity.Property(e => e.MaxDiscountAmount)
+                .HasPrecision(12, 2)
+                .HasColumnName("max_discount_amount");
             entity.Property(e => e.StartDate)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("start_date");

@@ -18,5 +18,6 @@ namespace MV.InfrastructureLayer.Interfaces
         Task<User?> GetByIdAsync(int id);
         Task<bool> UpdateAsync(User user);
         Task<User?> GetByExternalLoginAsync(string provider, string externalId);
+        Task<Role?> GetRoleByNameAsync(string roleName);
     }
 }

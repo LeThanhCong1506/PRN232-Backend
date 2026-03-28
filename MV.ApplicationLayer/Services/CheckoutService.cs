@@ -207,6 +207,10 @@ public class CheckoutService : ICheckoutService
                         ? subtotal * coupon.DiscountValue / 100
                         : coupon.DiscountValue;
 
+                    // Cap theo MaxDiscountAmount nếu coupon có giới hạn tối đa
+                    if (discountType == "PERCENTAGE" && coupon.MaxDiscountAmount.HasValue && discount > coupon.MaxDiscountAmount.Value)
+                        discount = coupon.MaxDiscountAmount.Value;
+
                     // Ensure discount doesn't exceed subtotal
                     if (discount > subtotal)
                     {

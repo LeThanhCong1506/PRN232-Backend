@@ -4,8 +4,6 @@ using MV.DomainLayer.DTOs.Login.Response;
 using MV.DomainLayer.Entities;
 using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.Interfaces;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace MV.ApplicationLayer.Services
 {
@@ -37,7 +35,7 @@ namespace MV.ApplicationLayer.Services
                 Username = dto.Username,
                 FullName = dto.FullName,
                 Email = dto.Email,
-                PasswordHash = HashPassword(dto.Password),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Phone = dto.Phone,
                 Address = dto.Address,
                 IsActive = true,
@@ -54,9 +52,8 @@ namespace MV.ApplicationLayer.Services
             if (user == null) return null;
 
             if (user.PasswordHash == null) return null;
-            
-            var hash = HashPassword(dto.Password);
-            if (user.PasswordHash != hash) return null;
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash)) return null;
 
             return new LoginResponseDto
             {
@@ -66,13 +63,6 @@ namespace MV.ApplicationLayer.Services
                 Role = user.Role.RoleName,
                 AccessToken = _jwt.GenerateToken(user)
             };
-        }
-
-        private string HashPassword(string password)
-        {
-            using var sha = SHA256.Create();
-            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(bytes);
         }
 
         public async Task<List<UserDto>> GetAllAsync()
