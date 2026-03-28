@@ -15,17 +15,20 @@ public class CheckoutService : ICheckoutService
     private readonly IUserRepository _userRepository;
     private readonly ICouponRepository _couponRepository;
     private readonly IProductBundleRepository _bundleRepository;
+    private readonly IShippingFeeService _shippingFeeService;
 
     public CheckoutService(
         ICartRepository cartRepository,
         IUserRepository userRepository,
         ICouponRepository couponRepository,
-        IProductBundleRepository bundleRepository)
+        IProductBundleRepository bundleRepository,
+        IShippingFeeService shippingFeeService)
     {
         _cartRepository = cartRepository;
         _userRepository = userRepository;
         _couponRepository = couponRepository;
         _bundleRepository = bundleRepository;
+        _shippingFeeService = shippingFeeService;
     }
 
     public async Task<ApiResponse<ValidateCheckoutResponse>> ValidateCheckoutAsync(int userId, ValidateCheckoutRequest request)
@@ -141,7 +144,7 @@ public class CheckoutService : ICheckoutService
 
         // 5. Calculate subtotal
         decimal subtotal = cartItemDtos.Sum(item => item.ItemTotal);
-        decimal shippingFee = 5000; // Fixed fee, synced with OrderService
+        decimal shippingFee = _shippingFeeService.CalculateShippingFee(subtotal, request.Province);
         decimal discount = 0;
         string? couponError = null;
         var couponDto = new CheckoutCouponDto
@@ -234,7 +237,9 @@ public class CheckoutService : ICheckoutService
                 Subtotal = subtotal,
                 ShippingFee = shippingFee,
                 Discount = discount,
-                Total = subtotal + shippingFee - discount
+                Total = subtotal + shippingFee - discount,
+                IsFreeShipping = shippingFee == 0,
+                FreeShippingThreshold = _shippingFeeService.GetFreeShippingThreshold()
             }
         };
 

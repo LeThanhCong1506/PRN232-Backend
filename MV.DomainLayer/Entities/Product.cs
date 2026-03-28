@@ -31,6 +31,8 @@ public partial class Product
 
     public bool? IsDeleted { get; set; }
 
+    public string? CompatibilityInfo { get; set; }
+
     public virtual Brand Brand { get; set; } = null!;
 
     public virtual ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
@@ -52,4 +54,12 @@ public partial class Product
     public virtual WarrantyPolicy? WarrantyPolicy { get; set; }
 
     public virtual ICollection<Category> Categories { get; set; } = new List<Category>();
+
+    public virtual ICollection<ProductSpecification> ProductSpecifications { get; set; } = new List<ProductSpecification>();
+
+    public virtual ICollection<ProductDocument> ProductDocuments { get; set; } = new List<ProductDocument>();
+
+    public virtual ICollection<RelatedProduct> RelatedProducts { get; set; } = new List<RelatedProduct>();
+
+    public virtual ICollection<RelatedProduct> RelatedToByProducts { get; set; } = new List<RelatedProduct>();
 }

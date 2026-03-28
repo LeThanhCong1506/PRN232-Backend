@@ -68,6 +68,14 @@ public partial class StemDbContext : DbContext
 
     public virtual DbSet<Notification> Notifications { get; set; }
 
+    public virtual DbSet<ProductSpecification> ProductSpecifications { get; set; }
+
+    public virtual DbSet<ProductDocument> ProductDocuments { get; set; }
+
+    public virtual DbSet<RelatedProduct> RelatedProducts { get; set; }
+
+    public virtual DbSet<ReturnRequest> ReturnRequests { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
@@ -517,6 +525,9 @@ public partial class StemDbContext : DbContext
                 .HasDefaultValue(0)
                 .HasColumnName("stock_quantity");
             entity.Property(e => e.WarrantyPolicyId).HasColumnName("warranty_policy_id");
+            entity.Property(e => e.CompatibilityInfo)
+                .HasMaxLength(2000)
+                .HasColumnName("compatibility_info");
 
             entity.HasOne(d => d.Brand).WithMany(p => p.Products)
                 .HasForeignKey(d => d.BrandId)
@@ -1305,6 +1316,130 @@ public partial class StemDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.ReceiverId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductSpecification>(entity =>
+        {
+            entity.HasKey(e => e.SpecificationId).HasName("product_specification_pkey");
+
+            entity.ToTable("product_specification");
+
+            entity.Property(e => e.SpecificationId).HasColumnName("specification_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.SpecName)
+                .HasMaxLength(100)
+                .HasColumnName("spec_name");
+            entity.Property(e => e.SpecValue)
+                .HasMaxLength(500)
+                .HasColumnName("spec_value");
+            entity.Property(e => e.DisplayOrder)
+                .HasDefaultValue(0)
+                .HasColumnName("display_order");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.ProductSpecifications)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_spec_product");
+        });
+
+        modelBuilder.Entity<ProductDocument>(entity =>
+        {
+            entity.HasKey(e => e.DocumentId).HasName("product_document_pkey");
+
+            entity.ToTable("product_document");
+
+            entity.Property(e => e.DocumentId).HasColumnName("document_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.DocumentType)
+                .HasMaxLength(50)
+                .HasColumnName("document_type");
+            entity.Property(e => e.Title)
+                .HasMaxLength(200)
+                .HasColumnName("title");
+            entity.Property(e => e.Url)
+                .HasMaxLength(500)
+                .HasColumnName("url");
+            entity.Property(e => e.DisplayOrder)
+                .HasDefaultValue(0)
+                .HasColumnName("display_order");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.ProductDocuments)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_doc_product");
+        });
+
+        modelBuilder.Entity<RelatedProduct>(entity =>
+        {
+            entity.HasKey(e => e.RelatedProductId).HasName("related_product_pkey");
+
+            entity.ToTable("related_product");
+
+            entity.Property(e => e.RelatedProductId).HasColumnName("related_product_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.RelatedToProductId).HasColumnName("related_to_product_id");
+            entity.Property(e => e.RelationType)
+                .HasMaxLength(30)
+                .HasColumnName("relation_type");
+            entity.Property(e => e.DisplayOrder)
+                .HasDefaultValue(0)
+                .HasColumnName("display_order");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.RelatedProducts)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_related_product");
+
+            entity.HasOne(d => d.RelatedToProduct).WithMany(p => p.RelatedToByProducts)
+                .HasForeignKey(d => d.RelatedToProductId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_related_to_product");
+        });
+
+        modelBuilder.Entity<ReturnRequest>(entity =>
+        {
+            entity.HasKey(e => e.ReturnRequestId).HasName("return_request_pkey");
+
+            entity.ToTable("return_request");
+
+            entity.Property(e => e.ReturnRequestId).HasColumnName("return_request_id");
+            entity.Property(e => e.OrderId).HasColumnName("order_id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Type)
+                .HasMaxLength(20)
+                .HasColumnName("type");
+            entity.Property(e => e.Reason).HasColumnName("reason");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'SUBMITTED'")
+                .HasColumnName("status");
+            entity.Property(e => e.AdminNote).HasColumnName("admin_note");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.ProcessedBy).HasColumnName("processed_by");
+            entity.Property(e => e.ProcessedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("processed_at");
+
+            entity.HasOne(d => d.Order).WithMany()
+                .HasForeignKey(d => d.OrderId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_return_order");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_return_user");
+
+            entity.HasOne(d => d.ProcessedByNavigation).WithMany()
+                .HasForeignKey(d => d.ProcessedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_return_processed_by");
         });
 
         OnModelCreatingPartial(modelBuilder);

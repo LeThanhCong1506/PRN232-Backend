@@ -21,6 +21,7 @@ public class OrderService : IOrderService
     private readonly IConfiguration _configuration;
     private readonly INotificationService _notificationService;
     private readonly IProductBundleRepository _bundleRepo;
+    private readonly IShippingFeeService _shippingFeeService;
 
     public OrderService(
         IOrderRepository orderRepo,
@@ -28,7 +29,8 @@ public class OrderService : IOrderService
         StemDbContext context,
         IConfiguration configuration,
         INotificationService notificationService,
-        IProductBundleRepository bundleRepo)
+        IProductBundleRepository bundleRepo,
+        IShippingFeeService shippingFeeService)
     {
         _orderRepo = orderRepo;
         _cartRepo = cartRepo;
@@ -36,6 +38,7 @@ public class OrderService : IOrderService
         _configuration = configuration;
         _notificationService = notificationService;
         _bundleRepo = bundleRepo;
+        _shippingFeeService = shippingFeeService;
     }
 
     // ==================== CHECKOUT ====================
@@ -116,7 +119,7 @@ public class OrderService : IOrderService
             subtotal += (item.Quantity ?? 1) * item.Product.Price;
         }
 
-        decimal shippingFee = 5000; // Phí ship
+        decimal shippingFee = _shippingFeeService.CalculateShippingFee(subtotal, request.Province);
 
         if (coupon != null)
         {

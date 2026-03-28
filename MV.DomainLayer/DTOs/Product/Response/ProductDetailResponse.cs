@@ -15,6 +15,8 @@ public class ProductDetailResponse
     public bool HasSerialTracking { get; set; }
     public DateTime? CreatedAt { get; set; }
 
+    public string? CompatibilityInfo { get; set; }
+
     // Brand info
     public BrandInfo Brand { get; set; } = null!;
 
@@ -32,6 +34,15 @@ public class ProductDetailResponse
 
     // Bundle components (chỉ có khi ProductType = KIT)
     public List<BundleComponentInfo>? BundleComponents { get; set; }
+
+    // Technical specifications
+    public List<SpecificationInfo> Specifications { get; set; } = new List<SpecificationInfo>();
+
+    // Documents (datasheet, tutorial, etc.)
+    public List<DocumentInfo> Documents { get; set; } = new List<DocumentInfo>();
+
+    // Related products
+    public List<RelatedProductInfo> RelatedProducts { get; set; } = new List<RelatedProductInfo>();
 
     public class BrandInfo
     {
@@ -80,5 +91,34 @@ public class ProductDetailResponse
         public string ChildProductSku { get; set; } = null!;
         public decimal ChildProductPrice { get; set; }
         public int Quantity { get; set; }
+    }
+
+    public class SpecificationInfo
+    {
+        public int SpecificationId { get; set; }
+        public string SpecName { get; set; } = null!;
+        public string SpecValue { get; set; } = null!;
+        public int DisplayOrder { get; set; }
+    }
+
+    public class DocumentInfo
+    {
+        public int DocumentId { get; set; }
+        public string DocumentType { get; set; } = null!;
+        public string Title { get; set; } = null!;
+        public string Url { get; set; } = null!;
+        public int DisplayOrder { get; set; }
+    }
+
+    public class RelatedProductInfo
+    {
+        public int RelatedProductId { get; set; }
+        public int ProductId { get; set; }
+        public string Name { get; set; } = null!;
+        public string Sku { get; set; } = null!;
+        public decimal Price { get; set; }
+        public string? PrimaryImage { get; set; }
+        public string RelationType { get; set; } = null!;
+        public int DisplayOrder { get; set; }
     }
 }

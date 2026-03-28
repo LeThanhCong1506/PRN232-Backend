@@ -175,6 +175,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<ISepayRepository, SepayRepository>();
             builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
             builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+            builder.Services.AddScoped<IReturnRequestRepository, ReturnRequestRepository>();
 
             builder.Services.AddScoped<IRoleService, RoleService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
@@ -192,7 +193,9 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IAdminProductService, AdminProductService>();
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
-            
+            builder.Services.AddScoped<IReturnRequestService, ReturnRequestService>();
+            builder.Services.AddScoped<IShippingFeeService, ShippingFeeService>();
+
             // OAuth
             builder.Services.AddHttpClient();
             builder.Services.AddScoped<IExternalAuthService, ExternalAuthService>();

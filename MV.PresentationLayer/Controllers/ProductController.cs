@@ -481,5 +481,38 @@ namespace MV.PresentationLayer.Controllers
 
             return Ok(result);
         }
+
+        // ==================== RELATED PRODUCTS ====================
+
+        [HttpGet("{id}/related")]
+        [AllowAnonymous]
+        [SwaggerOperation(Summary = "Get related products")]
+        public async Task<IActionResult> GetRelatedProducts(int id)
+        {
+            var result = await _productService.GetRelatedProductsAsync(id);
+            if (!result.Success) return BadRequest(result);
+            return Ok(result);
+        }
+
+        [HttpPost("{id}/related")]
+        [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Add related product (Admin)")]
+        public async Task<IActionResult> AddRelatedProduct(int id, [FromBody] CreateRelatedProductDto request)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            var result = await _productService.AddRelatedProductAsync(id, request);
+            if (!result.Success) return BadRequest(result);
+            return Ok(result);
+        }
+
+        [HttpDelete("{id}/related/{relatedProductId}")]
+        [Authorize(Roles = "Admin")]
+        [SwaggerOperation(Summary = "Remove related product (Admin)")]
+        public async Task<IActionResult> RemoveRelatedProduct(int id, int relatedProductId)
+        {
+            var result = await _productService.RemoveRelatedProductAsync(id, relatedProductId);
+            if (!result.Success) return BadRequest(result);
+            return Ok(result);
+        }
     }
 }

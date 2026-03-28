@@ -21,5 +21,10 @@ namespace MV.ApplicationLayer.Interfaces
         // Category management
         Task<ApiResponse<bool>> AddCategoriesToProductAsync(int productId, List<int> categoryIds);
         Task<ApiResponse<bool>> RemoveCategoryFromProductAsync(int productId, int categoryId);
+
+        // Related products
+        Task<ApiResponse<List<ProductDetailResponse.RelatedProductInfo>>> GetRelatedProductsAsync(int productId);
+        Task<ApiResponse<bool>> AddRelatedProductAsync(int productId, CreateRelatedProductDto request);
+        Task<ApiResponse<bool>> RemoveRelatedProductAsync(int productId, int relatedProductId);
     }
 }

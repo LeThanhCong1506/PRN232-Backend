@@ -1,4 +1,5 @@
-﻿using MV.ApplicationLayer.Interfaces;
+﻿using Microsoft.EntityFrameworkCore;
+using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.DTOs.Product.Request;
@@ -157,7 +158,8 @@ namespace MV.ApplicationLayer.Services
                 StockQuantity = request.HasSerialTracking ? 0 : request.StockQuantity,
                 BrandId = request.BrandId,
                 WarrantyPolicyId = request.WarrantyPolicyId,
-                HasSerialTracking = request.HasSerialTracking
+                HasSerialTracking = request.HasSerialTracking,
+                CompatibilityInfo = request.CompatibilityInfo
             };
 
             var createdProduct = await _productRepository.CreateAsync(product);
@@ -166,6 +168,35 @@ namespace MV.ApplicationLayer.Services
             if (request.CategoryIds.Any())
             {
                 await _productRepository.AddCategoriesToProductAsync(createdProduct.ProductId, request.CategoryIds);
+            }
+
+            // Add specifications
+            if (request.Specifications.Any())
+            {
+                var specs = request.Specifications.Select(s => new ProductSpecification
+                {
+                    ProductId = createdProduct.ProductId,
+                    SpecName = s.SpecName,
+                    SpecValue = s.SpecValue,
+                    DisplayOrder = s.DisplayOrder
+                });
+                await _context.ProductSpecifications.AddRangeAsync(specs);
+                await _context.SaveChangesAsync();
+            }
+
+            // Add documents
+            if (request.Documents.Any())
+            {
+                var docs = request.Documents.Select(d => new ProductDocument
+                {
+                    ProductId = createdProduct.ProductId,
+                    DocumentType = d.DocumentType,
+                    Title = d.Title,
+                    Url = d.Url,
+                    DisplayOrder = d.DisplayOrder
+                });
+                await _context.ProductDocuments.AddRangeAsync(docs);
+                await _context.SaveChangesAsync();
             }
 
             // Get full detail
@@ -304,6 +335,7 @@ namespace MV.ApplicationLayer.Services
             product.BrandId = request.BrandId;
             product.WarrantyPolicyId = request.WarrantyPolicyId;
             product.HasSerialTracking = request.HasSerialTracking;
+            product.CompatibilityInfo = request.CompatibilityInfo;
 
             await _productRepository.UpdateAsync(product);
 
@@ -318,6 +350,41 @@ namespace MV.ApplicationLayer.Services
             {
                 await _productRepository.AddCategoriesToProductAsync(productId, request.CategoryIds);
             }
+
+            // Update specifications: delete all, re-add
+            var existingSpecs = _context.ProductSpecifications.Where(s => s.ProductId == productId);
+            _context.ProductSpecifications.RemoveRange(existingSpecs);
+
+            if (request.Specifications.Any())
+            {
+                var specs = request.Specifications.Select(s => new ProductSpecification
+                {
+                    ProductId = productId,
+                    SpecName = s.SpecName,
+                    SpecValue = s.SpecValue,
+                    DisplayOrder = s.DisplayOrder
+                });
+                await _context.ProductSpecifications.AddRangeAsync(specs);
+            }
+
+            // Update documents: delete all, re-add
+            var existingDocs = _context.ProductDocuments.Where(d => d.ProductId == productId);
+            _context.ProductDocuments.RemoveRange(existingDocs);
+
+            if (request.Documents.Any())
+            {
+                var docs = request.Documents.Select(d => new ProductDocument
+                {
+                    ProductId = productId,
+                    DocumentType = d.DocumentType,
+                    Title = d.Title,
+                    Url = d.Url,
+                    DisplayOrder = d.DisplayOrder
+                });
+                await _context.ProductDocuments.AddRangeAsync(docs);
+            }
+
+            await _context.SaveChangesAsync();
 
             // Get full detail
             var detail = await _productRepository.GetDetailByIdAsync(productId);
@@ -387,6 +454,7 @@ namespace MV.ApplicationLayer.Services
                 AvailableQuantity = product.StockQuantity ?? 0, // Will calculate based on ProductInstances later
                 HasSerialTracking = product.HasSerialTracking ?? false,
                 CreatedAt = product.CreatedAt,
+                CompatibilityInfo = product.CompatibilityInfo,
                 Brand = new ProductDetailResponse.BrandInfo
                 {
                     BrandId = product.Brand.BrandId,
@@ -420,8 +488,106 @@ namespace MV.ApplicationLayer.Services
                     ThreeStarCount = product.Reviews.Count(r => r.Rating == 3),
                     TwoStarCount = product.Reviews.Count(r => r.Rating == 2),
                     OneStarCount = product.Reviews.Count(r => r.Rating == 1)
-                }
+                },
+                Specifications = product.ProductSpecifications.Select(s => new ProductDetailResponse.SpecificationInfo
+                {
+                    SpecificationId = s.SpecificationId,
+                    SpecName = s.SpecName,
+                    SpecValue = s.SpecValue,
+                    DisplayOrder = s.DisplayOrder
+                }).ToList(),
+                Documents = product.ProductDocuments.Select(d => new ProductDetailResponse.DocumentInfo
+                {
+                    DocumentId = d.DocumentId,
+                    DocumentType = d.DocumentType,
+                    Title = d.Title,
+                    Url = d.Url,
+                    DisplayOrder = d.DisplayOrder
+                }).ToList(),
+                RelatedProducts = product.RelatedProducts.Select(r => new ProductDetailResponse.RelatedProductInfo
+                {
+                    RelatedProductId = r.RelatedProductId,
+                    ProductId = r.RelatedToProductId,
+                    Name = r.RelatedToProduct.Name,
+                    Sku = r.RelatedToProduct.Sku,
+                    Price = r.RelatedToProduct.Price,
+                    PrimaryImage = r.RelatedToProduct.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
+                    RelationType = r.RelationType,
+                    DisplayOrder = r.DisplayOrder
+                }).ToList()
             };
+        }
+
+        public async Task<ApiResponse<List<ProductDetailResponse.RelatedProductInfo>>> GetRelatedProductsAsync(int productId)
+        {
+            if (!await _productRepository.ExistsAsync(productId))
+                return ApiResponse<List<ProductDetailResponse.RelatedProductInfo>>.ErrorResponse($"Product {productId} not found.");
+
+            var related = await _context.RelatedProducts
+                .AsNoTracking()
+                .Where(r => r.ProductId == productId)
+                .OrderBy(r => r.DisplayOrder)
+                .Include(r => r.RelatedToProduct)
+                    .ThenInclude(p => p.ProductImages)
+                .Select(r => new ProductDetailResponse.RelatedProductInfo
+                {
+                    RelatedProductId = r.RelatedProductId,
+                    ProductId = r.RelatedToProductId,
+                    Name = r.RelatedToProduct.Name,
+                    Sku = r.RelatedToProduct.Sku,
+                    Price = r.RelatedToProduct.Price,
+                    PrimaryImage = r.RelatedToProduct.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
+                    RelationType = r.RelationType,
+                    DisplayOrder = r.DisplayOrder
+                })
+                .ToListAsync();
+
+            return ApiResponse<List<ProductDetailResponse.RelatedProductInfo>>.SuccessResponse(related);
+        }
+
+        public async Task<ApiResponse<bool>> AddRelatedProductAsync(int productId, CreateRelatedProductDto request)
+        {
+            if (!await _productRepository.ExistsAsync(productId))
+                return ApiResponse<bool>.ErrorResponse($"Product {productId} not found.");
+
+            if (!await _productRepository.ExistsAsync(request.RelatedToProductId))
+                return ApiResponse<bool>.ErrorResponse($"Related product {request.RelatedToProductId} not found.");
+
+            if (productId == request.RelatedToProductId)
+                return ApiResponse<bool>.ErrorResponse("A product cannot be related to itself.");
+
+            var exists = await _context.RelatedProducts.AnyAsync(r =>
+                r.ProductId == productId && r.RelatedToProductId == request.RelatedToProductId);
+
+            if (exists)
+                return ApiResponse<bool>.ErrorResponse("This related product already exists.");
+
+            var relatedProduct = new RelatedProduct
+            {
+                ProductId = productId,
+                RelatedToProductId = request.RelatedToProductId,
+                RelationType = request.RelationType,
+                DisplayOrder = request.DisplayOrder
+            };
+
+            await _context.RelatedProducts.AddAsync(relatedProduct);
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<bool>.SuccessResponse(true, "Related product added.");
+        }
+
+        public async Task<ApiResponse<bool>> RemoveRelatedProductAsync(int productId, int relatedProductId)
+        {
+            var entry = await _context.RelatedProducts
+                .FirstOrDefaultAsync(r => r.ProductId == productId && r.RelatedProductId == relatedProductId);
+
+            if (entry == null)
+                return ApiResponse<bool>.ErrorResponse("Related product entry not found.");
+
+            _context.RelatedProducts.Remove(entry);
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<bool>.SuccessResponse(true, "Related product removed.");
         }
     }
 }
