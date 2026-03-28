@@ -22,7 +22,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
+                .Where(p => p.IsActive == true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.SearchTerm))
@@ -79,7 +79,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
+                .Where(p => p.IsActive == true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.Search))
@@ -131,13 +131,11 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task SoftDeleteAsync(int productId)
         {
-            var product = await _context.Products.FindAsync(productId);
-            if (product != null)
-            {
-                product.IsActive = false;
-                product.IsDeleted = true;
-                await _context.SaveChangesAsync();
-            }
+            // Dùng ExecuteUpdateAsync để bypass NoTracking global setting
+            // Trực tiếp generate SQL: UPDATE product SET is_active = false WHERE product_id = @id
+            await _context.Products
+                .Where(p => p.ProductId == productId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false));
         }
 
         public async Task<Product> GetProductByIdAsync(int productId)
@@ -234,7 +232,7 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<bool> ExistsAsync(int productId)
         {
-            return await _context.Products.AnyAsync(p => p.ProductId == productId);
+            return await _context.Products.AnyAsync(p => p.ProductId == productId && p.IsActive == true);
         }
 
         public async Task<bool> SkuExistsAsync(string sku, int? excludeProductId = null)
