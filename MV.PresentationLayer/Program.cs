@@ -197,6 +197,8 @@ namespace MV.PresentationLayer
             // Cloudinary
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 
+            builder.Services.AddSingleton<IChatbotService, ChatbotService>();
+
             // SignalR + Realtime Notification
             builder.Services.AddSignalR();
             builder.Services.AddSingleton<INotificationService, SignalRNotificationService>();

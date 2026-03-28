@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace MV.DomainLayer.Entities;
@@ -32,6 +32,8 @@ public partial class User
     public string? Ward { get; set; }
 
     public string? StreetAddress { get; set; }
+
+    public string? AvatarUrl { get; set; }
 
     public virtual Cart? Cart { get; set; }
 
