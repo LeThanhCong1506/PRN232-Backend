@@ -69,10 +69,19 @@ namespace MV.InfrastructureLayer.Repositories
             existingUser.District = user.District;
             existingUser.Ward = user.Ward;
             existingUser.StreetAddress = user.StreetAddress;
+            existingUser.ExternalProvider = user.ExternalProvider;
+            existingUser.ExternalId = user.ExternalId;
+            existingUser.PasswordHash = user.PasswordHash;
             _context.Users.Update(existingUser);
             await _context.SaveChangesAsync();
             return true;
         }
 
+        public async Task<User?> GetByExternalLoginAsync(string provider, string externalId)
+        {
+            return await _context.Users
+                .Include(x => x.Role)
+                .FirstOrDefaultAsync(x => x.ExternalProvider == provider && x.ExternalId == externalId && x.IsActive == true);
+        }
     }
 }
