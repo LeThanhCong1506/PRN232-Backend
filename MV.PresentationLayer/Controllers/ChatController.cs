@@ -105,7 +105,7 @@ public class ChatController : ControllerBase
             ReceiverId = isAdmin ? dto.ReceiverId : null,
             Content = dto.Content.Trim(),
             IsFromAdmin = isAdmin,
-            SentAt = DateTime.Now,
+            SentAt = DateTime.UtcNow,
             IsRead = false
         };
 

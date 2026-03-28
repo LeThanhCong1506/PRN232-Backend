@@ -91,7 +91,7 @@ public class ChatHub : Hub
             ReceiverId = isAdmin ? receiverId : null,
             Content = content.Trim(),
             IsFromAdmin = isAdmin,
-            SentAt = DateTime.Now,
+            SentAt = DateTime.UtcNow,
             IsRead = false
         };
 

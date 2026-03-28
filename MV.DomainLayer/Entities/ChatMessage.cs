@@ -21,7 +21,7 @@ public class ChatMessage
     /// </summary>
     public bool IsFromAdmin { get; set; }
 
-    public DateTime SentAt { get; set; } = DateTime.Now;
+    public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
     public bool IsRead { get; set; } = false;
 
