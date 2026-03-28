@@ -511,7 +511,7 @@ namespace MV.ApplicationLayer.Services
                     Name = r.RelatedToProduct.Name,
                     Sku = r.RelatedToProduct.Sku,
                     Price = r.RelatedToProduct.Price,
-                    PrimaryImage = r.RelatedToProduct.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
+                    PrimaryImage = r.RelatedToProduct.ProductImages.OrderBy(i => i.ImageId).Select(i => i.ImageUrl).FirstOrDefault(),
                     RelationType = r.RelationType,
                     DisplayOrder = r.DisplayOrder
                 }).ToList()
@@ -536,7 +536,7 @@ namespace MV.ApplicationLayer.Services
                     Name = r.RelatedToProduct.Name,
                     Sku = r.RelatedToProduct.Sku,
                     Price = r.RelatedToProduct.Price,
-                    PrimaryImage = r.RelatedToProduct.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
+                    PrimaryImage = r.RelatedToProduct.ProductImages.OrderBy(i => i.ImageId).Select(i => i.ImageUrl).FirstOrDefault(),
                     RelationType = r.RelationType,
                     DisplayOrder = r.DisplayOrder
                 })
