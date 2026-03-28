@@ -47,8 +47,11 @@ public class CategoryRepository : ICategoryRepository
 
     public async Task UpdateCategoryAsync(Category category)
     {
-        _context.Categories.Update(category);
-        await _context.SaveChangesAsync();
+        // Use ExecuteUpdateAsync to do a direct SQL UPDATE, bypassing the change tracker entirely.
+        // This avoids EF Core cascade re-inserting product_category junction records (product_category_pkey violation).
+        await _context.Categories
+            .Where(c => c.CategoryId == category.CategoryId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Name, category.Name));
     }
 
     public async Task DeleteCategoryAsync(int id)

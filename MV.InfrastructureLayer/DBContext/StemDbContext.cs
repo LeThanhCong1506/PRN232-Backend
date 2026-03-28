@@ -66,10 +66,12 @@ public partial class StemDbContext : DbContext
 
     public virtual DbSet<ChatMessage> ChatMessages { get; set; }
 
+    public virtual DbSet<Notification> Notifications { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
-            .HasPostgresEnum("claim_status_enum", new[] { "SUBMITTED", "APPROVED", "REJECTED", "RESOLVED" })
+            .HasPostgresEnum("claim_status_enum", new[] { "SUBMITTED", "APPROVED", "REJECTED", "RESOLVED", "UNRESOLVED" })
             .HasPostgresEnum("difficulty_level_enum", new[] { "beginner", "intermediate", "advanced" })
             .HasPostgresEnum("discount_type_enum", new[] { "FIXED_AMOUNT", "PERCENTAGE" })
             .HasPostgresEnum("instance_status_enum", new[] { "IN_STOCK", "SOLD", "WARRANTY", "DEFECTIVE", "RETURNED" })
@@ -1231,6 +1233,43 @@ public partial class StemDbContext : DbContext
                 .HasMaxLength(100)
                 .HasColumnName("policy_name");
             entity.Property(e => e.TermsAndConditions).HasColumnName("terms_and_conditions");
+        });
+
+        // Notification entity configuration
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(e => e.NotificationId).HasName("notification_pkey");
+
+            entity.ToTable("notification");
+
+            entity.Property(e => e.NotificationId)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("notification_id");
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Title)
+                .HasMaxLength(255)
+                .HasColumnName("title");
+            entity.Property(e => e.Message).HasColumnName("message");
+            entity.Property(e => e.Type)
+                .HasMaxLength(50)
+                .HasColumnName("type");
+            entity.Property(e => e.IsRead)
+                .HasDefaultValue(false)
+                .HasColumnName("is_read");
+            entity.Property(e => e.LinkUrl)
+                .HasMaxLength(500)
+                .HasColumnName("link_url");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("fk_notification_user");
         });
 
         // ChatMessage entity configuration

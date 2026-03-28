@@ -16,7 +16,10 @@ public class WarrantyRepository : IWarrantyRepository
 
     public async Task<Warranty?> GetByIdAsync(int id)
     {
+        // PERFORMANCE FIX: Thêm AsSplitQuery cho deep Include để tránh Cartesian explosion
         return await _context.Warranties
+            .AsNoTracking()
+            .AsSingleQuery()
             .Include(w => w.WarrantyPolicy)
             .Include(w => w.SerialNumberNavigation)
                 .ThenInclude(pi => pi.Product)
@@ -115,7 +118,23 @@ public class WarrantyRepository : IWarrantyRepository
 
     public async Task<IEnumerable<Warranty>> GetWarrantiesByUserIdAsync(int userId)
     {
+        // PERFORMANCE FIX: Tách thành 2 query riêng thay vì 1 query khổng lồ với deep Include
+
+        // Query 1: Lấy warranty IDs của user (query nhẹ)
+        var warrantyIds = await _context.Warranties
+            .AsNoTracking()
+            .Where(w => w.SerialNumberNavigation.OrderItem != null
+                     && w.SerialNumberNavigation.OrderItem.Order.UserId == userId)
+            .Select(w => w.WarrantyId)
+            .ToListAsync();
+
+        if (warrantyIds.Count == 0)
+            return Enumerable.Empty<Warranty>();
+
+        // Query 2: Load full data với AsSplitQuery cho các IDs đã lọc
         return await _context.Warranties
+            .AsNoTracking()
+            .AsSingleQuery()
             .Include(w => w.WarrantyPolicy)
             .Include(w => w.SerialNumberNavigation)
                 .ThenInclude(pi => pi.Product)
@@ -123,8 +142,7 @@ public class WarrantyRepository : IWarrantyRepository
             .Include(w => w.SerialNumberNavigation)
                 .ThenInclude(pi => pi.OrderItem!)
                     .ThenInclude(oi => oi.Order)
-            .Where(w => w.SerialNumberNavigation.OrderItem != null
-                     && w.SerialNumberNavigation.OrderItem.Order.UserId == userId)
+            .Where(w => warrantyIds.Contains(w.WarrantyId))
             .OrderByDescending(w => w.CreatedAt)
             .ToListAsync();
     }

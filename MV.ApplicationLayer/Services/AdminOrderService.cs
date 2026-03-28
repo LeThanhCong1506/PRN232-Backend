@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Enums;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -15,6 +17,9 @@ public class AdminOrderService : IAdminOrderService
     private readonly IProductRepository _productRepo;
     private readonly IUserRepository _userRepo;
     private readonly StemDbContext _context;
+    private readonly IProductBundleRepository _bundleRepo;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<AdminOrderService> _logger;
 
     private static readonly Dictionary<string, List<string>> AllowedTransitions = new()
     {
@@ -29,12 +34,18 @@ public class AdminOrderService : IAdminOrderService
         IOrderRepository orderRepo,
         IProductRepository productRepo,
         IUserRepository userRepo,
-        StemDbContext context)
+        StemDbContext context,
+        IProductBundleRepository bundleRepo,
+        INotificationService notificationService,
+        ILogger<AdminOrderService> logger)
     {
         _orderRepo = orderRepo;
         _productRepo = productRepo;
         _userRepo = userRepo;
         _context = context;
+        _bundleRepo = bundleRepo;
+        _notificationService = notificationService;
+        _logger = logger;
     }
 
     public async Task<ApiResponse<AdminOrderListResult>> GetAdminOrdersAsync(AdminOrderFilter filter)
@@ -185,36 +196,57 @@ public class AdminOrderService : IAdminOrderService
                 $"Cannot transition from {currentStatus} to {newStatus}.");
 
         // Use transaction for complex status changes
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        var strategy = _context.Database.CreateExecutionStrategy();
         try
         {
-            switch (newStatus)
+            await strategy.ExecuteAsync(async () =>
             {
-                case "CONFIRMED":
-                    await HandleConfirmOrder(order, adminUserId, request);
-                    break;
-                case "SHIPPED":
-                    await HandleShipOrder(order, adminUserId, request);
-                    break;
-                case "DELIVERED":
-                    await HandleDeliverOrder(order, orderId);
-                    break;
-                case "CANCELLED":
-                    await HandleCancelOrder(order, adminUserId, currentStatus, request);
-                    break;
-            }
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    switch (newStatus)
+                    {
+                        case "CONFIRMED":
+                            await HandleConfirmOrder(order, adminUserId, request);
+                            break;
+                        case "SHIPPED":
+                            await HandleShipOrder(order, adminUserId, request);
+                            break;
+                        case "DELIVERED":
+                            await HandleDeliverOrder(order, orderId);
+                            break;
+                        case "CANCELLED":
+                            await HandleCancelOrder(order, adminUserId, currentStatus, request);
+                            break;
+                    }
 
-            // Update status
-            await _orderRepo.SetOrderStatusAsync(orderId, newStatus);
-            order.UpdatedAt = DateTime.UtcNow;
-            await _orderRepo.UpdateOrderAsync(order);
+                    // Update status
+                    await _orderRepo.SetOrderStatusAsync(orderId, newStatus);
+                    order.UpdatedAt = DateTime.UtcNow;
+                    await _orderRepo.UpdateOrderAsync(order);
 
-            await transaction.CommitAsync();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return ApiResponse<AdminOrderDetailResponse>.ErrorResponse($"Failed to update order status: {ex.Message}");
+        }
+
+        // Send Real-time Notification — outside execution strategy to avoid duplicate sends on retry
+        try
+        {
+            await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send order status notification for order {OrderId}", orderId);
         }
 
         return await GetAdminOrderDetailAsync(orderId);
@@ -377,10 +409,22 @@ public class AdminOrderService : IAdminOrderService
         order.CancelledBy = adminUserId;
         order.CancelReason = request.Note ?? "Cancelled by admin";
 
-        // Restore stock for each order item
+        // Restore stock (KIT restore từng component, sản phẩm thường restore trực tiếp)
         foreach (var item in order.OrderItems)
         {
-            await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+            if (item.Product?.ProductType == ProductTypeEnum.KIT.ToString())
+            {
+                var components = await _bundleRepo.GetBundleComponentsAsync(item.ProductId);
+                foreach (var comp in components)
+                {
+                    var restoreQty = (comp.Quantity ?? 1) * item.Quantity;
+                    await _orderRepo.IncrementStockAsync(comp.ChildProductId, restoreQty);
+                }
+            }
+            else
+            {
+                await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+            }
         }
 
         // Restore coupon usage if applicable

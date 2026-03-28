@@ -132,6 +132,15 @@ public class WarrantyService : IWarrantyService
             return ApiResponse<bool>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
+        // (W7) Chặn xóa nếu có claim đang pending
+        var hasPendingClaims = warranty.WarrantyClaims?.Any(c =>
+            c.Status == "SUBMITTED" || c.Status == "APPROVED") ?? false;
+        if (hasPendingClaims)
+        {
+            return ApiResponse<bool>.ErrorResponse(
+                "Cannot delete warranty that has pending or approved claims. Please resolve all claims first.");
+        }
+
         await _warrantyRepository.DeleteAsync(id);
         return ApiResponse<bool>.SuccessResponse(true, "Warranty deleted successfully.");
     }

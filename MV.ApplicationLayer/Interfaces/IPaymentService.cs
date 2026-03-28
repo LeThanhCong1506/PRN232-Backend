@@ -28,7 +28,13 @@ public interface IPaymentService
     Task<ApiResponse<PaymentStatusResponse>> ProcessSuccessCallbackAsync(string orderInvoiceNumber);
 
     /// <summary>
-    /// Xử lý các payment SEPAY hết hạn - gọi từ background service
+    /// Kiểm tra và trả về payment status, tự động expire nếu quá hạn (lazy expiry)
+    /// </summary>
+    Task<string> CheckAndGetPaymentStatusAsync(int orderId);
+
+    /// <summary>
+    /// Background job: Tự động expire tất cả SEPAY payments đã quá hạn,
+    /// cancel order và restore stock + coupon.
     /// </summary>
     Task ExpireOverduePaymentsAsync();
 }

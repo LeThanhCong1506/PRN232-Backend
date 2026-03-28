@@ -12,5 +12,4 @@ public interface ISepayRepository
     // Payment queries
     Task<Payment?> GetPaymentByOrderIdAsync(int orderId);
     Task<Payment?> GetPaymentByReferenceAsync(string paymentReference);
-    Task<List<int>> GetExpiredPendingSepayOrderIdsAsync();
 }

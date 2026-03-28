@@ -66,11 +66,11 @@ public class WarrantyController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy thông tin bảo hành theo ID
+    /// Lấy thông tin bảo hành theo ID (Admin hoặc chủ warranty)
     /// </summary>
     [HttpGet("{id}")]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "Get warranty by ID")]
+    [Authorize]
+    [SwaggerOperation(Summary = "Get warranty by ID (Admin or owner)")]
     public async Task<IActionResult> GetById(int id)
     {
         var result = await _warrantyService.GetByIdAsync(id);
@@ -84,11 +84,11 @@ public class WarrantyController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy thông tin bảo hành theo serial number
+    /// Lấy thông tin bảo hành theo serial number (Admin only)
     /// </summary>
     [HttpGet("serial/{serialNumber}")]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "Get warranty by serial number")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Get warranty by serial number (Admin only)")]
     public async Task<IActionResult> GetBySerialNumber(string serialNumber)
     {
         var result = await _warrantyService.GetBySerialNumberAsync(serialNumber);
@@ -102,11 +102,11 @@ public class WarrantyController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy tất cả bảo hành
+    /// Lấy tất cả bảo hành (Admin only)
     /// </summary>
     [HttpGet]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "Get all warranties")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Get all warranties (Admin only)")]
     public async Task<IActionResult> GetAll()
     {
         var result = await _warrantyService.GetAllAsync();
@@ -114,11 +114,11 @@ public class WarrantyController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách bảo hành theo product ID
+    /// Lấy danh sách bảo hành theo product ID (Admin only)
     /// </summary>
     [HttpGet("product/{productId}")]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "Get warranties by product ID")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Get warranties by product ID (Admin only)")]
     public async Task<IActionResult> GetByProductId(int productId)
     {
         var result = await _warrantyService.GetByProductIdAsync(productId);
@@ -126,11 +126,11 @@ public class WarrantyController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách bảo hành đang active
+    /// Lấy danh sách bảo hành đang active (Admin only)
     /// </summary>
     [HttpGet("active")]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "Get active warranties")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Get active warranties (Admin only)")]
     public async Task<IActionResult> GetActiveWarranties()
     {
         var result = await _warrantyService.GetActiveWarrantiesAsync();
@@ -138,11 +138,11 @@ public class WarrantyController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách bảo hành đã hết hạn
+    /// Lấy danh sách bảo hành đã hết hạn (Admin only)
     /// </summary>
     [HttpGet("expired")]
-    [AllowAnonymous]
-    [SwaggerOperation(Summary = "Get expired warranties")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Get expired warranties (Admin only)")]
     public async Task<IActionResult> GetExpiredWarranties()
     {
         var result = await _warrantyService.GetExpiredWarrantiesAsync();

@@ -19,5 +19,13 @@ namespace MV.InfrastructureLayer.Repositories
             return await _context.Coupons
                 .FirstOrDefaultAsync(c => c.Code.ToLower() == code.ToLower());
         }
+
+        public async Task<string?> GetCouponDiscountTypeAsync(int couponId)
+        {
+            var result = await _context.Database
+                .SqlQueryRaw<string>("SELECT discount_type::text AS \"Value\" FROM coupon WHERE coupon_id = {0}", couponId)
+                .FirstOrDefaultAsync();
+            return result;
+        }
     }
 }

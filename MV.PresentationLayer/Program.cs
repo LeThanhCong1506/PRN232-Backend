@@ -44,7 +44,10 @@ namespace MV.PresentationLayer
                         "http://localhost:5175",
                         "http://127.0.0.1:3000",
                         "http://localhost:5255",  // Swagger Docker
-                        "http://127.0.0.1:5255"
+                        "http://127.0.0.1:5255",
+                        // Production FE domain
+                        "https://prn232.store",
+                        "https://www.prn232.store"
                     }.Concat(extraOrigins).Distinct().ToArray();
 
                     policy.WithOrigins(origins)
@@ -135,6 +138,9 @@ namespace MV.PresentationLayer
             builder.Services.AddControllers()
                 .AddJsonOptions(options =>
                 {
+                    // CRITICAL: SePay webhook gửi JSON có thể khác case (TransferAmount vs transferAmount)
+                    // System.Text.Json mặc định case-sensitive → model binding fail → 400 trước khi vào controller
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
                     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
                 })
                 .ConfigureApiBehaviorOptions(options =>
@@ -166,6 +172,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IOrderRepository, OrderRepository>();
             builder.Services.AddScoped<ISepayRepository, SepayRepository>();
             builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+            builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
             builder.Services.AddScoped<IRoleService, RoleService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
@@ -184,6 +191,9 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
 
+            // Background Services
+            builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
+
             // Cloudinary
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 
@@ -193,40 +203,57 @@ namespace MV.PresentationLayer
             builder.Services.AddSignalR();
             builder.Services.AddSingleton<INotificationService, SignalRNotificationService>();
 
-            // Background service: auto-expire overdue SEPAY payments every 60 seconds
-            builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
-
-            // Background service: polling SePay API (bật cho local dev)
-            builder.Services.AddHostedService<SepayPollingBackgroundService>();
-
-            // Prevent background service exceptions from crashing the host
-            builder.Services.Configure<HostOptions>(options =>
-            {
-                options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
-            });
-
             // Register DbContext with connection string from appsettings
-            // ConfigureWarnings is used to suppress ManyServiceProvidersCreatedWarning which causes 500 errors
-            // Maximum Pool Size=20: giới hạn số connection để không vượt quá max_connections của PostgreSQL
+            // Connection pool settings tự động theo environment:
+            // - Production (Render free tier): pool nhỏ vì max_connections giới hạn
+            // - Development (local PostgreSQL): pool lớn hơn vì max_connections=100
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (!connectionString!.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
-                connectionString += ";Maximum Pool Size=20;Minimum Pool Size=1;Connection Idle Lifetime=60";
+            {
+                var isProduction = builder.Environment.IsProduction();
+                var poolSize = isProduction ? 10 : 30;
+                connectionString += $";Maximum Pool Size={poolSize};Minimum Pool Size=0;Connection Idle Lifetime=60;Timeout=15;Command Timeout=30";
+            }
 
-            builder.Services.AddDbContext<StemDbContext>(options =>
+            // MEMORY FIX: AddDbContextPool tái sử dụng DbContext instances thay vì tạo mới mỗi request
+            // Tránh OOM do EF Core tích lũy internal service providers không được giải phóng
+            builder.Services.AddDbContextPool<StemDbContext>(options =>
                 options.UseNpgsql(connectionString,
                     npgsqlOptions =>
                     {
                         npgsqlOptions.MigrationsAssembly("MV.InfrastructureLayer");
+
+                        // Enable automatic retry on transient failures
+                        // maxRetryCount: 5 attempts, maxRetryDelay: wait max 30s between retries
+                        npgsqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorCodesToAdd: null);
+
+                        // SingleQuery (default) — dùng 1 connection per query thay vì N connections cho N Include
+                        // Chỉ dùng .AsSplitQuery() explicit khi thực sự cần (large result sets)
+                        npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery);
+
                         npgsqlOptions.MapEnum<MV.DomainLayer.Enums.ProductTypeEnum>(
                             "product_type_enum",
                             schemaName: null,
                             nameTranslator: new Npgsql.NameTranslation.NpgsqlNullNameTranslator());
                     })
-                .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning)));
+                // PERFORMANCE FIX: Set default NoTracking cho read-only queries
+                .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking),
+                poolSize: 32);
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             //builder.Services.AddSwaggerGen();
+
+            // Health checks - để monitoring và keep-alive
+            builder.Services.AddHealthChecks()
+                .AddNpgSql(
+                    connectionString: connectionString,
+                    name: "postgresql",
+                    timeout: TimeSpan.FromSeconds(10),
+                    tags: new[] { "db", "sql", "postgresql" });
 
             var app = builder.Build();
 
@@ -235,7 +262,52 @@ namespace MV.PresentationLayer
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<StemDbContext>();
-                db.Database.CanConnect(); // chỉ kiểm tra kết nối, không thay đổi schema
+                if (db.Database.CanConnect())
+                {
+                    try
+                    {
+                        db.Database.ExecuteSqlRaw("ALTER TYPE claim_status_enum ADD VALUE IF NOT EXISTS 'UNRESOLVED';");
+                        Console.WriteLine("[DB INIT] Added UNRESOLVED to claim_status_enum successfully.");
+
+                        // Bổ sung tạo bảng Notification nếu chưa có
+                        db.Database.ExecuteSqlRaw(@"
+                            CREATE TABLE IF NOT EXISTS notification (
+                                notification_id SERIAL PRIMARY KEY,
+                                user_id INT NOT NULL,
+                                title VARCHAR(255) NOT NULL,
+                                message TEXT NOT NULL,
+                                type VARCHAR(50) NOT NULL,
+                                is_read BOOLEAN DEFAULT false,
+                                link_url VARCHAR(500),
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            );
+                        ");
+                        Console.WriteLine("[DB INIT] Checked/Created notification table successfully.");
+
+                        // Thêm FK constraint nếu chưa có (align DB với EF model)
+                        // Lưu ý: tên bảng user trong DB là "USER" (uppercase)
+                        db.Database.ExecuteSqlRaw(@"
+                            DO $$
+                            BEGIN
+                                IF NOT EXISTS (
+                                    SELECT 1 FROM information_schema.table_constraints
+                                    WHERE constraint_name = 'fk_notification_user'
+                                    AND table_name = 'notification'
+                                ) THEN
+                                    ALTER TABLE notification
+                                    ADD CONSTRAINT fk_notification_user
+                                    FOREIGN KEY (user_id) REFERENCES ""USER""(user_id)
+                                    ON DELETE RESTRICT;
+                                END IF;
+                            END $$;
+                        ");
+                        Console.WriteLine("[DB INIT] FK constraint fk_notification_user ensured.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[DB INIT] Note: Could not alter schema: {ex.Message}");
+                    }
+                }
             }
 
             // Configure the HTTP request pipeline.
@@ -271,6 +343,32 @@ namespace MV.PresentationLayer
             app.UseAuthorization();
 
             app.MapControllers();
+
+            // Health check endpoints
+            // /health - simple health check (200 OK if healthy)
+            // /health/detail - detailed health check with DB status
+            app.MapHealthChecks("/health");
+            app.MapHealthChecks("/health/detail", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+            {
+                ResponseWriter = async (context, report) =>
+                {
+                    context.Response.ContentType = "application/json";
+                    var result = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        status = report.Status.ToString(),
+                        timestamp = DateTime.UtcNow,
+                        checks = report.Entries.Select(e => new
+                        {
+                            name = e.Key,
+                            status = e.Value.Status.ToString(),
+                            duration = e.Value.Duration,
+                            description = e.Value.Description,
+                            exception = e.Value.Exception?.Message
+                        })
+                    });
+                    await context.Response.WriteAsync(result);
+                }
+            });
 
             // SignalR Hub endpoints
             app.MapHub<NotificationHub>("/hubs/notification");

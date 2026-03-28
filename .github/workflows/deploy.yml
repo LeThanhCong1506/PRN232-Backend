@@ -1,4 +1,4 @@
-name: Build, Test & Deploy to Render
+name: Build, Test & Deploy to Railway
 
 on:
   push:
@@ -33,16 +33,19 @@ jobs:
 
   # ─── Job 2: Deploy (chỉ chạy khi push lên main, không chạy với PR) ─────────
   deploy:
-    name: Deploy to Render
+    name: Deploy to Railway
     runs-on: ubuntu-latest
     needs: build-and-test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Trigger Render Deploy Hook
-        run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-            --request POST \
-            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" | grep -qE "^(200|201|202)$" \
-            && echo "Deploy triggered successfully" \
-            || (echo "Deploy hook failed" && exit 1)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service 3b085e43-c37d-4dcd-814c-3c48f3df66c5 --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

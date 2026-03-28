@@ -20,4 +20,9 @@ public interface IWarrantyClaimService
     /// BE-4.3.4: Admin resolve warranty claim
     /// </summary>
     Task<ApiResponse<ResolveWarrantyClaimResponse>> ResolveClaimAsync(int claimId, ResolveWarrantyClaimRequest request);
+
+    /// <summary>
+    /// Customer: Get my warranty claims (paged)
+    /// </summary>
+    Task<ApiResponse<AdminWarrantyClaimPagedResponse>> GetMyClaimsAsync(int userId, int page, int pageSize);
 }

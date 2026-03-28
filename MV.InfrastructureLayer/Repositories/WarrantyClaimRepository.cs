@@ -72,27 +72,42 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
 
     public async Task<List<WarrantyClaim>> GetAllAsync(string? status, int page, int pageSize)
     {
-        IQueryable<WarrantyClaim> query;
+        // PERFORMANCE FIX: Tách Count và Load riêng, thêm AsSplitQuery
+        IQueryable<WarrantyClaim> baseQuery;
 
         if (!string.IsNullOrWhiteSpace(status))
         {
             var pStatus = new Npgsql.NpgsqlParameter("pStatus", status);
-            query = _context.WarrantyClaims
+            baseQuery = _context.WarrantyClaims
                 .FromSqlRaw("SELECT * FROM warranty_claim WHERE status = @pStatus::claim_status_enum", pStatus);
         }
         else
         {
-            query = _context.WarrantyClaims.AsQueryable();
+            baseQuery = _context.WarrantyClaims.AsQueryable();
         }
 
-        return await query
+        // Bước 1: Lấy IDs với pagination (không Include)
+        var claimIds = await baseQuery
+            .AsNoTracking()
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => c.ClaimId)
+            .ToListAsync();
+
+        if (claimIds.Count == 0)
+            return new List<WarrantyClaim>();
+
+        // Bước 2: Load full data với AsSplitQuery cho các IDs đã lọc
+        return await _context.WarrantyClaims
+            .AsNoTracking()
+            .AsSingleQuery()
             .Include(c => c.Warranty)
                 .ThenInclude(w => w.SerialNumberNavigation)
                     .ThenInclude(pi => pi.Product)
             .Include(c => c.User)
+            .Where(c => claimIds.Contains(c.ClaimId))
             .OrderByDescending(c => c.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .ToListAsync();
     }
 
@@ -107,5 +122,37 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
         }
 
         return await _context.WarrantyClaims.CountAsync();
+    }
+
+    public async Task<List<WarrantyClaim>> GetByUserIdAsync(int userId, int page, int pageSize)
+    {
+        var baseQuery = _context.WarrantyClaims.Where(c => c.UserId == userId);
+        
+        var claimIds = await baseQuery
+            .AsNoTracking()
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => c.ClaimId)
+            .ToListAsync();
+
+        if (claimIds.Count == 0)
+            return new List<WarrantyClaim>();
+
+        return await _context.WarrantyClaims
+            .AsNoTracking()
+            .AsSingleQuery()
+            .Include(c => c.Warranty)
+                .ThenInclude(w => w.SerialNumberNavigation)
+                    .ThenInclude(pi => pi.Product)
+            .Include(c => c.User)
+            .Where(c => claimIds.Contains(c.ClaimId))
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<int> CountByUserIdAsync(int userId)
+    {
+        return await _context.WarrantyClaims.CountAsync(c => c.UserId == userId);
     }
 }

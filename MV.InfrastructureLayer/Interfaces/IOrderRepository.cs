@@ -32,6 +32,8 @@ public interface IOrderRepository
     Task IncrementCouponUsedCountAsync(int couponId);
     Task DecrementCouponUsedCountAsync(int couponId);
     Task<Coupon?> GetCouponByCodeAsync(string code);
+    /// <summary>Kiểm tra user đã dùng coupon này trong đơn hàng nào chưa (trừ đơn CANCELLED).</summary>
+    Task<bool> HasUserUsedCouponAsync(int userId, int couponId);
 
     // Raw SQL for enum columns (not scaffolded)
     Task<string?> GetOrderStatusAsync(int orderId);
@@ -42,9 +44,6 @@ public interface IOrderRepository
     Task SetPaymentStatusByOrderIdAsync(int orderId, string status);
     Task<Dictionary<int, (string? Method, string? Status)>> GetPaymentEnumsBatchAsync(List<int> orderIds);
     Task<string?> GetCouponDiscountTypeAsync(int couponId);
-
-    // Polling: lấy danh sách order PENDING + SEPAY (chưa hết hạn)
-    Task<List<OrderHeader>> GetPendingSepayOrdersAsync();
 
     // Admin Order Management
     Task<(List<OrderHeader> Items, int TotalCount)> GetAdminOrdersAsync(AdminOrderFilter filter);
