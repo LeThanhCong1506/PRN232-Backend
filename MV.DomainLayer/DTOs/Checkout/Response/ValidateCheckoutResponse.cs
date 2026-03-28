@@ -8,4 +8,9 @@ public class ValidateCheckoutResponse
     public CheckoutCouponDto? Coupon { get; set; }
     public CheckoutSummaryDto? Summary { get; set; }
     public List<StockErrorDto>? StockErrors { get; set; }
+    /// <summary>
+    /// Non-null nếu coupon được truyền vào nhưng không hợp lệ.
+    /// Page vẫn load bình thường, chỉ không áp dụng discount.
+    /// </summary>
+    public string? CouponError { get; set; }
 }
