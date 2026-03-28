@@ -1,6 +1,8 @@
 ﻿using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
+using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -12,13 +14,17 @@ namespace MV.ApplicationLayer.Services
         private readonly IProductRepository _productRepository;
         private readonly ICouponRepository _couponRepository;
         private readonly INotificationService _notificationService;
+        private readonly IProductBundleRepository _bundleRepository;
+        private readonly IOrderRepository _orderRepository;
 
-        public CartService(ICartRepository cartRepository, IProductRepository productRepository, ICouponRepository couponRepository, INotificationService notificationService)
+        public CartService(ICartRepository cartRepository, IProductRepository productRepository, ICouponRepository couponRepository, INotificationService notificationService, IProductBundleRepository bundleRepository, IOrderRepository orderRepository)
         {
             _cartRepository = cartRepository;
             _productRepository = productRepository;
             _couponRepository = couponRepository;
             _notificationService = notificationService;
+            _bundleRepository = bundleRepository;
+            _orderRepository = orderRepository;
         }
 
         public async Task<ApiResponse<CartResponseDto>> GetCartAsync(int userId)
@@ -32,11 +38,24 @@ namespace MV.ApplicationLayer.Services
                 cart = await _cartRepository.CreateCartAsync(userId);
             }
 
-            // 3. Map Entity to DTO
-            var cartDto = new CartResponseDto
+            // 3. Map Entity to DTO (tính đúng stock cho KIT từ components)
+            var cartItemDtos = new List<CartItemDto>();
+            foreach (var ci in cart.CartItems)
             {
-                CartId = cart.CartId,
-                Items = cart.CartItems.Select(ci => new CartItemDto
+                int effectiveStock;
+                if (ci.Product.ProductType == ProductTypeEnum.KIT.ToString())
+                {
+                    var components = await _bundleRepository.GetBundleComponentsAsync(ci.Product.ProductId);
+                    effectiveStock = components.Any()
+                        ? components.Min(c => (c.ChildProduct.StockQuantity ?? 0) / (c.Quantity ?? 1))
+                        : 0;
+                }
+                else
+                {
+                    effectiveStock = ci.Product.StockQuantity ?? 0;
+                }
+
+                cartItemDtos.Add(new CartItemDto
                 {
                     CartItemId = ci.CartItemId,
                     Quantity = (int)ci.Quantity,
@@ -46,13 +65,18 @@ namespace MV.ApplicationLayer.Services
                         Name = ci.Product.Name,
                         Sku = ci.Product.Sku,
                         Price = ci.Product.Price,
-                        StockQuantity = ci.Product.StockQuantity ?? 0,
+                        StockQuantity = effectiveStock,
                         PrimaryImage = ci.Product.ProductImages?.FirstOrDefault()?.ImageUrl ?? "/images/no-image.png",
-                        InStock = (ci.Product.StockQuantity ?? 0) > 0
+                        InStock = effectiveStock > 0
                     },
-                    // Calculate Item Total
                     ItemTotal = (decimal)(ci.Quantity) * (ci.Product.Price)
-                }).ToList()
+                });
+            }
+
+            var cartDto = new CartResponseDto
+            {
+                CartId = cart.CartId,
+                Items = cartItemDtos
             };
 
             // 4. Calculate Summary
@@ -81,7 +105,19 @@ namespace MV.ApplicationLayer.Services
                 return ApiResponse<object>.ErrorResponse("Product not found.");
             }
 
-            int currentStock = product.StockQuantity ?? 0;
+            // Tính stock đúng: KIT lấy từ components, sản phẩm thường lấy StockQuantity
+            int currentStock;
+            if (product.ProductType == ProductTypeEnum.KIT.ToString())
+            {
+                var components = await _bundleRepository.GetBundleComponentsAsync(product.ProductId);
+                currentStock = components.Any()
+                    ? components.Min(c => (c.ChildProduct.StockQuantity ?? 0) / (c.Quantity ?? 1))
+                    : 0;
+            }
+            else
+            {
+                currentStock = product.StockQuantity ?? 0;
+            }
 
             // CHECK 1: Out of Stock (Kho = 0)
             if (currentStock == 0)
@@ -168,8 +204,19 @@ namespace MV.ApplicationLayer.Services
                 };
             }
 
-            // 4. Check Stock
-            int currentStock = cartItem.Product.StockQuantity ?? 0;
+            // 4. Check Stock (KIT tính từ components)
+            int currentStock;
+            if (cartItem.Product.ProductType == ProductTypeEnum.KIT.ToString())
+            {
+                var components = await _bundleRepository.GetBundleComponentsAsync(cartItem.Product.ProductId);
+                currentStock = components.Any()
+                    ? components.Min(c => (c.ChildProduct.StockQuantity ?? 0) / (c.Quantity ?? 1))
+                    : 0;
+            }
+            else
+            {
+                currentStock = cartItem.Product.StockQuantity ?? 0;
+            }
             if (quantity > currentStock)
             {
                 var errorData = new Dictionary<string, int>
@@ -261,9 +308,6 @@ namespace MV.ApplicationLayer.Services
             // 3. Xóa tất cả cart items (giữ lại cart record)
             await _cartRepository.ClearCartAsync(cart.CartId);
 
-            // Notify realtime: cart cleared
-            await _notificationService.SendCartUpdatedAsync(userId, 0);
-
             // 4. Trả về thành công
             return new ApiResponse<object>
             {
@@ -285,7 +329,7 @@ namespace MV.ApplicationLayer.Services
             }
 
             // 3. Check thời gian hiệu lực (start_date <= NOW <= end_date)
-            var now = DateTime.UtcNow;
+            var now = DateTimeHelper.VietnamNow();
             if (now < coupon.StartDate || now > coupon.EndDate)
             {
                 return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");
@@ -300,7 +344,13 @@ namespace MV.ApplicationLayer.Services
                 }
             }
 
-            // 5. Lấy giỏ hàng của user và tính subtotal
+            // 5. Kiểm tra user đã dùng coupon này chưa
+            if (await _orderRepository.HasUserUsedCouponAsync(userId, coupon.CouponId))
+            {
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("You have already used this coupon code.");
+            }
+
+            // 6. Lấy giỏ hàng của user và tính subtotal
             var cart = await _cartRepository.GetCartByUserIdAsync(userId);
             if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
             {
@@ -309,7 +359,7 @@ namespace MV.ApplicationLayer.Services
 
             decimal cartSubtotal = cart.CartItems.Sum(ci => (ci.Quantity ?? 0) * ci.Product.Price);
 
-            // 6. Check min_order_value
+            // 7. Check min_order_value
             if (coupon.MinOrderValue.HasValue && cartSubtotal < coupon.MinOrderValue.Value)
             {
                 return new ApiResponse<ValidateCouponResponseDto>
@@ -324,8 +374,11 @@ namespace MV.ApplicationLayer.Services
                 };
             }
 
-            // 7. Tính discount (FIXED_AMOUNT - vì không có discountType)
-            decimal calculatedDiscount = coupon.DiscountValue;
+            // 8. Tính discount theo loại coupon (PERCENTAGE hoặc FIXED)
+            var discountType = await _couponRepository.GetCouponDiscountTypeAsync(coupon.CouponId);
+            decimal calculatedDiscount = discountType == "PERCENTAGE"
+                ? cartSubtotal * coupon.DiscountValue / 100
+                : coupon.DiscountValue;
 
             // Đảm bảo discount không vượt quá subtotal
             if (calculatedDiscount > cartSubtotal)
@@ -335,7 +388,7 @@ namespace MV.ApplicationLayer.Services
 
             decimal newTotal = cartSubtotal - calculatedDiscount;
 
-            // 8. Trả về kết quả thành công
+            // 9. Trả về kết quả thành công
             var responseData = new ValidateCouponResponseDto
             {
                 CouponId = coupon.CouponId,
@@ -353,18 +406,10 @@ namespace MV.ApplicationLayer.Services
         /// <summary>
         /// Helper: tính tổng items trong cart rồi gửi notification realtime
         /// </summary>
-        private async Task NotifyCartUpdatedAsync(int userId)
+        private Task NotifyCartUpdatedAsync(int userId)
         {
-            try
-            {
-                var cart = await _cartRepository.GetCartByUserIdAsync(userId);
-                var totalItems = cart?.CartItems?.Sum(ci => ci.Quantity ?? 0) ?? 0;
-                await _notificationService.SendCartUpdatedAsync(userId, totalItems);
-            }
-            catch
-            {
-                // Notification failure should not break the cart operation
-            }
+            // Cart update notifications disabled — không cần thiết cho UX
+            return Task.CompletedTask;
         }
     }
 }

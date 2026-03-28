@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -33,7 +34,7 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
         var pIssue = new Npgsql.NpgsqlParameter("p3", claim.IssueDescription);
         var pStatus = new Npgsql.NpgsqlParameter("p4", (object)(claim.Status ?? "SUBMITTED"));
         var pPhone = new Npgsql.NpgsqlParameter("p5", (object?)claim.ContactPhone ?? DBNull.Value);
-        var pCreatedAt = new Npgsql.NpgsqlParameter("p6", (object)(claim.CreatedAt ?? DateTime.Now));
+        var pCreatedAt = new Npgsql.NpgsqlParameter("p6", (object)(claim.CreatedAt ?? DateTimeHelper.VietnamNow()));
 
         await _context.Database.ExecuteSqlRawAsync(
             @"INSERT INTO warranty_claim (warranty_id, user_id, claim_date, issue_description, status, contact_phone, created_at)
@@ -122,5 +123,37 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
         }
 
         return await _context.WarrantyClaims.CountAsync();
+    }
+
+    public async Task<List<WarrantyClaim>> GetByUserIdAsync(int userId, int page, int pageSize)
+    {
+        var baseQuery = _context.WarrantyClaims.Where(c => c.UserId == userId);
+        
+        var claimIds = await baseQuery
+            .AsNoTracking()
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => c.ClaimId)
+            .ToListAsync();
+
+        if (claimIds.Count == 0)
+            return new List<WarrantyClaim>();
+
+        return await _context.WarrantyClaims
+            .AsNoTracking()
+            .AsSingleQuery()
+            .Include(c => c.Warranty)
+                .ThenInclude(w => w.SerialNumberNavigation)
+                    .ThenInclude(pi => pi.Product)
+            .Include(c => c.User)
+            .Where(c => claimIds.Contains(c.ClaimId))
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<int> CountByUserIdAsync(int userId)
+    {
+        return await _context.WarrantyClaims.CountAsync(c => c.UserId == userId);
     }
 }

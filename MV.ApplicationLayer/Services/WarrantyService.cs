@@ -3,6 +3,7 @@ using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.DTOs.Warranty.Request;
 using MV.DomainLayer.DTOs.Warranty.Response;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.ApplicationLayer.Services;
@@ -91,7 +92,7 @@ public class WarrantyService : IWarrantyService
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             IsActive = true,
-            ActivationDate = DateTime.UtcNow,
+            ActivationDate = DateTimeHelper.VietnamNow(),
             Notes = request.Notes
         };
 
@@ -132,6 +133,15 @@ public class WarrantyService : IWarrantyService
             return ApiResponse<bool>.ErrorResponse($"Warranty with ID {id} not found.");
         }
 
+        // (W7) Chặn xóa nếu có claim đang pending
+        var hasPendingClaims = warranty.WarrantyClaims?.Any(c =>
+            c.Status == "SUBMITTED" || c.Status == "APPROVED") ?? false;
+        if (hasPendingClaims)
+        {
+            return ApiResponse<bool>.ErrorResponse(
+                "Cannot delete warranty that has pending or approved claims. Please resolve all claims first.");
+        }
+
         await _warrantyRepository.DeleteAsync(id);
         return ApiResponse<bool>.SuccessResponse(true, "Warranty deleted successfully.");
     }
@@ -151,7 +161,7 @@ public class WarrantyService : IWarrantyService
         }
 
         warranty.IsActive = true;
-        warranty.ActivationDate = DateTime.UtcNow;
+        warranty.ActivationDate = DateTimeHelper.VietnamNow();
 
         await _warrantyRepository.UpdateAsync(warranty);
 

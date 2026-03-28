@@ -3,6 +3,7 @@ using MV.DomainLayer.DTOs.Checkout.Request;
 using MV.DomainLayer.DTOs.Checkout.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -174,7 +175,7 @@ public class CheckoutService : ICheckoutService
 
             if (coupon != null)
             {
-                var now = DateTime.UtcNow;
+                var now = DateTimeHelper.VietnamNow();
                 bool isValid = true;
 
                 // Check expiration
@@ -200,7 +201,11 @@ public class CheckoutService : ICheckoutService
 
                 if (isValid)
                 {
-                    discount = coupon.DiscountValue;
+                    // Tính đúng theo loại coupon (PERCENTAGE hoặc FIXED)
+                    var discountType = await _couponRepository.GetCouponDiscountTypeAsync(coupon.CouponId);
+                    discount = discountType == "PERCENTAGE"
+                        ? subtotal * coupon.DiscountValue / 100
+                        : coupon.DiscountValue;
 
                     // Ensure discount doesn't exceed subtotal
                     if (discount > subtotal)

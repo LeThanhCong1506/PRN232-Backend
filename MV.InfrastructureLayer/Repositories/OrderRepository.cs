@@ -4,6 +4,7 @@ using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.Order.Request;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using Npgsql;
@@ -199,7 +200,7 @@ public class OrderRepository : IOrderRepository
 
     public async Task<int> GetTodayOrderCountAsync()
     {
-        var today = DateTime.Now.Date;
+        var today = DateTimeHelper.VietnamNow().Date;
         return await _context.OrderHeaders
             .CountAsync(o => o.CreatedAt.HasValue && o.CreatedAt.Value.Date == today);
     }
@@ -213,8 +214,23 @@ public class OrderRepository : IOrderRepository
                 JOIN order_item oi ON oh.order_id = oi.order_id
                 WHERE oh.user_id = {0}
                   AND oi.product_id = {1}
-                  AND oh.status IN ('CONFIRMED'::order_status_enum, 'SHIPPED'::order_status_enum, 'DELIVERED'::order_status_enum)
+                  AND oh.status = 'DELIVERED'::order_status_enum
                 LIMIT 1", userId, productId)
+            .FirstOrDefaultAsync();
+        return result == 1;
+    }
+
+    public async Task<bool> HasUserUsedCouponAsync(int userId, int couponId)
+    {
+        // Kiểm tra user đã dùng coupon này trong đơn hàng nào chưa (trừ đơn CANCELLED)
+        var result = await _context.Database
+            .SqlQueryRaw<int>(@"
+                SELECT 1 AS ""Value""
+                FROM order_header
+                WHERE user_id = {0}
+                  AND coupon_id = {1}
+                  AND status != 'CANCELLED'::order_status_enum
+                LIMIT 1", userId, couponId)
             .FirstOrDefaultAsync();
         return result == 1;
     }
@@ -662,9 +678,9 @@ public class OrderRepository : IOrderRepository
                         StartDate = today,
                         EndDate = today.AddMonths(policy.DurationMonths),
                         IsActive = true,
-                        ActivationDate = DateTime.UtcNow,
+                        ActivationDate = DateTimeHelper.VietnamNow(),
                         Notes = $"Auto-created on delivery of order #{order.OrderNumber}",
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTimeHelper.VietnamNow()
                     });
                 }
             }
@@ -673,14 +689,14 @@ public class OrderRepository : IOrderRepository
                 // No serial tracking — auto-create a ProductInstance for warranty purposes
                 for (int i = 0; i < orderItem.Quantity; i++)
                 {
-                    var serialNumber = $"SN-{orderId}-{orderItem.OrderItemId}-{i + 1}-{DateTime.Now:yyyyMMddHHmmss}";
+                    var serialNumber = $"SN-{orderId}-{orderItem.OrderItemId}-{i + 1}-{DateTimeHelper.VietnamNow():yyyyMMddHHmmss}";
 
                     var instance = new ProductInstance
                     {
                         SerialNumber = serialNumber,
                         ProductId = product.ProductId,
                         OrderItemId = orderItem.OrderItemId,
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTimeHelper.VietnamNow()
                     };
                     _context.ProductInstances.Add(instance);
 
@@ -699,9 +715,9 @@ public class OrderRepository : IOrderRepository
                         StartDate = today,
                         EndDate = today.AddMonths(policy.DurationMonths),
                         IsActive = true,
-                        ActivationDate = DateTime.UtcNow,
+                        ActivationDate = DateTimeHelper.VietnamNow(),
                         Notes = $"Auto-created on delivery of order #{order.OrderNumber}",
-                        CreatedAt = DateTime.UtcNow
+                        CreatedAt = DateTimeHelper.VietnamNow()
                     });
                 }
             }

@@ -8,6 +8,7 @@ using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 
 namespace MV.ApplicationLayer.Services;
@@ -63,7 +64,7 @@ public class AuthService : IAuthService
             Address = request.Address,
             RoleId = customerRole.RoleId,
             IsActive = true,
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTimeHelper.VietnamNow()
         };
 
         _context.Users.Add(user);

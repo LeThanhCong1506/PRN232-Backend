@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MV.ApplicationLayer.Interfaces;
 using MV.ApplicationLayer.Services;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
@@ -61,6 +62,7 @@ namespace MV.PresentationLayer
             builder.Services.AddSwaggerGen(c =>
             {
                 c.EnableAnnotations();
+                c.MapType<IFormFile>(() => new Microsoft.OpenApi.Models.OpenApiSchema { Type = "string", Format = "binary" });
                 c.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Title = "MV API",
@@ -172,6 +174,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IOrderRepository, OrderRepository>();
             builder.Services.AddScoped<ISepayRepository, SepayRepository>();
             builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+            builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
             builder.Services.AddScoped<IRoleService, RoleService>();
             builder.Services.AddScoped<IOrderService, OrderService>();
@@ -190,8 +193,13 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
 
+            // Background Services
+            builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
+
             // Cloudinary
             builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
+
+            builder.Services.AddSingleton<IChatbotService, ChatbotService>();
 
             // SignalR + Realtime Notification
             builder.Services.AddSignalR();
@@ -256,17 +264,58 @@ namespace MV.PresentationLayer
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<StemDbContext>();
-                db.Database.CanConnect(); // chỉ kiểm tra kết nối, không thay đổi schema
+                if (db.Database.CanConnect())
+                {
+                    try
+                    {
+                        db.Database.ExecuteSqlRaw("ALTER TYPE claim_status_enum ADD VALUE IF NOT EXISTS 'UNRESOLVED';");
+                        Console.WriteLine("[DB INIT] Added UNRESOLVED to claim_status_enum successfully.");
+
+                        // Bổ sung tạo bảng Notification nếu chưa có
+                        db.Database.ExecuteSqlRaw(@"
+                            CREATE TABLE IF NOT EXISTS notification (
+                                notification_id SERIAL PRIMARY KEY,
+                                user_id INT NOT NULL,
+                                title VARCHAR(255) NOT NULL,
+                                message TEXT NOT NULL,
+                                type VARCHAR(50) NOT NULL,
+                                is_read BOOLEAN DEFAULT false,
+                                link_url VARCHAR(500),
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            );
+                        ");
+                        Console.WriteLine("[DB INIT] Checked/Created notification table successfully.");
+
+                        // Thêm FK constraint nếu chưa có (align DB với EF model)
+                        // Lưu ý: tên bảng user trong DB là "USER" (uppercase)
+                        db.Database.ExecuteSqlRaw(@"
+                            DO $$
+                            BEGIN
+                                IF NOT EXISTS (
+                                    SELECT 1 FROM information_schema.table_constraints
+                                    WHERE constraint_name = 'fk_notification_user'
+                                    AND table_name = 'notification'
+                                ) THEN
+                                    ALTER TABLE notification
+                                    ADD CONSTRAINT fk_notification_user
+                                    FOREIGN KEY (user_id) REFERENCES ""USER""(user_id)
+                                    ON DELETE RESTRICT;
+                                END IF;
+                            END $$;
+                        ");
+                        Console.WriteLine("[DB INIT] FK constraint fk_notification_user ensured.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[DB INIT] Note: Could not alter schema: {ex.Message}");
+                    }
+                }
             }
 
             // Configure the HTTP request pipeline.
             // Enable Swagger in Development or when EnableSwagger is true (for Docker)
-            var enableSwagger = app.Configuration.GetValue<bool>("EnableSwagger", false);
-            if (app.Environment.IsDevelopment() || enableSwagger)
-            {
-                app.UseSwagger();
-                app.UseSwaggerUI();
-            }
+            app.UseSwagger();
+            app.UseSwaggerUI();
 
             // Chỉ dùng HTTPS redirect khi không phải môi trường production trên Render
             // (Render tự xử lý SSL termination, container chạy HTTP)
@@ -305,7 +354,7 @@ namespace MV.PresentationLayer
                     var result = System.Text.Json.JsonSerializer.Serialize(new
                     {
                         status = report.Status.ToString(),
-                        timestamp = DateTime.UtcNow,
+                        timestamp = DateTimeHelper.VietnamNow(),
                         checks = report.Entries.Select(e => new
                         {
                             name = e.Key,

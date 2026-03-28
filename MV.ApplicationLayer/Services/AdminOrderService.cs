@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Admin.Order.Request;
 using MV.DomainLayer.DTOs.Admin.Order.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Enums;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -15,6 +18,9 @@ public class AdminOrderService : IAdminOrderService
     private readonly IProductRepository _productRepo;
     private readonly IUserRepository _userRepo;
     private readonly StemDbContext _context;
+    private readonly IProductBundleRepository _bundleRepo;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<AdminOrderService> _logger;
 
     private static readonly Dictionary<string, List<string>> AllowedTransitions = new()
     {
@@ -29,12 +35,18 @@ public class AdminOrderService : IAdminOrderService
         IOrderRepository orderRepo,
         IProductRepository productRepo,
         IUserRepository userRepo,
-        StemDbContext context)
+        StemDbContext context,
+        IProductBundleRepository bundleRepo,
+        INotificationService notificationService,
+        ILogger<AdminOrderService> logger)
     {
         _orderRepo = orderRepo;
         _productRepo = productRepo;
         _userRepo = userRepo;
         _context = context;
+        _bundleRepo = bundleRepo;
+        _notificationService = notificationService;
+        _logger = logger;
     }
 
     public async Task<ApiResponse<AdminOrderListResult>> GetAdminOrdersAsync(AdminOrderFilter filter)
@@ -211,7 +223,7 @@ public class AdminOrderService : IAdminOrderService
 
                     // Update status
                     await _orderRepo.SetOrderStatusAsync(orderId, newStatus);
-                    order.UpdatedAt = DateTime.UtcNow;
+                    order.UpdatedAt = DateTimeHelper.VietnamNow();
                     await _orderRepo.UpdateOrderAsync(order);
 
                     await transaction.CommitAsync();
@@ -226,6 +238,16 @@ public class AdminOrderService : IAdminOrderService
         catch (Exception ex)
         {
             return ApiResponse<AdminOrderDetailResponse>.ErrorResponse($"Failed to update order status: {ex.Message}");
+        }
+
+        // Send Real-time Notification — outside execution strategy to avoid duplicate sends on retry
+        try
+        {
+            await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send order status notification for order {OrderId}", orderId);
         }
 
         return await GetAdminOrderDetailAsync(orderId);
@@ -250,7 +272,7 @@ public class AdminOrderService : IAdminOrderService
         if (!string.IsNullOrEmpty(request.Note))
         {
             order.Payment.Notes = request.Note;
-            order.Payment.UpdatedAt = DateTime.UtcNow;
+            order.Payment.UpdatedAt = DateTimeHelper.VietnamNow();
             await _orderRepo.UpdatePaymentAsync(order.Payment);
         }
 
@@ -266,7 +288,7 @@ public class AdminOrderService : IAdminOrderService
         var totalRevenue = await _orderRepo.GetDeliveredRevenueAsync(DateTime.MinValue, DateTime.MaxValue);
 
         // Monthly revenue
-        var monthStart = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+        var monthStart = new DateTime(DateTimeHelper.VietnamNow().Year, DateTimeHelper.VietnamNow().Month, 1);
         var monthEnd = monthStart.AddMonths(1).AddTicks(-1);
         var monthlyRevenue = await _orderRepo.GetDeliveredRevenueAsync(monthStart, monthEnd);
 
@@ -343,7 +365,7 @@ public class AdminOrderService : IAdminOrderService
         if (paymentStatus == "FAILED")
             throw new InvalidOperationException("Cannot confirm order with FAILED payment.");
 
-        order.ConfirmedAt = DateTime.UtcNow;
+        order.ConfirmedAt = DateTimeHelper.VietnamNow();
         order.ConfirmedBy = adminUserId;
 
         // Update ProductInstance status to SOLD (if serial tracking)
@@ -356,7 +378,7 @@ public class AdminOrderService : IAdminOrderService
         if (string.IsNullOrEmpty(request.TrackingNumber))
             throw new InvalidOperationException("Tracking number is required for SHIPPED status.");
 
-        order.ShippedAt = DateTime.UtcNow;
+        order.ShippedAt = DateTimeHelper.VietnamNow();
         order.ShippedBy = adminUserId;
         order.TrackingNumber = request.TrackingNumber;
         order.Carrier = request.Carrier;
@@ -364,7 +386,7 @@ public class AdminOrderService : IAdminOrderService
 
     private async Task HandleDeliverOrder(OrderHeader order, int orderId)
     {
-        order.DeliveredAt = DateTime.UtcNow;
+        order.DeliveredAt = DateTimeHelper.VietnamNow();
 
         // Auto-complete COD payment
         var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
@@ -373,7 +395,7 @@ public class AdminOrderService : IAdminOrderService
             await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, "COMPLETED");
             if (order.Payment != null)
             {
-                order.Payment.PaymentDate = DateTime.UtcNow;
+                order.Payment.PaymentDate = DateTimeHelper.VietnamNow();
                 order.Payment.ReceivedAmount = order.Payment.Amount;
             }
         }
@@ -384,14 +406,26 @@ public class AdminOrderService : IAdminOrderService
 
     private async Task HandleCancelOrder(OrderHeader order, int adminUserId, string currentStatus, AdminUpdateOrderStatusRequest request)
     {
-        order.CancelledAt = DateTime.UtcNow;
+        order.CancelledAt = DateTimeHelper.VietnamNow();
         order.CancelledBy = adminUserId;
         order.CancelReason = request.Note ?? "Cancelled by admin";
 
-        // Restore stock for each order item
+        // Restore stock (KIT restore từng component, sản phẩm thường restore trực tiếp)
         foreach (var item in order.OrderItems)
         {
-            await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+            if (item.Product?.ProductType == ProductTypeEnum.KIT.ToString())
+            {
+                var components = await _bundleRepo.GetBundleComponentsAsync(item.ProductId);
+                foreach (var comp in components)
+                {
+                    var restoreQty = (comp.Quantity ?? 1) * item.Quantity;
+                    await _orderRepo.IncrementStockAsync(comp.ChildProductId, restoreQty);
+                }
+            }
+            else
+            {
+                await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+            }
         }
 
         // Restore coupon usage if applicable

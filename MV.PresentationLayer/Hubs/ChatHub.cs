@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
+using MV.InfrastructureLayer.Interfaces;
 using System.Security.Claims;
 
 namespace MV.PresentationLayer.Hubs;
@@ -17,11 +19,13 @@ public class ChatHub : Hub
 {
     private readonly StemDbContext _context;
     private readonly ILogger<ChatHub> _logger;
+    private readonly INotificationService _notificationService;
 
-    public ChatHub(StemDbContext context, ILogger<ChatHub> logger)
+    public ChatHub(StemDbContext context, ILogger<ChatHub> logger, INotificationService notificationService)
     {
         _context = context;
         _logger = logger;
+        _notificationService = notificationService;
     }
 
     public override async Task OnConnectedAsync()
@@ -32,7 +36,9 @@ public class ChatHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, $"chat_user_{userId}");
 
             // Admin/Staff join admin group
-            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+                ?? Context.User?.FindFirst("role")?.Value;
+                
             if (role == "Admin" || role == "Staff")
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, "chat_admins");
@@ -51,7 +57,9 @@ public class ChatHub : Hub
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"chat_user_{userId}");
 
-            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+                ?? Context.User?.FindFirst("role")?.Value;
+                
             if (role == "Admin" || role == "Staff")
             {
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, "chat_admins");
@@ -71,9 +79,12 @@ public class ChatHub : Hub
         var senderId = GetUserId();
         if (senderId == 0 || string.IsNullOrWhiteSpace(content)) return;
 
-        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+        var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+            ?? Context.User?.FindFirst("role")?.Value;
+            
         var isAdmin = role == "Admin" || role == "Staff";
-        var senderName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
+        var senderName = Context.User?.FindFirst(ClaimTypes.Name)?.Value 
+            ?? Context.User?.FindFirst("name")?.Value ?? "Unknown";
 
         var message = new ChatMessage
         {
@@ -81,7 +92,7 @@ public class ChatHub : Hub
             ReceiverId = isAdmin ? receiverId : null,
             Content = content.Trim(),
             IsFromAdmin = isAdmin,
-            SentAt = DateTime.Now,
+            SentAt = DateTimeHelper.VietnamNow(),
             IsRead = false
         };
 
@@ -106,6 +117,15 @@ public class ChatHub : Hub
             await Clients.Group($"chat_user_{receiverId.Value}").SendAsync("ReceiveMessage", messageDto);
             // Cũng gửi lại cho chính admin (confirm)
             await Clients.Caller.SendAsync("ReceiveMessage", messageDto);
+            // Gửi Notification bell cho customer
+            try
+            {
+                await _notificationService.SendNewChatMessageAsync(receiverId.Value, senderName, content.Trim());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send notification for chat message.");
+            }
         }
         else
         {
@@ -141,7 +161,9 @@ public class ChatHub : Hub
 
     private int GetUserId()
     {
-        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? Context.User?.FindFirst("sub")?.Value;
+            
         return int.TryParse(userIdStr, out var userId) ? userId : 0;
     }
 }

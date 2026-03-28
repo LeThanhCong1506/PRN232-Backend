@@ -13,4 +13,10 @@ public interface IWarrantyClaimRepository
     /// </summary>
     Task<List<WarrantyClaim>> GetAllAsync(string? status, int page, int pageSize);
     Task<int> CountAsync(string? status);
+
+    /// <summary>
+    /// Customer: lấy danh sách claims của chính mình (có phân trang)
+    /// </summary>
+    Task<List<WarrantyClaim>> GetByUserIdAsync(int userId, int page, int pageSize);
+    Task<int> CountByUserIdAsync(int userId);
 }

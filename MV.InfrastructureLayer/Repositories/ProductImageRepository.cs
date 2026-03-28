@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
@@ -16,7 +17,7 @@ public class ProductImageRepository : IProductImageRepository
 
     public async Task<ProductImage> AddAsync(ProductImage productImage)
     {
-        productImage.CreatedAt = DateTime.UtcNow;
+        productImage.CreatedAt = DateTimeHelper.VietnamNow();
         _context.ProductImages.Add(productImage);
         await _context.SaveChangesAsync();
         return productImage;

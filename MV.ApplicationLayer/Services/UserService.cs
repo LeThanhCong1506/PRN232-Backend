@@ -2,6 +2,7 @@ using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Login.Request;
 using MV.DomainLayer.DTOs.Login.Response;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
@@ -40,7 +41,7 @@ namespace MV.ApplicationLayer.Services
                 Phone = dto.Phone,
                 Address = dto.Address,
                 IsActive = true,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTimeHelper.VietnamNow()
             };
 
             await _repo.AddAsync(user);

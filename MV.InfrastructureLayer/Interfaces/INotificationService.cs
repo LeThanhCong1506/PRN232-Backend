@@ -29,4 +29,14 @@ public interface INotificationService
     /// Gửi thông báo tùy chỉnh
     /// </summary>
     Task SendNotificationAsync(int userId, string eventType, object data);
+
+    /// <summary>
+    /// Gửi thông báo khi admin thay đổi status warranty claim
+    /// </summary>
+    Task SendWarrantyClaimStatusChangedAsync(int userId, int claimId, string productName, string newStatus);
+
+    /// <summary>
+    /// Gửi thông báo khi admin gửi tin nhắn chat tới customer
+    /// </summary>
+    Task SendNewChatMessageAsync(int userId, string senderName, string messagePreview);
 }

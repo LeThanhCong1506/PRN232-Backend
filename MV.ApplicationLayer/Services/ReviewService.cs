@@ -2,6 +2,7 @@ using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.DTOs.Review.Response;
 using MV.DomainLayer.DTOs.Review.Request;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.Interfaces;
 using MV.DomainLayer.Entities;
 
@@ -73,7 +74,7 @@ public class ReviewService : IReviewService
             UserId = userId,
             Rating = request.Rating,
             Comment = request.Comment,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTimeHelper.VietnamNow()
         };
 
         await _reviewRepository.AddAsync(review);

@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.InfrastructureLayer.DBContext;
+using MV.InfrastructureLayer.Interfaces;
 using MV.PresentationLayer.Hubs;
 using Swashbuckle.AspNetCore.Annotations;
 using System.Security.Claims;
@@ -22,11 +24,54 @@ public class ChatController : ControllerBase
 {
     private readonly StemDbContext _context;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<ChatController> _logger;
 
-    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext)
+    private readonly ICloudinaryService _cloudinaryService;
+
+    public ChatController(StemDbContext context, IHubContext<ChatHub> hubContext,
+        INotificationService notificationService, ILogger<ChatController> logger,
+        ICloudinaryService cloudinaryService)
     {
         _context = context;
         _hubContext = hubContext;
+        _notificationService = notificationService;
+        _logger = logger;
+        _cloudinaryService = cloudinaryService;
+    }
+
+    private static readonly HashSet<string> _allowedImageTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"
+    };
+
+    /// <summary>
+    /// Upload ảnh cho chat lên Cloudinary, trả về URL để gửi trong tin nhắn.
+    /// </summary>
+    [HttpPost("upload-image")]
+    [SwaggerOperation(Summary = "Upload a chat image to Cloudinary")]
+    public async Task<IActionResult> UploadImage(IFormFile image)
+    {
+        if (image == null || image.Length == 0)
+            return BadRequest(ApiResponse<object>.ErrorResponse("No image provided"));
+
+        if (!_allowedImageTypes.Contains(image.ContentType))
+            return BadRequest(ApiResponse<object>.ErrorResponse("Only JPEG, PNG, GIF, and WebP images are allowed"));
+
+        const long maxSize = 5 * 1024 * 1024; // 5 MB
+        if (image.Length > maxSize)
+            return BadRequest(ApiResponse<object>.ErrorResponse("Image must be under 5 MB"));
+
+        try
+        {
+            var (imageUrl, _) = await _cloudinaryService.UploadImageAsync(image, "chat");
+            return Ok(ApiResponse<object>.SuccessResponse(new { imageUrl }, "Image uploaded"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload chat image to Cloudinary");
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("Failed to upload image"));
+        }
     }
 
     /// <summary>
@@ -61,7 +106,7 @@ public class ChatController : ControllerBase
             ReceiverId = isAdmin ? dto.ReceiverId : null,
             Content = dto.Content.Trim(),
             IsFromAdmin = isAdmin,
-            SentAt = DateTime.Now,
+            SentAt = DateTimeHelper.VietnamNow(),
             IsRead = false
         };
 
@@ -85,6 +130,16 @@ public class ChatController : ControllerBase
         {
             await _hubContext.Clients.Group($"chat_user_{dto.ReceiverId.Value}")
                 .SendAsync("ReceiveMessage", messageDto);
+
+            // Gửi notification bell cho customer — giống ChatHub.SendMessage
+            try
+            {
+                await _notificationService.SendNewChatMessageAsync(dto.ReceiverId.Value, senderName, dto.Content.Trim());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send chat notification for receiver {ReceiverId}", dto.ReceiverId.Value);
+            }
         }
         else
         {

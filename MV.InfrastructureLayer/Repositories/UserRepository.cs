@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
 using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
@@ -67,6 +67,12 @@ namespace MV.InfrastructureLayer.Repositories
             existingUser.District = user.District;
             existingUser.Ward = user.Ward;
             existingUser.IsActive = user.IsActive;
+            existingUser.AvatarUrl = user.AvatarUrl;
+            existingUser.FullName = user.FullName;
+            existingUser.Province = user.Province;
+            existingUser.District = user.District;
+            existingUser.Ward = user.Ward;
+            existingUser.StreetAddress = user.StreetAddress;
             _context.Users.Update(existingUser);
             await _context.SaveChangesAsync();
             return true;

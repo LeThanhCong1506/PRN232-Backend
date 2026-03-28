@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MV.DomainLayer.Entities;
+using MV.DomainLayer.Helpers;
 using MV.DomainLayer.Interfaces;
 using MV.InfrastructureLayer.DBContext;
 using System;
@@ -42,7 +43,7 @@ namespace MV.InfrastructureLayer.Repositories
             var cart = new Cart
             {
                 UserId = userId,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTimeHelper.VietnamNow()
             };
 
             _context.Carts.Add(cart);
@@ -73,7 +74,7 @@ namespace MV.InfrastructureLayer.Repositories
                     CartId = cartId,
                     ProductId = productId,
                     Quantity = quantity,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTimeHelper.VietnamNow()
                 };
 
                 _context.CartItems.Add(newItem);

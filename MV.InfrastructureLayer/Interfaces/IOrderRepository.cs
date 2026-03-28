@@ -32,6 +32,8 @@ public interface IOrderRepository
     Task IncrementCouponUsedCountAsync(int couponId);
     Task DecrementCouponUsedCountAsync(int couponId);
     Task<Coupon?> GetCouponByCodeAsync(string code);
+    /// <summary>Kiểm tra user đã dùng coupon này trong đơn hàng nào chưa (trừ đơn CANCELLED).</summary>
+    Task<bool> HasUserUsedCouponAsync(int userId, int couponId);
 
     // Raw SQL for enum columns (not scaffolded)
     Task<string?> GetOrderStatusAsync(int orderId);
