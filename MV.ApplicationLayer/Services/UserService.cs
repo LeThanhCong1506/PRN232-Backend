@@ -53,6 +53,8 @@ namespace MV.ApplicationLayer.Services
             var user = await _repo.GetByEmailAsync(dto.Email);
             if (user == null) return null;
 
+            if (user.PasswordHash == null) return null;
+            
             var hash = HashPassword(dto.Password);
             if (user.PasswordHash != hash) return null;
 

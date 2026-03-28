@@ -1,4 +1,4 @@
-﻿using MV.DomainLayer.Entities;
+using MV.DomainLayer.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,5 +17,6 @@ namespace MV.InfrastructureLayer.Interfaces
         Task<List<User>> GetAllAsync();
         Task<User?> GetByIdAsync(int id);
         Task<bool> UpdateAsync(User user);
+        Task<User?> GetByExternalLoginAsync(string provider, string externalId);
     }
 }

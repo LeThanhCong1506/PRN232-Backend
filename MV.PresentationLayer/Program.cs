@@ -192,6 +192,10 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IAdminProductService, AdminProductService>();
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
+            
+            // OAuth
+            builder.Services.AddHttpClient();
+            builder.Services.AddScoped<IExternalAuthService, ExternalAuthService>();
 
             // Background Services
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();
@@ -270,6 +274,14 @@ namespace MV.PresentationLayer
                     {
                         db.Database.ExecuteSqlRaw("ALTER TYPE claim_status_enum ADD VALUE IF NOT EXISTS 'UNRESOLVED';");
                         Console.WriteLine("[DB INIT] Added UNRESOLVED to claim_status_enum successfully.");
+
+                        // Bổ sung tạo cột cho OAuth
+                        db.Database.ExecuteSqlRaw(@"
+                            ALTER TABLE ""USER"" ADD COLUMN IF NOT EXISTS external_provider VARCHAR(20);
+                            ALTER TABLE ""USER"" ADD COLUMN IF NOT EXISTS external_id VARCHAR(255);
+                            ALTER TABLE ""USER"" ALTER COLUMN password_hash DROP NOT NULL;
+                        ");
+                        Console.WriteLine("[DB INIT] Added OAuth columns to USER table successfully.");
 
                         // Bổ sung tạo bảng Notification nếu chưa có
                         db.Database.ExecuteSqlRaw(@"

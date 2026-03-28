@@ -875,6 +875,12 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.AvatarUrl)
                 .HasMaxLength(255)
                 .HasColumnName("avatar_url");
+            entity.Property(e => e.ExternalProvider)
+                .HasMaxLength(20)
+                .HasColumnName("external_provider");
+            entity.Property(e => e.ExternalId)
+                .HasMaxLength(255)
+                .HasColumnName("external_id");
 
             entity.HasOne(d => d.Role).WithMany(p => p.Users)
                 .HasForeignKey(d => d.RoleId)
