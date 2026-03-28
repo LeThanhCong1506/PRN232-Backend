@@ -312,12 +312,8 @@ namespace MV.PresentationLayer
 
             // Configure the HTTP request pipeline.
             // Enable Swagger in Development or when EnableSwagger is true (for Docker)
-            var enableSwagger = app.Configuration.GetValue<bool>("EnableSwagger", false);
-            if (app.Environment.IsDevelopment() || enableSwagger)
-            {
-                app.UseSwagger();
-                app.UseSwaggerUI();
-            }
+            app.UseSwagger();
+            app.UseSwaggerUI();
 
             // Chỉ dùng HTTPS redirect khi không phải môi trường production trên Render
             // (Render tự xử lý SSL termination, container chạy HTTP)
