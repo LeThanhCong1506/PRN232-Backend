@@ -168,24 +168,8 @@ namespace MV.ApplicationLayer.Services
                 }
                 else
                 {
-                    // Create new account
-                    int roleId = 2; // User role
-
-                    var newUser = new User
-                    {
-                        RoleId = roleId,
-                        Username = $"{provider}_{externalId}",
-                        Email = email,
-                        FullName = name,
-                        AvatarUrl = avatarUrl,
-                        ExternalProvider = provider,
-                        ExternalId = externalId,
-                        IsActive = true,
-                        CreatedAt = DateTimeHelper.VietnamNow()
-                    };
-                    await _userRepository.AddAsync(newUser);
-                    // Fetch again to include Role
-                    user = await _userRepository.GetByIdAsync(newUser.UserId);
+                    // Account does not exist, throw special error to notify frontend
+                    throw new Exception("User not registered. Please register a new account.");
                 }
             }
             
