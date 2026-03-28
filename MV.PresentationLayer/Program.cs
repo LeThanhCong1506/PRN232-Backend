@@ -61,6 +61,7 @@ namespace MV.PresentationLayer
             builder.Services.AddSwaggerGen(c =>
             {
                 c.EnableAnnotations();
+                c.MapType<IFormFile>(() => new Microsoft.OpenApi.Models.OpenApiSchema { Type = "string", Format = "binary" });
                 c.SwaggerDoc("v1", new OpenApiInfo
                 {
                     Title = "MV API",

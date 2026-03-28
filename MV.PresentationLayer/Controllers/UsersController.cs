@@ -142,7 +142,7 @@ namespace MV.PresentationLayer.Controllers
         [HttpPost("me/avatar")]
         [Authorize]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UploadAvatar([FromForm] IFormFile file)
+        public async Task<IActionResult> UploadAvatar([FromForm] List<IFormFile> files)
         {
             var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
                    ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -150,6 +150,7 @@ namespace MV.PresentationLayer.Controllers
             if (!int.TryParse(sub, out var userId))
                 return Unauthorized();
 
+            var file = files?.FirstOrDefault();
             if (file == null || file.Length == 0)
                 return BadRequest(ApiResponse<string>.ErrorResponse("No file provided"));
 

@@ -81,8 +81,9 @@ public class CategoryController : ControllerBase
     [HttpPost("{id}/image")]
     [Authorize(Roles = "Admin")]
     [Consumes("multipart/form-data")]
-    public async Task<IActionResult> UploadCategoryImage(int id, [FromForm] IFormFile file)
+    public async Task<IActionResult> UploadCategoryImage(int id, [FromForm] List<IFormFile> files)
     {
+        var file = files?.FirstOrDefault();
         if (file == null || file.Length == 0)
             return BadRequest(ApiResponse<string>.ErrorResponse("No file provided"));
 
