@@ -55,3 +55,4 @@ nunit-*.xml
 /MV.PresentationLayer/appsettings.json
 /MV.PresentationLayer/appsettings.json
 /MV.PresentationLayer/serviceAccountKey.json
+/MV.PresentationLayer/appsettings.json
