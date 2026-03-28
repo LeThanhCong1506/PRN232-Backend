@@ -325,14 +325,18 @@ namespace MV.ApplicationLayer.Services
             // 2. Check coupon tồn tại
             if (coupon == null)
             {
-                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon code does not exist.");
             }
 
             // 3. Check thời gian hiệu lực (start_date <= NOW <= end_date)
             var now = DateTimeHelper.VietnamNow();
-            if (now < coupon.StartDate || now > coupon.EndDate)
+            if (now < coupon.StartDate)
             {
-                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse($"This coupon is not active yet. It starts on {coupon.StartDate:dd/MM/yyyy}.");
+            }
+            if (now > coupon.EndDate)
+            {
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse($"This coupon expired on {coupon.EndDate:dd/MM/yyyy}.");
             }
 
             // 4. Check usage_limit > used_count (nếu có giới hạn)
@@ -340,7 +344,7 @@ namespace MV.ApplicationLayer.Services
             {
                 if (coupon.UsedCount >= coupon.UsageLimit)
                 {
-                    return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Coupon not found or invalid.");
+                    return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("This coupon has reached its usage limit.");
                 }
             }
 
@@ -354,24 +358,16 @@ namespace MV.ApplicationLayer.Services
             var cart = await _cartRepository.GetCartByUserIdAsync(userId);
             if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
             {
-                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Cart is empty.");
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse("Your cart is empty.");
             }
 
             decimal cartSubtotal = cart.CartItems.Sum(ci => (ci.Quantity ?? 0) * ci.Product.Price);
 
             // 7. Check min_order_value
-            if (coupon.MinOrderValue.HasValue && cartSubtotal < coupon.MinOrderValue.Value)
+            if (coupon.MinOrderValue.HasValue && coupon.MinOrderValue.Value > 0 && cartSubtotal < coupon.MinOrderValue.Value)
             {
-                return new ApiResponse<ValidateCouponResponseDto>
-                {
-                    Success = false,
-                    Message = "Minimum order value not met.",
-                    Data = new ValidateCouponResponseDto
-                    {
-                        CartSubtotal = cartSubtotal,
-                        DiscountValue = coupon.MinOrderValue.Value
-                    }
-                };
+                return ApiResponse<ValidateCouponResponseDto>.ErrorResponse(
+                    $"Minimum order value for this coupon is {coupon.MinOrderValue.Value:N0} ₫. Your cart total is {cartSubtotal:N0} ₫.");
             }
 
             // 8. Tính discount theo loại coupon (PERCENTAGE hoặc FIXED)
