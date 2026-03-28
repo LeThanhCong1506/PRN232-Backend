@@ -80,6 +80,7 @@ public class CategoryController : ControllerBase
     /// </summary>
     [HttpPost("{id}/image")]
     [Authorize(Roles = "Admin")]
+    [Consumes("multipart/form-data")]
     public async Task<IActionResult> UploadCategoryImage(int id, [FromForm] IFormFile file)
     {
         if (file == null || file.Length == 0)

@@ -141,6 +141,7 @@ namespace MV.PresentationLayer.Controllers
         /// </summary>
         [HttpPost("me/avatar")]
         [Authorize]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadAvatar([FromForm] IFormFile file)
         {
             var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
