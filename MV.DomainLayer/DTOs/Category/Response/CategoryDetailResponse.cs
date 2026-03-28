@@ -4,6 +4,7 @@ public class CategoryDetailResponse
 {
     public int CategoryId { get; set; }
     public string Name { get; set; } = null!;
+    public string? ImageUrl { get; set; }
     public int TotalProducts { get; set; }
     public int InStockProducts { get; set; }
     public decimal? AveragePrice { get; set; }
