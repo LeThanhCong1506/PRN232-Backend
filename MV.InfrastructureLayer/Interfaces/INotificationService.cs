@@ -40,4 +40,24 @@ public interface INotificationService
     /// Gửi thông báo khi admin gửi tin nhắn chat tới customer
     /// </summary>
     Task SendNewChatMessageAsync(int userId, string senderName, string messagePreview);
+
+    /// <summary>
+    /// Gửi thông báo khi có đơn hàng mới tới Admin
+    /// </summary>
+    Task SendAdminNewOrderAsync(int orderId, string orderNumber, decimal totalAmount);
+
+    /// <summary>
+    /// Gửi thông báo khách thanh toán thành công tới Admin (VD: Sepay)
+    /// </summary>
+    Task SendAdminPaymentConfirmedAsync(int orderId, string orderNumber, decimal amount);
+
+    /// <summary>
+    /// Gửi thông báo khi có yêu cầu bảo hành mới tới Admin
+    /// </summary>
+    Task SendAdminNewWarrantyClaimAsync(int claimId, string customerName, string productName);
+
+    /// <summary>
+    /// Gửi thông báo khi có yêu cầu trả hàng mới tới Admin
+    /// </summary>
+    Task SendAdminNewReturnRequestAsync(int requestId, string orderNumber, string customerName);
 }

@@ -21,4 +21,8 @@
     <ProjectReference Include="..\MV.InfrastructureLayer\MV.InfrastructureLayer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+  </ItemGroup>
+
 </Project>

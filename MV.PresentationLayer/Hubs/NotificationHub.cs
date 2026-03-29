@@ -21,20 +21,22 @@ public class NotificationHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? Context.User?.FindFirst("sub")?.Value;
             
-        if (!string.IsNullOrEmpty(userId))
+        if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
-            
-            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
-            if (role == "Admin" || role == "Store")
+            _logger.LogInformation("User {UserId} connected to NotificationHub. ConnectionId: {ConnectionId}", userIdStr, Context.ConnectionId);
+
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+                ?? Context.User?.FindFirst("role")?.Value;
+
+            if (role == "Admin" || role == "Staff")
             {
-                await Groups.AddToGroupAsync(Context.ConnectionId, "admin_group");
+                await Groups.AddToGroupAsync(Context.ConnectionId, "admin_notifications");
+                _logger.LogInformation("User {UserId} joined admin_notifications group.", userIdStr);
             }
-            
-            _logger.LogInformation("User {UserId} connected to NotificationHub. ConnectionId: {ConnectionId}", userId, Context.ConnectionId);
         }
 
         await base.OnConnectedAsync();
@@ -42,13 +44,21 @@ public class NotificationHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? Context.User?.FindFirst("sub")?.Value;
             
-        if (!string.IsNullOrEmpty(userId))
+        if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{userId}");
-            _logger.LogInformation("User {UserId} disconnected from NotificationHub. ConnectionId: {ConnectionId}", userId, Context.ConnectionId);
+            _logger.LogInformation("User {UserId} disconnected from NotificationHub. ConnectionId: {ConnectionId}", userIdStr, Context.ConnectionId);
+
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value
+                ?? Context.User?.FindFirst("role")?.Value;
+
+            if (role == "Admin" || role == "Staff")
+            {
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, "admin_notifications");
+            }
         }
 
         await base.OnDisconnectedAsync(exception);

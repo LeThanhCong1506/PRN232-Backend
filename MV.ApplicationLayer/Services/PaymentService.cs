@@ -180,6 +180,7 @@ public class PaymentService : IPaymentService
                     if (payment.Order != null)
                     {
                         try { await _notificationService.SendPaymentConfirmedAsync(payment.Order.UserId, payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
+                        try { await _notificationService.SendAdminPaymentConfirmedAsync(payment.OrderId, payment.Order.OrderNumber, request.TransferAmount); } catch { }
                     }
                 }
                 catch (Exception ex)
@@ -450,6 +451,7 @@ public class PaymentService : IPaymentService
 
                         // Notify realtime: payment confirmed
                         try { await _notificationService.SendPaymentConfirmedAsync(order.UserId, order.OrderId, order.OrderNumber, payment.Amount); } catch { }
+                        try { await _notificationService.SendAdminPaymentConfirmedAsync(order.OrderId, order.OrderNumber, payment.Amount); } catch { }
 
                         return ApiResponse<PaymentStatusResponse>.SuccessResponse(new PaymentStatusResponse
                         {

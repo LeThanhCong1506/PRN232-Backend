@@ -195,10 +195,16 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IReviewService, ReviewService>();
             builder.Services.AddScoped<IReturnRequestService, ReturnRequestService>();
             builder.Services.AddScoped<IShippingFeeService, ShippingFeeService>();
+            builder.Services.AddScoped<IExportService, ExportService>();
 
             // OAuth
             builder.Services.AddHttpClient();
             builder.Services.AddScoped<IExternalAuthService, ExternalAuthService>();
+
+            // Auth + Email
+            builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddHttpClient<ResendEmailService>();
+            builder.Services.AddScoped<IEmailService, ResendEmailService>();
 
             // Background Services
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();

@@ -72,6 +72,8 @@ public class AdminOrderService : IAdminOrderService
                 CustomerEmail = o.CustomerEmail,
                 CustomerPhone = o.CustomerPhone,
                 TotalAmount = o.TotalAmount,
+                ShippingFee = o.ShippingFee,
+                DiscountAmount = o.DiscountAmount,
                 PaymentMethod = payment.Method,
                 PaymentStatus = payment.Status,
                 ItemCount = o.OrderItems.Count,
@@ -265,10 +267,13 @@ public class AdminOrderService : IAdminOrderService
         if (order.Payment == null)
             return ApiResponse<bool>.ErrorResponse("Order has no payment record.");
 
-        var validStatuses = new[] { "PENDING", "COMPLETED", "FAILED", "EXPIRED" };
+        var validStatuses = new[] { "PENDING", "COMPLETED", "FAILED", "EXPIRED", "PAID" };
         var newStatus = request.NewPaymentStatus.ToUpper();
         if (!validStatuses.Contains(newStatus))
             return ApiResponse<bool>.ErrorResponse($"Invalid payment status: {newStatus}. Valid: {string.Join(", ", validStatuses)}");
+
+        // Map PAID → COMPLETED
+        if (newStatus == "PAID") newStatus = "COMPLETED";
 
         await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, newStatus);
 

@@ -140,6 +140,36 @@ namespace MV.ApplicationLayer.Services
                 }
             }
 
+            // Auto-suggest related products nếu chưa có manually added
+            if (response.RelatedProducts == null || !response.RelatedProducts.Any())
+            {
+                var categoryIds = product.Categories.Select(c => c.CategoryId).ToList();
+                var autoRelated = await _context.Products
+                    .AsNoTracking()
+                    .Where(p => p.ProductId != productId
+                        && p.IsActive == true
+                        && p.IsDeleted != true
+                        && (p.Categories.Any(c => categoryIds.Contains(c.CategoryId))
+                            || p.BrandId == product.BrandId))
+                    .OrderByDescending(p => p.Categories.Count(c => categoryIds.Contains(c.CategoryId)))
+                    .ThenByDescending(p => p.BrandId == product.BrandId ? 1 : 0)
+                    .Take(8)
+                    .Select(p => new ProductDetailResponse.RelatedProductInfo
+                    {
+                        RelatedProductId = 0,
+                        ProductId = p.ProductId,
+                        Name = p.Name,
+                        Sku = p.Sku,
+                        Price = p.Price,
+                        PrimaryImage = p.ProductImages.OrderBy(i => i.ImageId).Select(i => i.ImageUrl).FirstOrDefault(),
+                        RelationType = "AUTO",
+                        DisplayOrder = 0
+                    })
+                    .ToListAsync();
+
+                response.RelatedProducts = autoRelated;
+            }
+
             return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product retrieved successfully.");
         }
 

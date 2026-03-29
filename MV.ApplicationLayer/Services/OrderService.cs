@@ -307,6 +307,9 @@ public class OrderService : IOrderService
                         : "Order successful. Redirect to checkoutUrl to complete payment."
                 };
 
+                // Notify Admin about the new order
+                try { await _notificationService.SendAdminNewOrderAsync(order.OrderId, orderNumber, totalAmount); } catch { }
+
                 return ApiResponse<CheckoutResponse>.SuccessResponse(response, "Order placed successfully.");
             }
             catch (Exception ex)
