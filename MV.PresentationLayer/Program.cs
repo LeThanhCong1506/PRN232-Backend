@@ -202,7 +202,8 @@ namespace MV.PresentationLayer
 
             // Auth + Email
             builder.Services.AddScoped<IAuthService, AuthService>();
-            builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+            builder.Services.AddHttpClient<ResendEmailService>();
+            builder.Services.AddScoped<IEmailService, ResendEmailService>();
 
             // Background Services
             builder.Services.AddHostedService<PaymentExpiryBackgroundService>();

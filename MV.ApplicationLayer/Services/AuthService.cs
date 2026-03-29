@@ -168,11 +168,22 @@ public class AuthService : IAuthService
 
         // Rate limit: max 3 requests per hour
         var now = DateTimeHelper.VietnamNow();
-        var lastAttempt = user.PasswordResetTokenExpiry;
 
-        // Reset counter nếu đã qua 1 giờ kể từ lần cuối
-        if (lastAttempt.HasValue && lastAttempt.Value <= now.AddMinutes(-60))
+        Console.WriteLine($"[FORGOT-PW] Attempts={user.PasswordResetAttempts}, Expiry={user.PasswordResetTokenExpiry}, Now={now}");
+
+        // Reset counter nếu đã qua 1 giờ kể từ lần gửi cuối
+        if (user.PasswordResetTokenExpiry.HasValue)
         {
+            var lastRequestTime = user.PasswordResetTokenExpiry.Value.AddMinutes(-15);
+            if (now - lastRequestTime > TimeSpan.FromHours(1))
+            {
+                user.PasswordResetAttempts = 0;
+                Console.WriteLine($"[FORGOT-PW] Counter reset (last request was {lastRequestTime})");
+            }
+        }
+        else
+        {
+            // Chưa từng gửi hoặc đã bị clear → reset counter
             user.PasswordResetAttempts = 0;
         }
 
