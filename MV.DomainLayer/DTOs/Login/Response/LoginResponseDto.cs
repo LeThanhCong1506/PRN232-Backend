@@ -13,5 +13,6 @@ namespace MV.DomainLayer.DTOs.Login.Response
         public string Email { get; set; } = null!;
         public string Role { get; set; } = null!;
         public string AccessToken { get; set; } = null!;
+        public string? AvatarUrl { get; set; }
     }
 }

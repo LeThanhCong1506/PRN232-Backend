@@ -282,6 +282,7 @@ namespace MV.PresentationLayer
                         db.Database.ExecuteSqlRaw(@"
                             ALTER TABLE ""USER"" ADD COLUMN IF NOT EXISTS external_provider VARCHAR(20);
                             ALTER TABLE ""USER"" ADD COLUMN IF NOT EXISTS external_id VARCHAR(255);
+                            ALTER TABLE ""USER"" ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);
                             ALTER TABLE ""USER"" ALTER COLUMN password_hash DROP NOT NULL;
                         ");
                         Console.WriteLine("[DB INIT] Added OAuth columns to USER table successfully.");

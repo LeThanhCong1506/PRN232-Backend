@@ -370,7 +370,11 @@ public class OrderService : IOrderService
             return ApiResponse<OrderDetailResponse>.ErrorResponse("The order does not exist.");
         }
 
-        if (!Enum.TryParse<OrderStatusEnum>(request.Status, true, out var newStatus))
+        // Normalize: mobile may send "Shipping" instead of the correct enum value "SHIPPED"
+        var statusStr = request.Status;
+        if (statusStr.Equals("Shipping", StringComparison.OrdinalIgnoreCase)) statusStr = "SHIPPED";
+
+        if (!Enum.TryParse<OrderStatusEnum>(statusStr, true, out var newStatus))
         {
             return ApiResponse<OrderDetailResponse>.ErrorResponse("Invalid status");
         }

@@ -238,7 +238,8 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<bool> ExistsAsync(int productId)
         {
-            return await _context.Products.AnyAsync(p => p.ProductId == productId && p.IsActive == true);
+            // Check IsActive != false to also include products where IsActive is null (not explicitly deactivated)
+            return await _context.Products.AnyAsync(p => p.ProductId == productId && p.IsActive != false);
         }
 
         public async Task<bool> SkuExistsAsync(string sku, int? excludeProductId = null)
