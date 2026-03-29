@@ -6,4 +6,6 @@ public class CheckoutSummaryDto
     public decimal ShippingFee { get; set; }
     public decimal Discount { get; set; }
     public decimal Total { get; set; }
+    public bool IsFreeShipping { get; set; }
+    public decimal FreeShippingThreshold { get; set; }
 }

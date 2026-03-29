@@ -190,6 +190,11 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)
                 .Include(p => p.WarrantyPolicy)
+                .Include(p => p.ProductSpecifications.OrderBy(s => s.DisplayOrder))
+                .Include(p => p.ProductDocuments.OrderBy(d => d.DisplayOrder))
+                .Include(p => p.RelatedProducts.OrderBy(r => r.DisplayOrder))
+                    .ThenInclude(r => r.RelatedToProduct)
+                        .ThenInclude(rp => rp.ProductImages)
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
 
             if (product == null) return null;

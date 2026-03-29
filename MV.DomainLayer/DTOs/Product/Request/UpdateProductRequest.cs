@@ -34,4 +34,11 @@ public class UpdateProductRequest
     public bool HasSerialTracking { get; set; }
 
     public List<int> CategoryIds { get; set; } = new List<int>();
+
+    [StringLength(2000, ErrorMessage = "Compatibility info cannot exceed 2000 characters")]
+    public string? CompatibilityInfo { get; set; }
+
+    public List<ProductSpecificationDto> Specifications { get; set; } = new List<ProductSpecificationDto>();
+
+    public List<ProductDocumentDto> Documents { get; set; } = new List<ProductDocumentDto>();
 }

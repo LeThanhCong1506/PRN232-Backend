@@ -168,8 +168,28 @@ namespace MV.ApplicationLayer.Services
                 }
                 else
                 {
-                    // Account does not exist, throw special error to notify frontend
-                    throw new Exception("User not registered. Please register a new account.");
+                    // Create new account
+                    var defaultRoleName = "Customer";
+                    var role = await _userRepository.GetRoleByNameAsync(defaultRoleName);
+                    
+                    user = new User
+                    {
+                        Username = name ?? email.Split('@')[0],
+                        Email = email,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()),
+                        RoleId = role?.RoleId ?? 2,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        ExternalProvider = provider,
+                        ExternalId = externalId,
+                        AvatarUrl = avatarUrl
+                    };
+                    await _userRepository.AddAsync(user);
+                    
+                    if (role != null)
+                    {
+                        user.Role = role;
+                    }
                 }
             }
             

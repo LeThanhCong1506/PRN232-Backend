@@ -15,17 +15,20 @@ public class CheckoutService : ICheckoutService
     private readonly IUserRepository _userRepository;
     private readonly ICouponRepository _couponRepository;
     private readonly IProductBundleRepository _bundleRepository;
+    private readonly IShippingFeeService _shippingFeeService;
 
     public CheckoutService(
         ICartRepository cartRepository,
         IUserRepository userRepository,
         ICouponRepository couponRepository,
-        IProductBundleRepository bundleRepository)
+        IProductBundleRepository bundleRepository,
+        IShippingFeeService shippingFeeService)
     {
         _cartRepository = cartRepository;
         _userRepository = userRepository;
         _couponRepository = couponRepository;
         _bundleRepository = bundleRepository;
+        _shippingFeeService = shippingFeeService;
     }
 
     public async Task<ApiResponse<ValidateCheckoutResponse>> ValidateCheckoutAsync(int userId, ValidateCheckoutRequest request)
@@ -132,35 +135,18 @@ public class CheckoutService : ICheckoutService
             };
         }
 
-        // 4. Get user and validate shipping info
+        // 4. Get user shipping info (không crash nếu thiếu — user sẽ điền trên form checkout)
         var user = await _userRepository.GetByIdAsync(userId);
         if (user == null)
         {
             return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("User not found.");
         }
 
-        var missingFields = new List<string>();
-        if (string.IsNullOrWhiteSpace(user.Phone))
-        {
-            missingFields.Add("phone");
-        }
-        if (string.IsNullOrWhiteSpace(user.Address))
-        {
-            missingFields.Add("address");
-        }
-
-        if (missingFields.Any())
-        {
-            return ApiResponse<ValidateCheckoutResponse>.ErrorResponse(
-                "Please update your shipping information before checkout.",
-                missingFields
-            );
-        }
-
         // 5. Calculate subtotal
         decimal subtotal = cartItemDtos.Sum(item => item.ItemTotal);
-        decimal shippingFee = 5000; // Fixed fee, synced with OrderService
+        decimal shippingFee = _shippingFeeService.CalculateShippingFee(subtotal, request.Province);
         decimal discount = 0;
+        string? couponError = null;
         var couponDto = new CheckoutCouponDto
         {
             IsApplied = false,
@@ -168,7 +154,7 @@ public class CheckoutService : ICheckoutService
             DiscountAmount = 0
         };
 
-        // 6. Validate coupon if provided
+        // 6. Validate coupon if provided — lỗi coupon KHÔNG crash trang, chỉ set CouponError
         if (!string.IsNullOrWhiteSpace(request.CouponCode))
         {
             var coupon = await _couponRepository.GetCouponByCodeAsync(request.CouponCode);
@@ -193,42 +179,46 @@ public class CheckoutService : ICheckoutService
                     }
                 }
 
-                // Check min order value
-                if (isValid && coupon.MinOrderValue.HasValue && subtotal < coupon.MinOrderValue.Value)
-                {
-                    return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon minimum order value not met.");
-                }
-
                 if (isValid)
                 {
-                    // Tính đúng theo loại coupon (PERCENTAGE hoặc FIXED)
-                    var discountType = await _couponRepository.GetCouponDiscountTypeAsync(coupon.CouponId);
-                    discount = discountType == "PERCENTAGE"
-                        ? subtotal * coupon.DiscountValue / 100
-                        : coupon.DiscountValue;
-
-                    // Ensure discount doesn't exceed subtotal
-                    if (discount > subtotal)
+                    // Check min order value
+                    if (coupon.MinOrderValue.HasValue && subtotal < coupon.MinOrderValue.Value)
                     {
-                        discount = subtotal;
+                        couponError = $"Minimum order value for this coupon is {coupon.MinOrderValue.Value:N0} ₫.";
                     }
+                    else
+                    {
+                        // Tính đúng theo loại coupon (PERCENTAGE hoặc FIXED)
+                        var discountType = await _couponRepository.GetCouponDiscountTypeAsync(coupon.CouponId);
+                        discount = discountType == "PERCENTAGE"
+                            ? subtotal * coupon.DiscountValue / 100
+                            : coupon.DiscountValue;
 
-                    couponDto.IsApplied = true;
-                    couponDto.Code = coupon.Code;
-                    couponDto.DiscountAmount = discount;
+                        // Cap theo MaxDiscountAmount nếu coupon có giới hạn tối đa
+                        if (discountType == "PERCENTAGE" && coupon.MaxDiscountAmount.HasValue && discount > coupon.MaxDiscountAmount.Value)
+                            discount = coupon.MaxDiscountAmount.Value;
+
+                        // Ensure discount doesn't exceed subtotal
+                        if (discount > subtotal)
+                            discount = subtotal;
+
+                        couponDto.IsApplied = true;
+                        couponDto.Code = coupon.Code;
+                        couponDto.DiscountAmount = discount;
+                    }
                 }
                 else
                 {
-                    return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon is invalid or expired.");
+                    couponError = "Coupon is invalid or expired.";
                 }
             }
             else
             {
-                return ApiResponse<ValidateCheckoutResponse>.ErrorResponse("Coupon is invalid or expired.");
+                couponError = "Coupon not found.";
             }
         }
 
-        // 7. Build response
+        // 7. Build response — luôn trả về 200 OK, lỗi coupon được truyền qua CouponError
         var response = new ValidateCheckoutResponse
         {
             IsValid = true,
@@ -240,13 +230,16 @@ public class CheckoutService : ICheckoutService
                 Phone = user.Phone,
                 Address = user.Address
             },
-            Coupon = couponDto,
+            Coupon = couponDto.IsApplied ? couponDto : null,
+            CouponError = couponError,
             Summary = new CheckoutSummaryDto
             {
                 Subtotal = subtotal,
                 ShippingFee = shippingFee,
                 Discount = discount,
-                Total = subtotal + shippingFee - discount
+                Total = subtotal + shippingFee - discount,
+                IsFreeShipping = shippingFee == 0,
+                FreeShippingThreshold = _shippingFeeService.GetFreeShippingThreshold()
             }
         };
 

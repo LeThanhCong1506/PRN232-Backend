@@ -223,9 +223,8 @@ public class PaymentService : IPaymentService
         var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId) ?? "COD";
         var paymentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId) ?? "PENDING";
 
-        // Lazy expiry: nếu PENDING + SEPAY + hết hạn → expire inline
+        // Lazy expiry: nếu PENDING + có ExpiredAt đã qua → expire inline (COD hoặc SEPAY)
         if (paymentStatus == PaymentStatusEnum.PENDING.ToString()
-            && paymentMethod == PaymentMethodEnum.SEPAY.ToString()
             && payment.ExpiredAt.HasValue
             && payment.ExpiredAt.Value < DateTimeHelper.VietnamNow())
         {
@@ -532,9 +531,14 @@ public class PaymentService : IPaymentService
                     var order = await _orderRepo.GetOrderByIdAsync(orderId);
                     if (order == null) return;
 
-                    // Double-check: vẫn PENDING không (tránh race condition)
-                    var currentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
-                    if (currentStatus != PaymentStatusEnum.PENDING.ToString()) return;
+                    // Double-check: payment vẫn PENDING không (tránh race condition)
+                    var currentPaymentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
+                    if (currentPaymentStatus != PaymentStatusEnum.PENDING.ToString()) return;
+
+                    // Guard: chỉ cancel đơn ở trạng thái PENDING
+                    // Đơn COD đã được admin CONFIRM thì KHÔNG cancel dù ExpiredAt đã qua
+                    var currentOrderStatus = await _orderRepo.GetOrderStatusAsync(orderId);
+                    if (currentOrderStatus != OrderStatusEnum.PENDING.ToString()) return;
 
                     // Set payment status to EXPIRED
                     await _orderRepo.SetPaymentStatusByOrderIdAsync(orderId, PaymentStatusEnum.EXPIRED.ToString());
@@ -546,9 +550,12 @@ public class PaymentService : IPaymentService
                     }
 
                     // Cancel the order
+                    var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
                     await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
                     order.CancelledAt = DateTimeHelper.VietnamNow();
-                    order.CancelReason = "Hết hạn thanh toán SEPAY";
+                    order.CancelReason = paymentMethod == PaymentMethodEnum.COD.ToString()
+                        ? "Đơn hàng COD tự động hủy: không được xác nhận trong 48 giờ"
+                        : "Hết hạn thanh toán SEPAY";
                     order.UpdatedAt = DateTimeHelper.VietnamNow();
                     await _orderRepo.UpdateOrderAsync(order);
 
@@ -600,19 +607,21 @@ public class PaymentService : IPaymentService
         if (!overdueOrderIds.Any()) return;
 
         // Lọc những cái còn PENDING payment status (dùng raw SQL vì status là enum)
+        // Xử lý cả COD (timeout 48h) và SEPAY (timeout 10 phút)
         var pendingOverdue = new List<int>();
         foreach (var orderId in overdueOrderIds)
         {
             var status = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
             var method = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
             if (status == PaymentStatusEnum.PENDING.ToString()
-                && method == PaymentMethodEnum.SEPAY.ToString())
+                && (method == PaymentMethodEnum.SEPAY.ToString()
+                    || method == PaymentMethodEnum.COD.ToString()))
             {
                 pendingOverdue.Add(orderId);
             }
         }
 
-        _logger.LogInformation("PaymentExpiryJob: Found {Count} overdue SEPAY payments to expire.", pendingOverdue.Count);
+        _logger.LogInformation("PaymentExpiryJob: Found {Count} overdue payments to expire (COD + SEPAY).", pendingOverdue.Count);
 
         foreach (var orderId in pendingOverdue)
         {
