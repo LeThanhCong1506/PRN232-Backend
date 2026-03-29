@@ -69,6 +69,27 @@ public class SignalRNotificationService : INotificationService
         _logger.LogInformation("OrderStatusChanged sent to user {UserId}: Order {OrderNumber} → {Status}", userId, orderNumber, newStatus);
     }
 
+    public async Task NotifyAdminsOrderChangedAsync(int orderId, string orderNumber, string newStatus)
+    {
+        var data = new
+        {
+            OrderId = orderId,
+            OrderNumber = orderNumber,
+            Status = newStatus,
+            Timestamp = DateTimeHelper.VietnamNow(),
+            Type = "AdminOrderUpdated"
+        };
+        try
+        {
+            await _hubContext.Clients.Group("admin_group").SendAsync("AdminOrderUpdated", data);
+            _logger.LogInformation("AdminOrderUpdated sent to admin_group: Order {OrderNumber} -> {Status}", orderNumber, newStatus);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending AdminOrderUpdated to admin_group");
+        }
+    }
+
     public async Task SendPaymentConfirmedAsync(int userId, int orderId, string orderNumber, decimal amount)
     {
         var dbNotif = await SaveNotificationAsync(userId, "PaymentConfirmed", "Payment Received", $"Payment of {amount:C} for order #{orderNumber} confirmed.", $"/orders/{orderId}");

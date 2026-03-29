@@ -60,8 +60,12 @@ namespace MV.InfrastructureLayer.Repositories
                 return false;
             existingUser.Username = user.Username;
             existingUser.Email = user.Email;
+            existingUser.FullName = user.FullName;
             existingUser.Phone = user.Phone;
             existingUser.Address = user.Address;
+            existingUser.Province = user.Province;
+            existingUser.District = user.District;
+            existingUser.Ward = user.Ward;
             existingUser.IsActive = user.IsActive;
             existingUser.AvatarUrl = user.AvatarUrl;
             existingUser.FullName = user.FullName;

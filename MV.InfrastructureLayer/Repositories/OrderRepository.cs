@@ -240,7 +240,12 @@ public class OrderRepository : IOrderRepository
 
     public async Task UpdateOrderAsync(OrderHeader orderHeader)
     {
-        _context.OrderHeaders.Update(orderHeader);
+        // Use Entry().State instead of Update() to avoid marking all loaded navigation
+        // properties (Payment, OrderItems, User, Coupon) as Modified, which would trigger
+        // unnecessary/broken cascade UPDATE statements for those entities.
+        var entry = _context.Entry(orderHeader);
+        if (entry.State == EntityState.Detached)
+            entry.State = EntityState.Modified;
         await _context.SaveChangesAsync();
     }
 

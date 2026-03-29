@@ -1,9 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Brand.Request;
 using MV.DomainLayer.DTOs.Brand.Response;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.ApplicationLayer.Services;
@@ -11,10 +13,12 @@ namespace MV.ApplicationLayer.Services;
 public class BrandService : IBrandService
 {
     private readonly IBrandRepository _brandRepository;
+    private readonly StemDbContext _context;
 
-    public BrandService(IBrandRepository brandRepository)
+    public BrandService(IBrandRepository brandRepository, StemDbContext context)
     {
         _brandRepository = brandRepository;
+        _context = context;
     }
 
     public async Task<PagedResponse<BrandResponse>> GetAllBrandsAsync(PaginationFilter filter)
@@ -152,16 +156,19 @@ public class BrandService : IBrandService
     {
         try
         {
-            var brand = await _brandRepository.GetBrandWithDetailsAsync(id);
+            var brand = await _brandRepository.GetBrandByIdAsync(id);
             if (brand == null)
             {
                 return ApiResponse<bool>.ErrorResponse($"Brand with ID {id} not found.");
             }
 
-            // Check if brand has products
-            if (brand.Products.Any())
+            // FK constraint: products.brand_id → brands.brand_id (RESTRICT, NOT NULL).
+            // Cannot delete a brand that still has associated products.
+            var productCount = await _context.Products.CountAsync(p => p.BrandId == id);
+            if (productCount > 0)
             {
-                return ApiResponse<bool>.ErrorResponse($"Cannot delete brand. It has {brand.Products.Count} associated product(s).");
+                return ApiResponse<bool>.ErrorResponse(
+                    $"Cannot delete brand '{brand.Name}': it has {productCount} associated product(s). Please delete or reassign all products first.");
             }
 
             await _brandRepository.DeleteBrandAsync(id);

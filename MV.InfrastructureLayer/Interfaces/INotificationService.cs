@@ -14,6 +14,7 @@ public interface INotificationService
     /// Gửi thông báo order status đã thay đổi
     /// </summary>
     Task SendOrderStatusChangedAsync(int userId, int orderId, string orderNumber, string newStatus);
+    Task NotifyAdminsOrderChangedAsync(int orderId, string orderNumber, string newStatus);
 
     /// <summary>
     /// Gửi thông báo payment đã được xác nhận thành công

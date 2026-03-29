@@ -192,6 +192,8 @@ public class AdminOrderService : IAdminOrderService
         currentStatus ??= "PENDING";
 
         var newStatus = request.NewStatus.ToUpper();
+        // Normalize: mobile may send "Shipping" instead of the correct enum value "SHIPPED"
+        if (newStatus == "SHIPPING") newStatus = "SHIPPED";
 
         // Validate transition
         if (!AllowedTransitions.TryGetValue(currentStatus, out var allowed) || !allowed.Contains(newStatus))
@@ -246,6 +248,7 @@ public class AdminOrderService : IAdminOrderService
         try
         {
             await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus);
+            await _notificationService.NotifyAdminsOrderChangedAsync(orderId, order.OrderNumber, newStatus);
         }
         catch (Exception ex)
         {

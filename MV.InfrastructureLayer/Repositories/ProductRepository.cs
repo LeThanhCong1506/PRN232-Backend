@@ -23,7 +23,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
+                .Where(p => p.IsActive == true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.SearchTerm))
@@ -89,7 +89,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
+                .Where(p => p.IsActive == true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.Search))
@@ -250,7 +250,8 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<bool> ExistsAsync(int productId)
         {
-            return await _context.Products.AnyAsync(p => p.ProductId == productId);
+            // Check IsActive != false to also include products where IsActive is null (not explicitly deactivated)
+            return await _context.Products.AnyAsync(p => p.ProductId == productId && p.IsActive != false);
         }
 
         public async Task<bool> SkuExistsAsync(string sku, int? excludeProductId = null)

@@ -47,8 +47,13 @@ public class BrandRepository : IBrandRepository
 
     public async Task UpdateBrandAsync(Brand brand)
     {
-        _context.Brands.Update(brand);
-        await _context.SaveChangesAsync();
+        // Use ExecuteUpdateAsync to do a direct SQL UPDATE, bypassing the change tracker entirely.
+        // This avoids EF Core marking all loaded Products navigation as Modified (cascade update issue).
+        await _context.Brands
+            .Where(b => b.BrandId == brand.BrandId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.Name, brand.Name)
+                .SetProperty(b => b.LogoUrl, brand.LogoUrl));
     }
 
     public async Task DeleteBrandAsync(int id)
