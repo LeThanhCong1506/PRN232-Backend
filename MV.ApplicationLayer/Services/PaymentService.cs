@@ -308,7 +308,7 @@ public class PaymentService : IPaymentService
                     payment.VerifiedBy = adminUserId;
                     payment.VerifiedAt = DateTimeHelper.VietnamNow();
                     payment.UpdatedAt = DateTimeHelper.VietnamNow();
-                    payment.Notes = "Xác nhận thủ công bởi Admin";
+                    payment.Notes = "Manually confirmed by Admin";
                     await _orderRepo.UpdatePaymentAsync(payment);
 
                     // Set payment status to COMPLETED
@@ -404,7 +404,7 @@ public class PaymentService : IPaymentService
                     ReceivedAmount = payment.ReceivedAmount,
                     IsPaid = true,
                     RemainingSeconds = 0
-                }, "Thanh toán đã hoàn tất trước đó");
+                }, "Payment already completed.");
             }
 
             // 4. Chỉ xử lý nếu đang PENDING
@@ -479,7 +479,7 @@ public class PaymentService : IPaymentService
             {
                 _logger.LogError(ex, "Error processing success callback for OrderId={OrderId}", order.OrderId);
                 return ApiResponse<PaymentStatusResponse>.ErrorResponse(
-                    $"Lỗi khi xử lý callback: {ex.Message}");
+                    $"Error processing callback: {ex.Message}");
             }
         }
         catch (Exception ex)
@@ -559,8 +559,8 @@ public class PaymentService : IPaymentService
                     await _orderRepo.SetOrderStatusAsync(orderId, OrderStatusEnum.CANCELLED.ToString());
                     order.CancelledAt = DateTimeHelper.VietnamNow();
                     order.CancelReason = paymentMethod == PaymentMethodEnum.COD.ToString()
-                        ? "Đơn hàng COD tự động hủy: không được xác nhận trong 48 giờ"
-                        : "Hết hạn thanh toán SEPAY";
+                        ? "COD order auto-cancelled: not confirmed within 48 hours"
+                        : "SEPAY payment expired";
                     order.UpdatedAt = DateTimeHelper.VietnamNow();
                     await _orderRepo.UpdateOrderAsync(order);
 

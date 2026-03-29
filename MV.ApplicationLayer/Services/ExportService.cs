@@ -35,16 +35,16 @@ public class ExportService : IExportService
         var worksheet = workbook.Worksheets.Add("Orders");
 
         // Headers
-        worksheet.Cell(1, 1).Value = "Mã Đơn";
-        worksheet.Cell(1, 2).Value = "Ngày Tạo";
-        worksheet.Cell(1, 3).Value = "Khách Hàng";
-        worksheet.Cell(1, 4).Value = "SĐT";
-        worksheet.Cell(1, 5).Value = "Tổng Tiền";
-        worksheet.Cell(1, 6).Value = "Phí Ship";
-        worksheet.Cell(1, 7).Value = "Giảm Giá";
-        worksheet.Cell(1, 8).Value = "Phương thức TT";
-        worksheet.Cell(1, 9).Value = "Trạng thái TT";
-        worksheet.Cell(1, 10).Value = "Trạng thái Đơn hàng";
+        worksheet.Cell(1, 1).Value = "Order Number";
+        worksheet.Cell(1, 2).Value = "Created Date";
+        worksheet.Cell(1, 3).Value = "Customer";
+        worksheet.Cell(1, 4).Value = "Phone";
+        worksheet.Cell(1, 5).Value = "Total Amount";
+        worksheet.Cell(1, 6).Value = "Shipping Fee";
+        worksheet.Cell(1, 7).Value = "Discount";
+        worksheet.Cell(1, 8).Value = "Payment Method";
+        worksheet.Cell(1, 9).Value = "Payment Status";
+        worksheet.Cell(1, 10).Value = "Order Status";
 
         var row = 2;
         foreach (var order in orders)
@@ -80,14 +80,14 @@ public class ExportService : IExportService
         using var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Inventory");
 
-        // Headers: SKU, Tên Sản Phẩm, Danh Mục, Thương Hiệu, Giá Bán, Số Lượng Tồn Kho, Trạng Thái
+        // Headers: SKU, Product Name, Category, Brand, Price, Stock Quantity, Status
         worksheet.Cell(1, 1).Value = "SKU";
-        worksheet.Cell(1, 2).Value = "Tên Sản Phẩm";
-        worksheet.Cell(1, 3).Value = "Danh Mục";
-        worksheet.Cell(1, 4).Value = "Thương Hiệu";
-        worksheet.Cell(1, 5).Value = "Giá Bán";
-        worksheet.Cell(1, 6).Value = "Số Lượng Tồn Kho";
-        worksheet.Cell(1, 7).Value = "Trạng Thái";
+        worksheet.Cell(1, 2).Value = "Product Name";
+        worksheet.Cell(1, 3).Value = "Category";
+        worksheet.Cell(1, 4).Value = "Brand";
+        worksheet.Cell(1, 5).Value = "Price";
+        worksheet.Cell(1, 6).Value = "Stock Quantity";
+        worksheet.Cell(1, 7).Value = "Status";
 
         var row = 2;
         foreach (var product in products)
@@ -116,12 +116,12 @@ public class ExportService : IExportService
         using var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Users");
 
-        // Headers: Tên đăng nhập, Họ & Tên, Email, SĐT, Ngày đăng ký
-        worksheet.Cell(1, 1).Value = "Tên đăng nhập";
-        worksheet.Cell(1, 2).Value = "Họ & Tên";
+        // Headers: Username, Full Name, Email, Phone, Registration Date
+        worksheet.Cell(1, 1).Value = "Username";
+        worksheet.Cell(1, 2).Value = "Full Name";
         worksheet.Cell(1, 3).Value = "Email";
-        worksheet.Cell(1, 4).Value = "SĐT";
-        worksheet.Cell(1, 5).Value = "Ngày đăng ký";
+        worksheet.Cell(1, 4).Value = "Phone";
+        worksheet.Cell(1, 5).Value = "Registration Date";
 
         var row = 2;
         foreach (var user in users)

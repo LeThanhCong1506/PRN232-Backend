@@ -225,7 +225,7 @@ public class ChatController : ControllerBase
                 UserName = g.First().Sender.Username,
                 LastMessage = g.OrderByDescending(m => m.SentAt).First().Content,
                 LastMessageAt = g.Max(m => m.SentAt),
-                UnreadCount = g.Count(m => !m.IsRead)
+                UnreadCount = g.Count(m => !m.IsRead && !m.IsFromAdmin)
             })
             .OrderByDescending(c => c.LastMessageAt)
             .ToListAsync();

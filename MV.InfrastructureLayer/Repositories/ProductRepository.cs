@@ -139,13 +139,16 @@ namespace MV.InfrastructureLayer.Repositories
             return (items, totalCount);
         }
 
-        public async Task SoftDeleteAsync(int productId)
+        public async Task<bool> SoftDeleteAsync(int productId)
         {
-            // Dùng ExecuteUpdateAsync để bypass NoTracking global setting
-            // Trực tiếp generate SQL: UPDATE product SET is_active = false WHERE product_id = @id
-            await _context.Products
-                .Where(p => p.ProductId == productId)
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsActive, false));
+            var product = await _context.Products.FindAsync(productId);
+            if (product != null)
+            {
+                product.IsActive = false;
+                product.IsDeleted = true;
+                return await _context.SaveChangesAsync() > 0;
+            }
+            return false;
         }
 
         public async Task<Product> GetProductByIdAsync(int productId)

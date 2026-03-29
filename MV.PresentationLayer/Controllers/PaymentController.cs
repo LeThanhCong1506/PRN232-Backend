@@ -33,12 +33,12 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Webhook endpoint nhận thông báo giao dịch từ SePay.
-    /// SePay sẽ POST đến endpoint này khi có giao dịch mới.
+    /// Webhook endpoint to receive transaction notifications from SePay.
+    /// SePay will POST to this endpoint when a new transaction occurs.
     /// </summary>
     [HttpPost("sepay-webhook")]
     [AllowAnonymous]
-    [SwaggerOperation(Summary = "SePay Webhook - Nhận thông báo giao dịch từ SePay")]
+    [SwaggerOperation(Summary = "SePay Webhook - Receive transaction notifications from SePay")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> SepayWebhook([FromBody] SepayWebhookRequest request)
@@ -81,11 +81,11 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy trạng thái thanh toán của đơn hàng (cho frontend polling)
+    /// Get payment status of an order (for frontend polling)
     /// </summary>
     [HttpGet("{orderId}/status")]
     [Authorize]
-    [SwaggerOperation(Summary = "Lấy trạng thái thanh toán đơn hàng")]
+    [SwaggerOperation(Summary = "Get order payment status")]
     [ProducesResponseType(typeof(ApiResponse<PaymentStatusResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPaymentStatus(int orderId)
@@ -99,7 +99,7 @@ public class PaymentController : ControllerBase
 
         if (!result.Success)
         {
-            if (result.Message.Contains("không tồn tại"))
+            if (result.Message.Contains("not found") || result.Message.Contains("does not exist"))
                 return NotFound(result);
             if (result.Message.Contains("Unauthorized"))
                 return StatusCode(403, result);
@@ -110,11 +110,11 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Admin xác nhận thanh toán thủ công (cho trường hợp webhook SePay lỗi)
+    /// Admin manually confirms payment (for cases where SePay webhook fails)
     /// </summary>
     [HttpPut("{orderId}/verify")]
     [Authorize(Roles = "Admin,Staff")]
-    [SwaggerOperation(Summary = "[Admin] Xác nhận thanh toán thủ công")]
+    [SwaggerOperation(Summary = "[Admin] Manually confirm payment")]
     [ProducesResponseType(typeof(ApiResponse<PaymentStatusResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> VerifyPaymentManually(int orderId)
@@ -127,7 +127,7 @@ public class PaymentController : ControllerBase
 
         if (!result.Success)
         {
-            if (result.Message.Contains("không tồn tại"))
+            if (result.Message.Contains("not found") || result.Message.Contains("does not exist"))
                 return NotFound(result);
             return BadRequest(result);
         }
@@ -136,12 +136,12 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Endpoint dành riêng cho trang Checkout HTML để polling trạng thái thanh toán mà không cần JWT token.
-    /// Giao diện HTML tự host không có token, nên gọi endpoint này để biết khi nào giao dịch thành công.
+    /// Endpoint for the Checkout HTML page to poll payment status without a JWT token.
+    /// The self-hosted HTML interface has no token, so it calls this endpoint to know when the transaction succeeds.
     /// </summary>
     [HttpGet("{orderId}/poll-status")]
     [AllowAnonymous]
-    [ApiExplorerSettings(IgnoreApi = true)] // Ẩn khỏi Swagger
+    [ApiExplorerSettings(IgnoreApi = true)] // Hidden from Swagger
     public async Task<IActionResult> PollPaymentStatus(int orderId)
     {
         var paymentStatus = await _paymentService.CheckAndGetPaymentStatusAsync(orderId);
@@ -151,15 +151,15 @@ public class PaymentController : ControllerBase
     // ==================== SEPAY CHECKOUT REDIRECT ====================
 
     /// <summary>
-    /// Redirect đến trang thanh toán SePay.
-    /// Endpoint này render HTML form ẩn rồi auto-submit POST đến SePay Payment Gateway.
-    /// Frontend chỉ cần mở URL này (window.location hoặc window.open).
-    /// FE truyền successUrl, errorUrl, cancelUrl qua query params để linh hoạt thay đổi.
-    /// Ví dụ: /api/Payment/30/checkout?successUrl=http://localhost:3000/payment/success&amp;errorUrl=...&amp;cancelUrl=...
+    /// Redirect to SePay payment page.
+    /// This endpoint renders a hidden HTML form and auto-submits a POST to the SePay Payment Gateway.
+    /// Frontend only needs to open this URL (window.location or window.open).
+    /// FE passes successUrl, errorUrl, cancelUrl via query params for flexibility.
+    /// Example: /api/Payment/30/checkout?successUrl=http://localhost:3000/payment/success&amp;errorUrl=...&amp;cancelUrl=...
     /// </summary>
     [HttpGet("{orderId}/checkout")]
     [AllowAnonymous]
-    [SwaggerOperation(Summary = "Redirect đến trang thanh toán SePay")]
+    [SwaggerOperation(Summary = "Redirect to SePay payment page")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -169,18 +169,17 @@ public class PaymentController : ControllerBase
         [FromQuery] string? errorUrl,
         [FromQuery] string? cancelUrl)
     {
-        var order = await _orderRepo.GetOrderByIdAsync(orderId);
         if (order == null)
-            return NotFound("Đơn hàng không tồn tại");
+            return NotFound("Order does not exist");
 
         var payment = order.Payment;
         if (payment == null)
-            return NotFound("Không tìm thấy thông tin thanh toán");
+            return NotFound("Payment information not found");
 
         // Check payment method
         var paymentMethod = await _orderRepo.GetPaymentMethodByOrderIdAsync(orderId);
         if (paymentMethod != PaymentMethodEnum.SEPAY.ToString())
-            return BadRequest("Đơn hàng này không sử dụng phương thức thanh toán SEPAY");
+            return BadRequest("This order does not use the SEPAY payment method");
 
         // Check payment status
         var paymentStatus = await _orderRepo.GetPaymentStatusByOrderIdAsync(orderId);
@@ -206,8 +205,8 @@ public class PaymentController : ControllerBase
             return Content($@"
                 <html><head><meta http-equiv='refresh' content='3;url={finalCancelUrl}'></head>
                 <body style='font-family: Arial; text-align: center; padding: 50px;'>
-                    <h2 style='color: red;'>Đơn hàng đã hết hạn thanh toán!</h2>
-                    <p>Đang chuyển về trang chủ...</p>
+                    <h2 style='color: red;'>Payment has expired!</h2>
+                    <p>Redirecting to home page...</p>
                 </body></html>", "text/html");
         }
 
@@ -227,7 +226,7 @@ public class PaymentController : ControllerBase
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Thanh toán đơn hàng {order.OrderNumber}</title>
+    <title>Payment for order {order.OrderNumber}</title>
     <link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap' rel='stylesheet'>
     <style>
         body {{ 
@@ -334,9 +333,9 @@ public class PaymentController : ControllerBase
 </head>
 <body>
     <div class='card'>
-        <h2>Mã QR Thanh Toán</h2>
-        <div class='amount-subtitle'>Số tiền cần thanh toán</div>
-        <div class='amount'>{payment.Amount:N0} VNĐ</div>
+        <h2>QR Payment Code</h2>
+        <div class='amount-subtitle'>Amount to pay</div>
+        <div class='amount'>{payment.Amount:N0} VND</div>
         
         <div class='qr-container'>
             <img class='qr-image' src='{payment.QrCodeUrl}' alt='QR Code' />
@@ -344,33 +343,33 @@ public class PaymentController : ControllerBase
         
         <div class='info-box'>
             <div class='info-row'>
-                <span class='info-label'>Ngân hàng</span>
+                <span class='info-label'>Bank</span>
                 <span class='info-value'>{bankName}</span>
             </div>
             <div class='info-row'>
-                <span class='info-label'>Tài khoản</span>
+                <span class='info-label'>Account</span>
                 <span class='info-value'>{accountNumber}</span>
             </div>
             <div class='info-row'>
-                <span class='info-label'>Chủ thẻ</span>
+                <span class='info-label'>Account name</span>
                 <span class='info-value'>{accountName}</span>
             </div>
             <div class='info-row' style='margin-top: 8px; padding-top: 12px; border-top: 1px dashed #cbd5e1;'>
-                <span class='info-label'>Nội dung CK</span>
+                <span class='info-label'>Transfer content</span>
                 <span class='info-value highlight'>{payment.PaymentReference}</span>
             </div>
         </div>
         
         <div class='countdown-container'>
             <div class='spinner'></div>
-            <span>Chờ thanh toán...</span>
+            <span>Waiting for payment...</span>
             <span class='timer-text' id='timer'>{minutes:D2}:{seconds:D2}</span>
         </div>
         
         <div class='success-overlay' id='successOverlay'>
             <div class='success-icon'>✓</div>
-            <div class='success-text'>Thanh toán thành công!</div>
-            <div class='redirect-text'>Đang chuyển hướng...</div>
+            <div class='success-text'>Payment successful!</div>
+            <div class='redirect-text'>Redirecting...</div>
         </div>
     </div>
     
@@ -426,13 +425,13 @@ public class PaymentController : ControllerBase
     // ==================== SEPAY SUCCESS CALLBACK ====================
 
     /// <summary>
-    /// SePay redirect về đây khi thanh toán thành công.
-    /// Tự động cập nhật Payment → COMPLETED, Order → CONFIRMED.
-    /// Nếu có redirectUrl → redirect user về frontend, không thì trả JSON.
+    /// SePay redirects here when payment is successful.
+    /// Automatically updates Payment → COMPLETED, Order → CONFIRMED.
+    /// If redirectUrl is provided → redirects user to frontend, otherwise returns JSON.
     /// </summary>
     [HttpGet("callback/success")]
     [AllowAnonymous]
-    [SwaggerOperation(Summary = "SePay Success Callback - Xử lý khi thanh toán thành công")]
+    [SwaggerOperation(Summary = "SePay Success Callback - Process successful payment")]
     public async Task<IActionResult> SepaySuccessCallback(
         [FromQuery(Name = "order_invoice_number")] string? orderInvoiceNumber,
         [FromQuery] string? redirectUrl)
@@ -441,7 +440,7 @@ public class PaymentController : ControllerBase
         {
             if (!string.IsNullOrEmpty(redirectUrl))
                 return Redirect($"{redirectUrl}?status=error&message=missing_order_number");
-            return BadRequest(ApiResponse<object>.ErrorResponse("Thiếu order_invoice_number"));
+            return BadRequest(ApiResponse<object>.ErrorResponse("Missing order_invoice_number"));
         }
 
         // Xử lý cập nhật status
@@ -453,7 +452,7 @@ public class PaymentController : ControllerBase
             if (result.Success)
             {
                 var data = result.Data;
-                if (result.Message != null && result.Message.Contains("đã hoàn tất"))
+                if (result.Message != null && result.Message.Contains("already completed"))
                 {
                     return Redirect($"{redirectUrl}?status=success&orderNumber={orderInvoiceNumber}&note=already_completed");
                 }

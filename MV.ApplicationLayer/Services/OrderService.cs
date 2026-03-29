@@ -126,7 +126,7 @@ public class OrderService : IOrderService
             if (coupon.MinOrderValue.HasValue && subtotal < coupon.MinOrderValue.Value)
             {
                 return ApiResponse<CheckoutResponse>.ErrorResponse(
-                    $"Minimum order value {coupon.MinOrderValue.Value:N0}đ to use the coupon");
+                    $"Minimum order value {coupon.MinOrderValue.Value:N0} VND to use the coupon");
             }
 
             var discountType = await _orderRepo.GetCouponDiscountTypeAsync(coupon.CouponId);

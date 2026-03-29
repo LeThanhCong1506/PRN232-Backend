@@ -26,7 +26,7 @@ public class SmtpEmailService : IEmailService
 
     public async Task SendPasswordResetEmailAsync(string toEmail, string otp)
     {
-        var subject = "Mã đặt lại mật khẩu - STEM Gear";
+        var subject = "Password Reset Code - STEM Gear";
         var body = $@"
 <html>
 <body style=""font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"">
@@ -34,16 +34,16 @@ public class SmtpEmailService : IEmailService
         <h1 style=""color: white; margin: 0;"">STEM Gear</h1>
     </div>
     <div style=""padding: 30px; background-color: #f8f9fa;"">
-        <h2 style=""color: #0e121b;"">Đặt lại mật khẩu</h2>
-        <p style=""color: #4d6599;"">Bạn vừa yêu cầu đặt lại mật khẩu. Sử dụng mã OTP bên dưới:</p>
+        <h2 style=""color: #0e121b;"">Reset Your Password</h2>
+        <p style=""color: #4d6599;"">You have requested to reset your password. Use the OTP code below:</p>
         <div style=""background-color: white; border: 2px solid #2463eb; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;"">
             <span style=""font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #2463eb;"">{otp}</span>
         </div>
-        <p style=""color: #4d6599;"">Mã này có hiệu lực trong <strong>15 phút</strong>.</p>
-        <p style=""color: #4d6599;"">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.</p>
+        <p style=""color: #4d6599;"">This code is valid for <strong>15 minutes</strong>.</p>
+        <p style=""color: #4d6599;"">If you did not request a password reset, please ignore this email.</p>
     </div>
     <div style=""padding: 15px; text-align: center; color: #999; font-size: 12px;"">
-        © 2025 STEM Gear. Tất cả quyền được bảo lưu.
+        © 2025 STEM Gear. All rights reserved.
     </div>
 </body>
 </html>";

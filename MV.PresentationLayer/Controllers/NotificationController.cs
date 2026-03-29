@@ -27,7 +27,7 @@ public class NotificationController : ControllerBase
     }
 
     [HttpGet]
-    [SwaggerOperation(Summary = "[Customer] Lấy danh sách thông báo")]
+    [SwaggerOperation(Summary = "[Customer] Get notification list")]
     public async Task<IActionResult> GetMyNotifications([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         var userId = GetUserId();
@@ -46,7 +46,7 @@ public class NotificationController : ControllerBase
     }
 
     [HttpPut("{id}/read")]
-    [SwaggerOperation(Summary = "[Customer] Đánh dấu 1 thông báo là đã đọc")]
+    [SwaggerOperation(Summary = "[Customer] Mark a notification as read")]
     public async Task<IActionResult> MarkAsRead(int id)
     {
         var userId = GetUserId();
@@ -58,7 +58,7 @@ public class NotificationController : ControllerBase
     }
 
     [HttpPut("read-all")]
-    [SwaggerOperation(Summary = "[Customer] Đánh dấu tất cả thông báo là đã đọc")]
+    [SwaggerOperation(Summary = "[Customer] Mark all notifications as read")]
     public async Task<IActionResult> MarkAllAsRead()
     {
         var userId = GetUserId();

@@ -248,10 +248,15 @@ public class AdminProductService : IAdminProductService
             return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
 
         if (await _productRepo.HasOrdersAsync(productId))
-            return ApiResponse<bool>.ErrorResponse("Cannot delete product that has been ordered.");
+            return ApiResponse<bool>.ErrorResponse("Cannot delete this product because it has associated orders. The system will retain the information to ensure data integrity.");
 
-        await _productRepo.SoftDeleteAsync(productId);
-        return ApiResponse<bool>.SuccessResponse(true, "Product deactivated successfully.");
+        bool isSuccess = await _productRepo.SoftDeleteAsync(productId);
+        if (isSuccess)
+        {
+            return ApiResponse<bool>.SuccessResponse(true, "Product deleted successfully (hidden from display list).");
+        }
+        
+        return ApiResponse<bool>.ErrorResponse("An error occurred while updating the database. Please try again.");
     }
 
     public async Task<ApiResponse<List<AdminProductImageResponse>>> UploadImagesAsync(

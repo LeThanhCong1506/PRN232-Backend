@@ -89,7 +89,7 @@ namespace MV.PresentationLayer.Controllers
         ///     {
         ///       "name": "Arduino Uno R3",
         ///       "sku": "ARD-UNO-001",
-        ///       "description": "Vi điều khiển Arduino phổ biến nhất",
+        ///       "description": "Most popular Arduino microcontroller",
         ///       "price": 250000,
         ///       "stockQuantity": 50,
         ///       "brandId": 1,
