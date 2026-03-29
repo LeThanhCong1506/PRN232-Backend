@@ -72,6 +72,8 @@ public class AdminOrderService : IAdminOrderService
                 CustomerEmail = o.CustomerEmail,
                 CustomerPhone = o.CustomerPhone,
                 TotalAmount = o.TotalAmount,
+                ShippingFee = o.ShippingFee,
+                DiscountAmount = o.DiscountAmount,
                 PaymentMethod = payment.Method,
                 PaymentStatus = payment.Status,
                 ItemCount = o.OrderItems.Count,

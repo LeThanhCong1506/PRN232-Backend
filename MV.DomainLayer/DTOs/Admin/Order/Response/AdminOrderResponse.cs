@@ -9,6 +9,8 @@ public class AdminOrderResponse
     public string? CustomerEmail { get; set; }
     public string? CustomerPhone { get; set; }
     public decimal TotalAmount { get; set; }
+    public decimal? ShippingFee { get; set; }
+    public decimal? DiscountAmount { get; set; }
     public string? PaymentMethod { get; set; }
     public string? PaymentStatus { get; set; }
     public int ItemCount { get; set; }
