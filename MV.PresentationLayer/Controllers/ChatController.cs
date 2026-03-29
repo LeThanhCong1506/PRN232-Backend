@@ -289,6 +289,9 @@ public class ChatController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        
+        // Notify the customer that the admin has read their messages
+        await _hubContext.Clients.Group($"chat_user_{userId}").SendAsync("MessagesRead", userId);
 
         return Ok(ApiResponse<object>.SuccessResponse(new { markedCount = unreadMessages.Count }, "Messages marked as read"));
     }
@@ -345,6 +348,9 @@ public class ChatController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        // Notify admins that the customer has read their messages
+        await _hubContext.Clients.Group("chat_admins").SendAsync("MessagesRead", userId);
 
         return Ok(ApiResponse<object>.SuccessResponse(new { markedCount = unreadMessages.Count }));
     }
