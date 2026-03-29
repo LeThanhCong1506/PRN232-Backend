@@ -156,22 +156,19 @@ public class BrandService : IBrandService
     {
         try
         {
-            var brand = await _brandRepository.GetBrandWithDetailsAsync(id);
+            var brand = await _brandRepository.GetBrandByIdAsync(id);
             if (brand == null)
             {
                 return ApiResponse<bool>.ErrorResponse($"Brand with ID {id} not found.");
             }
 
-            // Hard delete: BrandId is non-nullable on Product (FK Restrict),
-            // so soft-delete all associated products first (IsDeleted=true, IsActive=false),
-            // then delete the brand itself.
-            if (brand.Products.Any())
+            // FK constraint: products.brand_id → brands.brand_id (RESTRICT, NOT NULL).
+            // Cannot delete a brand that still has associated products.
+            var productCount = await _context.Products.CountAsync(p => p.BrandId == id);
+            if (productCount > 0)
             {
-                await _context.Products
-                    .Where(p => p.BrandId == id)
-                    .ExecuteUpdateAsync(s => s
-                        .SetProperty(p => p.IsDeleted, true)
-                        .SetProperty(p => p.IsActive, false));
+                return ApiResponse<bool>.ErrorResponse(
+                    $"Cannot delete brand '{brand.Name}': it has {productCount} associated product(s). Please delete or reassign all products first.");
             }
 
             await _brandRepository.DeleteBrandAsync(id);
