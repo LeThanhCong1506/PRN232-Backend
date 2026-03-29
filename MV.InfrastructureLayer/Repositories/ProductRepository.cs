@@ -139,15 +139,16 @@ namespace MV.InfrastructureLayer.Repositories
             return (items, totalCount);
         }
 
-        public async Task SoftDeleteAsync(int productId)
+        public async Task<bool> SoftDeleteAsync(int productId)
         {
             var product = await _context.Products.FindAsync(productId);
             if (product != null)
             {
                 product.IsActive = false;
                 product.IsDeleted = true;
-                await _context.SaveChangesAsync();
+                return await _context.SaveChangesAsync() > 0;
             }
+            return false;
         }
 
         public async Task<Product> GetProductByIdAsync(int productId)

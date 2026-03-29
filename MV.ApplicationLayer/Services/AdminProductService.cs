@@ -248,10 +248,15 @@ public class AdminProductService : IAdminProductService
             return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
 
         if (await _productRepo.HasOrdersAsync(productId))
-            return ApiResponse<bool>.ErrorResponse("Cannot delete product that has been ordered.");
+            return ApiResponse<bool>.ErrorResponse("Không thể xóa sản phẩm này vì đã có đơn hàng liên quan. Hệ thống sẽ giữ lại thông tin để đảm bảo tính toàn vẹn dữ liệu.");
 
-        await _productRepo.SoftDeleteAsync(productId);
-        return ApiResponse<bool>.SuccessResponse(true, "Product deactivated successfully.");
+        bool isSuccess = await _productRepo.SoftDeleteAsync(productId);
+        if (isSuccess)
+        {
+            return ApiResponse<bool>.SuccessResponse(true, "Xóa sản phẩm thành công (đã ẩn khỏi danh sách hiển thị).");
+        }
+        
+        return ApiResponse<bool>.ErrorResponse("Có lỗi xảy ra trong quá trình cập nhật cơ sở dữ liệu. Vui lòng thử lại.");
     }
 
     public async Task<ApiResponse<List<AdminProductImageResponse>>> UploadImagesAsync(
