@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Admin.Product.Request;
 using MV.DomainLayer.DTOs.Admin.Product.Response;
@@ -7,6 +8,7 @@ using MV.DomainLayer.DTOs.Product.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
 using MV.DomainLayer.Enums;
+using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.ApplicationLayer.Services;
@@ -19,6 +21,7 @@ public class AdminProductService : IAdminProductService
     private readonly ICategoryRepository _categoryRepo;
     private readonly ICloudinaryService _cloudinaryService;
     private readonly IProductBundleRepository _bundleRepo;
+    private readonly StemDbContext _context;
 
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
     private const long MaxFileSize = 5 * 1024 * 1024; // 5MB
@@ -30,7 +33,8 @@ public class AdminProductService : IAdminProductService
         IBrandRepository brandRepo,
         ICategoryRepository categoryRepo,
         ICloudinaryService cloudinaryService,
-        IProductBundleRepository bundleRepo)
+        IProductBundleRepository bundleRepo,
+        StemDbContext context)
     {
         _productRepo = productRepo;
         _imageRepo = imageRepo;
@@ -38,6 +42,7 @@ public class AdminProductService : IAdminProductService
         _categoryRepo = categoryRepo;
         _cloudinaryService = cloudinaryService;
         _bundleRepo = bundleRepo;
+        _context = context;
     }
 
     public async Task<ApiResponse<PagedResponse<AdminProductResponse>>> GetAdminProductsAsync(AdminProductFilter filter)
@@ -115,6 +120,7 @@ public class AdminProductService : IAdminProductService
             BrandId = request.BrandId,
             WarrantyPolicyId = request.WarrantyPolicyId,
             HasSerialTracking = request.HasSerialTracking,
+            CompatibilityInfo = request.CompatibilityInfo,
             IsActive = true,
             IsDeleted = false
         };
@@ -123,6 +129,36 @@ public class AdminProductService : IAdminProductService
 
         if (request.CategoryIds.Any())
             await _productRepo.AddCategoriesToProductAsync(createdProduct.ProductId, request.CategoryIds);
+
+        // Save specifications
+        if (request.Specifications.Any())
+        {
+            var specs = request.Specifications.Select(s => new ProductSpecification
+            {
+                ProductId = createdProduct.ProductId,
+                SpecName = s.SpecName,
+                SpecValue = s.SpecValue,
+                DisplayOrder = s.DisplayOrder
+            });
+            _context.ProductSpecifications.AddRange(specs);
+        }
+
+        // Save documents
+        if (request.Documents.Any())
+        {
+            var docs = request.Documents.Select(d => new ProductDocument
+            {
+                ProductId = createdProduct.ProductId,
+                DocumentType = d.DocumentType,
+                Title = d.Title,
+                Url = d.Url,
+                DisplayOrder = d.DisplayOrder
+            });
+            _context.ProductDocuments.AddRange(docs);
+        }
+
+        if (request.Specifications.Any() || request.Documents.Any())
+            await _context.SaveChangesAsync();
 
         var detail = await _productRepo.GetDetailByIdAsync(createdProduct.ProductId);
         var response = MapToDetailResponse(detail!);
@@ -151,6 +187,7 @@ public class AdminProductService : IAdminProductService
         product.BrandId = request.BrandId;
         product.WarrantyPolicyId = request.WarrantyPolicyId;
         product.HasSerialTracking = request.HasSerialTracking;
+        product.CompatibilityInfo = request.CompatibilityInfo;
 
         await _productRepo.UpdateAsync(product);
 
@@ -161,6 +198,43 @@ public class AdminProductService : IAdminProductService
 
         if (request.CategoryIds.Any())
             await _productRepo.AddCategoriesToProductAsync(productId, request.CategoryIds);
+
+        // Update specifications: remove old, add new
+        var existingSpecs = await _context.ProductSpecifications
+            .Where(s => s.ProductId == productId).ToListAsync();
+        _context.ProductSpecifications.RemoveRange(existingSpecs);
+
+        if (request.Specifications.Any())
+        {
+            var newSpecs = request.Specifications.Select(s => new ProductSpecification
+            {
+                ProductId = productId,
+                SpecName = s.SpecName,
+                SpecValue = s.SpecValue,
+                DisplayOrder = s.DisplayOrder
+            });
+            _context.ProductSpecifications.AddRange(newSpecs);
+        }
+
+        // Update documents: remove old, add new
+        var existingDocs = await _context.ProductDocuments
+            .Where(d => d.ProductId == productId).ToListAsync();
+        _context.ProductDocuments.RemoveRange(existingDocs);
+
+        if (request.Documents.Any())
+        {
+            var newDocs = request.Documents.Select(d => new ProductDocument
+            {
+                ProductId = productId,
+                DocumentType = d.DocumentType,
+                Title = d.Title,
+                Url = d.Url,
+                DisplayOrder = d.DisplayOrder
+            });
+            _context.ProductDocuments.AddRange(newDocs);
+        }
+
+        await _context.SaveChangesAsync();
 
         var detail = await _productRepo.GetDetailByIdAsync(productId);
         var response = MapToDetailResponse(detail!);
@@ -287,6 +361,7 @@ public class AdminProductService : IAdminProductService
             AvailableQuantity = product.StockQuantity ?? 0,
             HasSerialTracking = product.HasSerialTracking ?? false,
             CreatedAt = product.CreatedAt,
+            CompatibilityInfo = product.CompatibilityInfo,
             Brand = new ProductDetailResponse.BrandInfo
             {
                 BrandId = product.Brand.BrandId,
@@ -320,7 +395,33 @@ public class AdminProductService : IAdminProductService
                 ThreeStarCount = product.Reviews.Count(r => r.Rating == 3),
                 TwoStarCount = product.Reviews.Count(r => r.Rating == 2),
                 OneStarCount = product.Reviews.Count(r => r.Rating == 1)
-            }
+            },
+            Specifications = product.ProductSpecifications?.Select(s => new ProductDetailResponse.SpecificationInfo
+            {
+                SpecificationId = s.SpecificationId,
+                SpecName = s.SpecName,
+                SpecValue = s.SpecValue,
+                DisplayOrder = s.DisplayOrder
+            }).ToList() ?? new List<ProductDetailResponse.SpecificationInfo>(),
+            Documents = product.ProductDocuments?.Select(d => new ProductDetailResponse.DocumentInfo
+            {
+                DocumentId = d.DocumentId,
+                DocumentType = d.DocumentType,
+                Title = d.Title,
+                Url = d.Url,
+                DisplayOrder = d.DisplayOrder
+            }).ToList() ?? new List<ProductDetailResponse.DocumentInfo>(),
+            RelatedProducts = product.RelatedProducts?.Select(r => new ProductDetailResponse.RelatedProductInfo
+            {
+                RelatedProductId = r.RelatedProductId,
+                ProductId = r.RelatedToProductId,
+                Name = r.RelatedToProduct?.Name,
+                Sku = r.RelatedToProduct?.Sku,
+                Price = r.RelatedToProduct?.Price ?? 0,
+                PrimaryImage = r.RelatedToProduct?.ProductImages?.OrderBy(i => i.ImageId).Select(i => i.ImageUrl).FirstOrDefault(),
+                RelationType = r.RelationType,
+                DisplayOrder = r.DisplayOrder
+            }).ToList() ?? new List<ProductDetailResponse.RelatedProductInfo>()
         };
     }
 }
