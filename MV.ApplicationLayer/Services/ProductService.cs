@@ -38,27 +38,47 @@ namespace MV.ApplicationLayer.Services
             // 1. Gọi Repository
             var (products, totalCount) = await _productRepository.GetPagedProductsAsync(filter);
 
-            // 2. Map Entity -> DTO
-            var productDtos = products.Select(p => new ProductResponseDto
+            // 2. Load bundle components cho tất cả KIT products trong 1 query
+            var kitProductIds = products
+                .Where(p => p.ProductType == ProductTypeEnum.KIT.ToString())
+                .Select(p => p.ProductId)
+                .ToList();
+
+            var allBundles = kitProductIds.Any()
+                ? (await _bundleRepository.GetBundleComponentsByProductIdsAsync(kitProductIds))
+                    .GroupBy(b => b.ParentProductId)
+                    .ToDictionary(g => g.Key, g => g.ToList())
+                : new Dictionary<int, List<ProductBundle>>();
+
+            // 3. Map Entity -> DTO
+            var productDtos = products.Select(p =>
             {
-                ProductId = p.ProductId,
-                Sku = p.Sku,
-                Name = p.Name,
-                Price = p.Price,
-                StockQuantity = p.StockQuantity ?? 0,
-                ProductType = "MODULE", // Xử lý map enum nếu cần
-                Brand = p.Brand != null ? new BrandDto
+                var effectiveStock = p.ProductType == ProductTypeEnum.KIT.ToString()
+                    && allBundles.TryGetValue(p.ProductId, out var comps) && comps.Any()
+                    ? comps.Min(b => (b.ChildProduct.StockQuantity ?? 0) / (b.Quantity ?? 1))
+                    : p.StockQuantity ?? 0;
+
+                return new ProductResponseDto
                 {
-                    BrandId = p.Brand.BrandId,
-                    Name = p.Brand.Name
-                } : null,
-                PrimaryImage = p.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl ?? "/images/no-image.png",
-                Categories = p.Categories.Select(c => new CategoryDto
-                {
-                    CategoryId = c.CategoryId,
-                    Name = c.Name
-                }).ToList(),
-                InStock = (p.StockQuantity ?? 0) > 0
+                    ProductId = p.ProductId,
+                    Sku = p.Sku,
+                    Name = p.Name,
+                    Price = p.Price,
+                    StockQuantity = effectiveStock,
+                    ProductType = p.ProductType,
+                    Brand = p.Brand != null ? new BrandDto
+                    {
+                        BrandId = p.Brand.BrandId,
+                        Name = p.Brand.Name
+                    } : null,
+                    PrimaryImage = p.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl ?? "/images/no-image.png",
+                    Categories = p.Categories.Select(c => new CategoryDto
+                    {
+                        CategoryId = c.CategoryId,
+                        Name = c.Name
+                    }).ToList(),
+                    InStock = effectiveStock > 0
+                };
             }).ToList();
 
             // 3. Tạo PagedResponse (Đây là object chứa items và pagination)
@@ -110,6 +130,14 @@ namespace MV.ApplicationLayer.Services
                     ChildProductPrice = b.ChildProduct.Price,
                     Quantity = b.Quantity ?? 1
                 }).ToList();
+
+                // KIT stock là min(componentStock / componentQty) qua tất cả components
+                if (bundles.Any())
+                {
+                    var effectiveStock = bundles.Min(b => (b.ChildProduct.StockQuantity ?? 0) / (b.Quantity ?? 1));
+                    response.StockQuantity = effectiveStock;
+                    response.AvailableQuantity = effectiveStock;
+                }
             }
 
             return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product retrieved successfully.");
