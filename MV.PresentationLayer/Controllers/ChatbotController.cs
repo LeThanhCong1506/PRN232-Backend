@@ -7,7 +7,7 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace MV.PresentationLayer.Controllers;
 
 /// <summary>
-/// AI Chatbot - Trợ lý thông minh cho STEM Store
+/// AI Chatbot - Smart assistant for STEM Store
 /// </summary>
 [ApiController]
 [Route("api/chatbot")]
@@ -21,22 +21,22 @@ public class ChatbotController : ControllerBase
     }
 
     /// <summary>
-    /// Gửi câu hỏi cho chatbot AI
+    /// Send a question to the AI chatbot
     /// </summary>
-    /// <param name="request">Câu hỏi từ user</param>
-    /// <returns>Câu trả lời + nguồn (faq/ai/fallback/error)</returns>
+    /// <param name="request">Question from user</param>
+    /// <returns>Answer + source (faq/ai/fallback/error)</returns>
     /// <remarks>
     /// Sample request:
     /// 
     ///     POST /api/chatbot/ask
     ///     {
-    ///       "question": "Arduino Uno giá bao nhiêu?"
+    ///       "question": "How much does Arduino Uno cost?"
     ///     }
     ///     
     /// Response:
-    /// - answer: Nội dung câu trả lời
-    /// - source: "faq" (keyword match), "ai" (Groq AI), "fallback" (AI chưa cấu hình), "error"
-    /// - timestamp: Thời gian response
+    /// - answer: Answer content
+    /// - source: "faq" (keyword match), "ai" (Groq AI), "fallback" (AI not configured), "error"
+    /// - timestamp: Response timestamp
     /// </remarks>
     [HttpPost("ask")]
     [SwaggerOperation(Summary = "Ask chatbot a question")]

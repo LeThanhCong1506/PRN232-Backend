@@ -164,7 +164,7 @@ public class AuthService : IAuthService
 
         // Always return success to prevent email enumeration
         if (user == null || user.IsActive != true)
-            return ApiResponse<string>.SuccessResponse("Nếu email tồn tại, mã OTP đã được gửi.", "Nếu email tồn tại, mã OTP đã được gửi.");
+            return ApiResponse<string>.SuccessResponse("If the email exists, an OTP code has been sent.", "If the email exists, an OTP code has been sent.");
 
         // Rate limit: max 3 requests per hour
         var now = DateTimeHelper.VietnamNow();
@@ -189,7 +189,7 @@ public class AuthService : IAuthService
 
         if (user.PasswordResetAttempts >= 3)
         {
-            return ApiResponse<string>.ErrorResponse("Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau 1 giờ.");
+            return ApiResponse<string>.ErrorResponse("You have made too many requests. Please try again after 1 hour.");
         }
 
         // Generate 6-digit OTP
@@ -216,7 +216,7 @@ public class AuthService : IAuthService
                 Console.WriteLine($"[EMAIL ERROR INNER] {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
         }
 
-        return ApiResponse<string>.SuccessResponse("Nếu email tồn tại, mã OTP đã được gửi.", "Nếu email tồn tại, mã OTP đã được gửi.");
+        return ApiResponse<string>.SuccessResponse("If the email exists, an OTP code has been sent.", "If the email exists, an OTP code has been sent.");
     }
 
     public async Task<ApiResponse<string>> ResetPasswordAsync(ResetPasswordRequestDto request)
@@ -224,17 +224,17 @@ public class AuthService : IAuthService
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
         if (user == null || user.IsActive != true)
-            return ApiResponse<string>.ErrorResponse("Thông tin không hợp lệ.");
+            return ApiResponse<string>.ErrorResponse("Invalid information.");
 
         if (string.IsNullOrEmpty(user.PasswordResetToken) || !user.PasswordResetTokenExpiry.HasValue)
-            return ApiResponse<string>.ErrorResponse("Mã OTP không hợp lệ hoặc đã hết hạn.");
+            return ApiResponse<string>.ErrorResponse("OTP code is invalid or has expired.");
 
         var now = DateTimeHelper.VietnamNow();
         if (user.PasswordResetTokenExpiry.Value < now)
-            return ApiResponse<string>.ErrorResponse("Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.");
+            return ApiResponse<string>.ErrorResponse("OTP code has expired. Please request a new one.");
 
         if (!BCrypt.Net.BCrypt.Verify(request.Otp, user.PasswordResetToken))
-            return ApiResponse<string>.ErrorResponse("Mã OTP không đúng.");
+            return ApiResponse<string>.ErrorResponse("Incorrect OTP code.");
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
         user.PasswordResetToken = null;
@@ -244,7 +244,7 @@ public class AuthService : IAuthService
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
 
-        return ApiResponse<string>.SuccessResponse("Đặt lại mật khẩu thành công.", "Đặt lại mật khẩu thành công.");
+        return ApiResponse<string>.SuccessResponse("Password reset successful.", "Password reset successful.");
     }
 
     private string GenerateJwtToken(User user, string roleName)

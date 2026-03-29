@@ -80,7 +80,7 @@ namespace MV.PresentationLayer
                     Scheme = "Bearer",
                     BearerFormat = "JWT",
                     In = ParameterLocation.Header,
-                    Description = "Nhập: Bearer {your JWT token}"
+                    Description = "Enter: Bearer {your JWT token}"
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement

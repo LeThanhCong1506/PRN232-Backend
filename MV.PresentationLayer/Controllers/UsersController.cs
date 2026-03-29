@@ -52,7 +52,7 @@ namespace MV.PresentationLayer.Controllers
         {
             var result = await _service.LoginAsync(dto);
             if (result == null)
-                return Unauthorized("Email hoặc mật khẩu không đúng");
+                return Unauthorized("Invalid email or password.");
 
             return Ok(result);
         }
@@ -77,7 +77,7 @@ namespace MV.PresentationLayer.Controllers
 
             var user = await _service.GetByIdAsync(userId);
             if (user == null)
-                return NotFound("User không tồn tại");
+                return NotFound("User does not exist");
 
             // Get avatar from entity
             var entity = await _userRepository.GetByIdAsync(userId);
@@ -132,7 +132,7 @@ namespace MV.PresentationLayer.Controllers
             }
             else
             {
-                return BadRequest("Cập nhật thất bại");
+                return BadRequest("Update failed");
             }
         }
 
@@ -181,7 +181,7 @@ namespace MV.PresentationLayer.Controllers
         {
             var user = await _service.GetByIdAsync(id);
             if (user == null)
-                return NotFound("User không tồn tại");
+                return NotFound("User does not exist");
 
             return Ok(user);
         }
@@ -191,7 +191,7 @@ namespace MV.PresentationLayer.Controllers
         {
             var result = await _service.UpdateAsync(id, dto);
             if (result == true)
-                return Ok("Update thành công");
+                return Ok("Update successful");
             else
                 return BadRequest(result);
         }
