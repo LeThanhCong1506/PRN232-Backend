@@ -188,10 +188,14 @@ public class AuthService : IAuthService
         try
         {
             await _emailService.SendPasswordResetEmailAsync(user.Email, otp);
+            Console.WriteLine($"[EMAIL] Password reset email sent to {user.Email}");
         }
-        catch
+        catch (Exception ex)
         {
-            // Log but don't reveal email failure to user
+            Console.WriteLine($"[EMAIL ERROR] Failed to send password reset email to {user.Email}");
+            Console.WriteLine($"[EMAIL ERROR] {ex.GetType().Name}: {ex.Message}");
+            if (ex.InnerException != null)
+                Console.WriteLine($"[EMAIL ERROR INNER] {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
         }
 
         return ApiResponse<string>.SuccessResponse("Nếu email tồn tại, mã OTP đã được gửi.", "Nếu email tồn tại, mã OTP đã được gửi.");
