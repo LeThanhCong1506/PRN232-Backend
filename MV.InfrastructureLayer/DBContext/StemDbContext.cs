@@ -895,6 +895,14 @@ public partial class StemDbContext : DbContext
             entity.Property(e => e.ExternalId)
                 .HasMaxLength(255)
                 .HasColumnName("external_id");
+            entity.Property(e => e.PasswordResetToken)
+                .HasMaxLength(500)
+                .HasColumnName("password_reset_token");
+            entity.Property(e => e.PasswordResetTokenExpiry)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("password_reset_token_expiry");
+            entity.Property(e => e.PasswordResetAttempts)
+                .HasColumnName("password_reset_attempts");
 
             entity.HasOne(d => d.Role).WithMany(p => p.Users)
                 .HasForeignKey(d => d.RoleId)

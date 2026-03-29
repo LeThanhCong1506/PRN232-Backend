@@ -1,10 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using MV.ApplicationLayer.Interfaces;
+using MV.DomainLayer.DTOs.Auth;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
@@ -17,11 +19,13 @@ public class AuthService : IAuthService
 {
     private readonly StemDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly IEmailService _emailService;
 
-    public AuthService(StemDbContext context, IConfiguration configuration)
+    public AuthService(StemDbContext context, IConfiguration configuration, IEmailService emailService)
     {
         _context = context;
         _configuration = configuration;
+        _emailService = emailService;
     }
 
     public async Task<ApiResponse<AuthResponseDto>> RegisterAsync(RegisterRequestDto request)
@@ -152,6 +156,73 @@ public class AuthService : IAuthService
         };
 
         return ApiResponse<UserProfileResponseDto>.SuccessResponse(response);
+    }
+
+    public async Task<ApiResponse<string>> ForgotPasswordAsync(ForgotPasswordRequestDto request)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+        // Always return success to prevent email enumeration
+        if (user == null || user.IsActive != true)
+            return ApiResponse<string>.SuccessResponse("Nếu email tồn tại, mã OTP đã được gửi.", "Nếu email tồn tại, mã OTP đã được gửi.");
+
+        // Rate limit: max 3 requests per hour
+        var now = DateTimeHelper.VietnamNow();
+        if (user.PasswordResetAttempts >= 3 && user.PasswordResetTokenExpiry.HasValue
+            && user.PasswordResetTokenExpiry.Value > now.AddMinutes(-60))
+        {
+            return ApiResponse<string>.ErrorResponse("Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau 1 giờ.");
+        }
+
+        // Generate 6-digit OTP
+        var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+        var hashedOtp = BCrypt.Net.BCrypt.HashPassword(otp);
+
+        user.PasswordResetToken = hashedOtp;
+        user.PasswordResetTokenExpiry = now.AddMinutes(15);
+        user.PasswordResetAttempts = (user.PasswordResetAttempts ?? 0) + 1;
+
+        _context.Users.Update(user);
+        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _emailService.SendPasswordResetEmailAsync(user.Email, otp);
+        }
+        catch
+        {
+            // Log but don't reveal email failure to user
+        }
+
+        return ApiResponse<string>.SuccessResponse("Nếu email tồn tại, mã OTP đã được gửi.", "Nếu email tồn tại, mã OTP đã được gửi.");
+    }
+
+    public async Task<ApiResponse<string>> ResetPasswordAsync(ResetPasswordRequestDto request)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+        if (user == null || user.IsActive != true)
+            return ApiResponse<string>.ErrorResponse("Thông tin không hợp lệ.");
+
+        if (string.IsNullOrEmpty(user.PasswordResetToken) || !user.PasswordResetTokenExpiry.HasValue)
+            return ApiResponse<string>.ErrorResponse("Mã OTP không hợp lệ hoặc đã hết hạn.");
+
+        var now = DateTimeHelper.VietnamNow();
+        if (user.PasswordResetTokenExpiry.Value < now)
+            return ApiResponse<string>.ErrorResponse("Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.");
+
+        if (!BCrypt.Net.BCrypt.Verify(request.Otp, user.PasswordResetToken))
+            return ApiResponse<string>.ErrorResponse("Mã OTP không đúng.");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiry = null;
+        user.PasswordResetAttempts = 0;
+
+        _context.Users.Update(user);
+        await _context.SaveChangesAsync();
+
+        return ApiResponse<string>.SuccessResponse("Đặt lại mật khẩu thành công.", "Đặt lại mật khẩu thành công.");
     }
 
     private string GenerateJwtToken(User user, string roleName)

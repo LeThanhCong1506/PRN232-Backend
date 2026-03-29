@@ -39,6 +39,12 @@ public partial class User
 
     public string? AvatarUrl { get; set; }
 
+    public string? PasswordResetToken { get; set; }
+
+    public DateTime? PasswordResetTokenExpiry { get; set; }
+
+    public int? PasswordResetAttempts { get; set; }
+
     public virtual Cart? Cart { get; set; }
 
     public virtual ICollection<OrderHeader> OrderHeaderCancelledByNavigations { get; set; } = new List<OrderHeader>();
