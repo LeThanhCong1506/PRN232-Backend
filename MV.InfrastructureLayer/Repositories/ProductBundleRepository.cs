@@ -24,6 +24,14 @@ public class ProductBundleRepository : IProductBundleRepository
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<ProductBundle>> GetBundleComponentsByProductIdsAsync(IEnumerable<int> parentProductIds)
+    {
+        return await _context.ProductBundles
+            .Include(pb => pb.ChildProduct)
+            .Where(pb => parentProductIds.Contains(pb.ParentProductId))
+            .ToListAsync();
+    }
+
     public async Task<ProductBundle?> GetBundleItemAsync(int parentProductId, int childProductId)
     {
         return await _context.ProductBundles

@@ -22,6 +22,7 @@ public class PaymentService : IPaymentService
     private readonly IConfiguration _configuration;
     private readonly ILogger<PaymentService> _logger;
     private readonly INotificationService _notificationService;
+    private readonly IProductBundleRepository _bundleRepo;
 
     public PaymentService(
         ISepayRepository sepayRepo,
@@ -29,7 +30,8 @@ public class PaymentService : IPaymentService
         StemDbContext context,
         IConfiguration configuration,
         ILogger<PaymentService> logger,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IProductBundleRepository bundleRepo)
     {
         _sepayRepo = sepayRepo;
         _orderRepo = orderRepo;
@@ -37,6 +39,7 @@ public class PaymentService : IPaymentService
         _configuration = configuration;
         _logger = logger;
         _notificationService = notificationService;
+        _bundleRepo = bundleRepo;
     }
 
     // ==================== PROCESS WEBHOOK ====================
@@ -559,10 +562,22 @@ public class PaymentService : IPaymentService
                     order.UpdatedAt = DateTimeHelper.VietnamNow();
                     await _orderRepo.UpdateOrderAsync(order);
 
-                    // Restore stock
+                    // Restore stock (KIT restore từng component, sản phẩm thường restore trực tiếp)
                     foreach (var item in order.OrderItems)
                     {
-                        await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+                        if (item.Product?.ProductType == ProductTypeEnum.KIT.ToString())
+                        {
+                            var components = await _bundleRepo.GetBundleComponentsAsync(item.ProductId);
+                            foreach (var comp in components)
+                            {
+                                var restoreQty = (comp.Quantity ?? 1) * item.Quantity;
+                                await _orderRepo.IncrementStockAsync(comp.ChildProductId, restoreQty);
+                            }
+                        }
+                        else
+                        {
+                            await _orderRepo.IncrementStockAsync(item.ProductId, item.Quantity);
+                        }
                     }
 
                     // Restore coupon

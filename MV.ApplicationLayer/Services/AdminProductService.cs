@@ -18,6 +18,7 @@ public class AdminProductService : IAdminProductService
     private readonly IBrandRepository _brandRepo;
     private readonly ICategoryRepository _categoryRepo;
     private readonly ICloudinaryService _cloudinaryService;
+    private readonly IProductBundleRepository _bundleRepo;
 
     private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
     private const long MaxFileSize = 5 * 1024 * 1024; // 5MB
@@ -28,36 +29,58 @@ public class AdminProductService : IAdminProductService
         IProductImageRepository imageRepo,
         IBrandRepository brandRepo,
         ICategoryRepository categoryRepo,
-        ICloudinaryService cloudinaryService)
+        ICloudinaryService cloudinaryService,
+        IProductBundleRepository bundleRepo)
     {
         _productRepo = productRepo;
         _imageRepo = imageRepo;
         _brandRepo = brandRepo;
         _categoryRepo = categoryRepo;
         _cloudinaryService = cloudinaryService;
+        _bundleRepo = bundleRepo;
     }
 
     public async Task<ApiResponse<PagedResponse<AdminProductResponse>>> GetAdminProductsAsync(AdminProductFilter filter)
     {
         var (products, totalCount) = await _productRepo.GetAdminPagedProductsAsync(filter);
 
-        var items = products.Select(p => new AdminProductResponse
+        // Load bundle components cho tất cả KIT products trong 1 query
+        var kitProductIds = products
+            .Where(p => p.ProductType == ProductTypeEnum.KIT.ToString())
+            .Select(p => p.ProductId)
+            .ToList();
+
+        var allBundles = kitProductIds.Any()
+            ? (await _bundleRepo.GetBundleComponentsByProductIdsAsync(kitProductIds))
+                .GroupBy(b => b.ParentProductId)
+                .ToDictionary(g => g.Key, g => g.ToList())
+            : new Dictionary<int, List<ProductBundle>>();
+
+        var items = products.Select(p =>
         {
-            ProductId = p.ProductId,
-            Name = p.Name,
-            Sku = p.Sku,
-            ProductType = p.ProductType,
-            Price = p.Price,
-            StockQuantity = p.StockQuantity ?? 0,
-            IsActive = p.IsActive == true,
-            BrandName = p.Brand?.Name,
-            Categories = p.Categories.Select(c => c.Name).ToList(),
-            PrimaryImage = p.ProductImages
-                .Where(i => i.IsPrimary == true)
-                .Select(i => i.ImageUrl)
-                .FirstOrDefault()
-                ?? p.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
-            LowStock = (p.StockQuantity ?? 0) < 10
+            var effectiveStock = p.ProductType == ProductTypeEnum.KIT.ToString()
+                && allBundles.TryGetValue(p.ProductId, out var comps) && comps.Any()
+                ? comps.Min(b => (b.ChildProduct.StockQuantity ?? 0) / (b.Quantity ?? 1))
+                : p.StockQuantity ?? 0;
+
+            return new AdminProductResponse
+            {
+                ProductId = p.ProductId,
+                Name = p.Name,
+                Sku = p.Sku,
+                ProductType = p.ProductType,
+                Price = p.Price,
+                StockQuantity = effectiveStock,
+                IsActive = p.IsActive == true,
+                BrandName = p.Brand?.Name,
+                Categories = p.Categories.Select(c => c.Name).ToList(),
+                PrimaryImage = p.ProductImages
+                    .Where(i => i.IsPrimary == true)
+                    .Select(i => i.ImageUrl)
+                    .FirstOrDefault()
+                    ?? p.ProductImages.OrderBy(i => i.ImageId).FirstOrDefault()?.ImageUrl,
+                LowStock = effectiveStock < 10
+            };
         }).ToList();
 
         var pagedData = new PagedResponse<AdminProductResponse>(items, filter.PageNumber, filter.PageSize, totalCount);
