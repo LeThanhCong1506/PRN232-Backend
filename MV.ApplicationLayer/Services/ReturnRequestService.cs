@@ -13,11 +13,13 @@ public class ReturnRequestService : IReturnRequestService
 {
     private readonly IReturnRequestRepository _repository;
     private readonly StemDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public ReturnRequestService(IReturnRequestRepository repository, StemDbContext context)
+    public ReturnRequestService(IReturnRequestRepository repository, StemDbContext context, INotificationService notificationService)
     {
         _repository = repository;
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<ApiResponse<ReturnRequestResponse>> CreateReturnRequestAsync(int userId, CreateReturnRequestDto dto)
@@ -51,6 +53,15 @@ public class ReturnRequestService : IReturnRequestService
 
         var created = await _repository.CreateAsync(returnRequest);
         var detail = await _repository.GetByIdAsync(created.ReturnRequestId);
+
+        // Notify Admin about new return request
+        try
+        {
+            var customerName = order.CustomerName ?? order.User?.FullName ?? "Unknown";
+            var orderNumber = order.OrderNumber ?? "Unknown";
+            await _notificationService.SendAdminNewReturnRequestAsync(created.ReturnRequestId, orderNumber, customerName);
+        }
+        catch { }
 
         return ApiResponse<ReturnRequestResponse>.SuccessResponse(MapToResponse(detail!), "Return request submitted successfully.");
     }

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.SignalR;
 using MV.DomainLayer.Entities;
 using MV.DomainLayer.Helpers;
+using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 using MV.PresentationLayer.Hubs;
+using Microsoft.EntityFrameworkCore;
 
 namespace MV.PresentationLayer.Services;
 
@@ -173,6 +175,50 @@ public class SignalRNotificationService : INotificationService
         _logger.LogInformation("NewChatMessage notification sent to user {UserId} from {SenderName}", userId, senderName);
     }
 
+    public async Task SendAdminNewOrderAsync(int orderId, string orderNumber, decimal totalAmount)
+    {
+        await BroadcastToAdminsAsync(
+            "AdminNewOrder",
+            "New Order Received",
+            $"Order #{orderNumber} has been placed. Total: {totalAmount.ToString("C0", new System.Globalization.CultureInfo("vi-VN"))}.",
+            $"/admin/orders/{orderId}",
+            new { OrderId = orderId, OrderNumber = orderNumber, TotalAmount = totalAmount }
+        );
+    }
+
+    public async Task SendAdminPaymentConfirmedAsync(int orderId, string orderNumber, decimal amount)
+    {
+        await BroadcastToAdminsAsync(
+            "AdminPaymentConfirmed",
+            "Payment Confirmed",
+            $"Payment of {amount.ToString("C0", new System.Globalization.CultureInfo("vi-VN"))} for order #{orderNumber} has been confirmed.",
+            $"/admin/orders/{orderId}",
+            new { OrderId = orderId, OrderNumber = orderNumber, Amount = amount }
+        );
+    }
+
+    public async Task SendAdminNewWarrantyClaimAsync(int claimId, string customerName, string productName)
+    {
+        await BroadcastToAdminsAsync(
+            "AdminNewWarrantyClaim",
+            "New Warranty Claim",
+            $"{customerName} submitted a warranty claim for {productName}.",
+            $"/admin/warranty-claims",
+            new { ClaimId = claimId, CustomerName = customerName, ProductName = productName }
+        );
+    }
+
+    public async Task SendAdminNewReturnRequestAsync(int requestId, string orderNumber, string customerName)
+    {
+        await BroadcastToAdminsAsync(
+            "AdminNewReturnRequest",
+            "New Return Request",
+            $"{customerName} requested a return for order #{orderNumber}.",
+            $"/admin/return-requests",
+            new { RequestId = requestId, OrderNumber = orderNumber, CustomerName = customerName }
+        );
+    }
+
     private async Task<Notification?> SaveNotificationAsync(int userId, string type, string title, string message, string? linkUrl = null)
     {
         _logger.LogInformation("[NotifSave] Attempting: UserId={UserId}, Type={Type}, Title={Title}", userId, type, title);
@@ -211,6 +257,59 @@ public class SignalRNotificationService : INotificationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending {EventType} to user {UserId}", eventType, userId);
+        }
+    }
+
+    private async Task BroadcastToAdminsAsync(string type, string title, string message, string linkUrl, object payload)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<StemDbContext>();
+
+            var adminUserIds = await context.Users
+                .Include(u => u.Role)
+                .Where(u => u.Role != null && (u.Role.RoleName == "Admin" || u.Role.RoleName == "Staff"))
+                .Select(u => u.UserId)
+                .ToListAsync();
+
+            if (!adminUserIds.Any()) return;
+
+            var notifications = new List<Notification>();
+            foreach (var aId in adminUserIds)
+            {
+                notifications.Add(new Notification
+                {
+                    UserId = aId,
+                    Type = type,
+                    Title = title,
+                    Message = message,
+                    LinkUrl = linkUrl,
+                    IsRead = false,
+                    CreatedAt = DateTimeHelper.VietnamNow()
+                });
+            }
+
+            context.Notifications.AddRange(notifications);
+            await context.SaveChangesAsync();
+
+            var broadcastData = new
+            {
+                Type = type,
+                Title = title,
+                Message = message,
+                LinkUrl = linkUrl,
+                Timestamp = notifications.First().CreatedAt,
+                IsRead = false,
+                Payload = payload
+            };
+
+            await _hubContext.Clients.Group("admin_notifications").SendAsync("ReceiveAdminNotification", broadcastData);
+            _logger.LogInformation("Admin notification {Type} broadcasted to {Count} admins.", type, adminUserIds.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to broadcast admin notification {Type}", type);
         }
     }
 }

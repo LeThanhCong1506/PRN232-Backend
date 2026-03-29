@@ -92,6 +92,18 @@ public class WarrantyClaimService : IWarrantyClaimService
 
         var created = await _claimRepository.CreateAsync(claim);
 
+        // Notify Admin about new warranty claim
+        try
+        {
+            var customerName = warranty.SerialNumberNavigation?.OrderItem?.Order?.CustomerName ?? "Unknown Customer";
+            var productName = warranty.SerialNumberNavigation?.Product?.Name ?? "Unknown Product";
+            await _notificationService.SendAdminNewWarrantyClaimAsync(created.ClaimId, customerName, productName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send admin notification for new warranty claim {ClaimId}", created.ClaimId);
+        }
+
         var response = new SubmitWarrantyClaimResponse
         {
             ClaimId = created.ClaimId,
