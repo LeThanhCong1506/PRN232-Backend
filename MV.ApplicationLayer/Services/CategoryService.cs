@@ -1,9 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Category.Request;
 using MV.DomainLayer.DTOs.Category.Response;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.ApplicationLayer.Services;
@@ -11,10 +13,12 @@ namespace MV.ApplicationLayer.Services;
 public class CategoryService : ICategoryService
 {
     private readonly ICategoryRepository _categoryRepository;
+    private readonly StemDbContext _context;
 
-    public CategoryService(ICategoryRepository categoryRepository)
+    public CategoryService(ICategoryRepository categoryRepository, StemDbContext context)
     {
         _categoryRepository = categoryRepository;
+        _context = context;
     }
 
     public async Task<PagedResponse<CategoryResponse>> GetAllCategoriesAsync(PaginationFilter filter)
@@ -158,11 +162,10 @@ public class CategoryService : ICategoryService
                 return ApiResponse<bool>.ErrorResponse($"Category with ID {id} not found.");
             }
 
-            // Check if category has products
-            if (category.Products.Any())
-            {
-                return ApiResponse<bool>.ErrorResponse($"Cannot delete category. It has {category.Products.Count} associated product(s).");
-            }
+            // Hard delete: remove all rows from the product_category junction table first
+            // to avoid FK constraint violations, then delete the category itself.
+            await _context.Database.ExecuteSqlRawAsync(
+                "DELETE FROM product_category WHERE category_id = {0}", id);
 
             await _categoryRepository.DeleteCategoryAsync(id);
 
@@ -174,3 +177,5 @@ public class CategoryService : ICategoryService
         }
     }
 }
+
+

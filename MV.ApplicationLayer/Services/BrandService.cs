@@ -1,9 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Brand.Request;
 using MV.DomainLayer.DTOs.Brand.Response;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
 using MV.DomainLayer.Entities;
+using MV.InfrastructureLayer.DBContext;
 using MV.InfrastructureLayer.Interfaces;
 
 namespace MV.ApplicationLayer.Services;
@@ -11,10 +13,12 @@ namespace MV.ApplicationLayer.Services;
 public class BrandService : IBrandService
 {
     private readonly IBrandRepository _brandRepository;
+    private readonly StemDbContext _context;
 
-    public BrandService(IBrandRepository brandRepository)
+    public BrandService(IBrandRepository brandRepository, StemDbContext context)
     {
         _brandRepository = brandRepository;
+        _context = context;
     }
 
     public async Task<PagedResponse<BrandResponse>> GetAllBrandsAsync(PaginationFilter filter)
@@ -158,10 +162,16 @@ public class BrandService : IBrandService
                 return ApiResponse<bool>.ErrorResponse($"Brand with ID {id} not found.");
             }
 
-            // Check if brand has products
+            // Hard delete: BrandId is non-nullable on Product (FK Restrict),
+            // so soft-delete all associated products first (IsDeleted=true, IsActive=false),
+            // then delete the brand itself.
             if (brand.Products.Any())
             {
-                return ApiResponse<bool>.ErrorResponse($"Cannot delete brand. It has {brand.Products.Count} associated product(s).");
+                await _context.Products
+                    .Where(p => p.BrandId == id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.IsDeleted, true)
+                        .SetProperty(p => p.IsActive, false));
             }
 
             await _brandRepository.DeleteBrandAsync(id);

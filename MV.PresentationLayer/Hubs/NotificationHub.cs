@@ -27,6 +27,13 @@ public class NotificationHub : Hub
         if (!string.IsNullOrEmpty(userId))
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+            
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            if (role == "Admin" || role == "Store")
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, "admin_group");
+            }
+            
             _logger.LogInformation("User {UserId} connected to NotificationHub. ConnectionId: {ConnectionId}", userId, Context.ConnectionId);
         }
 

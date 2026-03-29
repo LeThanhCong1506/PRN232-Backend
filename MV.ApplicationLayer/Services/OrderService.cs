@@ -438,7 +438,10 @@ public class OrderService : IOrderService
         await _orderRepo.SetOrderStatusAsync(orderId, newStatus.ToString());
 
         // Notify realtime: order status changed
-        try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus.ToString()); } catch { }
+        try { 
+            await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus.ToString()); 
+            await _notificationService.NotifyAdminsOrderChangedAsync(orderId, order.OrderNumber, newStatus.ToString());
+        } catch { }
 
         // Reload and return
         order = await _orderRepo.GetOrderByIdAsync(orderId);
@@ -520,7 +523,10 @@ public class OrderService : IOrderService
                 await transaction.CommitAsync();
 
                 // Notify realtime: order cancelled
-                try { await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, "CANCELLED"); } catch { }
+                try { 
+                    await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, "CANCELLED"); 
+                    await _notificationService.NotifyAdminsOrderChangedAsync(orderId, order.OrderNumber, "CANCELLED");
+                } catch { }
 
                 return ApiResponse<object>.SuccessResponse(null!, "Order cancelled successfully.");
             }

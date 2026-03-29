@@ -246,6 +246,7 @@ public class AdminOrderService : IAdminOrderService
         try
         {
             await _notificationService.SendOrderStatusChangedAsync(order.UserId, orderId, order.OrderNumber, newStatus);
+            await _notificationService.NotifyAdminsOrderChangedAsync(orderId, order.OrderNumber, newStatus);
         }
         catch (Exception ex)
         {
