@@ -51,8 +51,15 @@ namespace MV.InfrastructureLayer.Repositories
             var totalCount = await baseQuery.CountAsync();
 
             // Bước 3: Lấy IDs với pagination
-            var productIds = await baseQuery
-                .OrderByDescending(p => p.CreatedAt)
+            var isAsc = filter.SortOrder?.ToLower() == "asc";
+            IQueryable<Product> sortedQuery = filter.SortBy?.ToLower() switch
+            {
+                "price" => isAsc ? baseQuery.OrderBy(p => p.Price) : baseQuery.OrderByDescending(p => p.Price),
+                "name" => isAsc ? baseQuery.OrderBy(p => p.Name) : baseQuery.OrderByDescending(p => p.Name),
+                _ => isAsc ? baseQuery.OrderBy(p => p.CreatedAt) : baseQuery.OrderByDescending(p => p.CreatedAt)
+            };
+
+            var productIds = await sortedQuery
                 .Skip((filter.PageNumber - 1) * filter.PageSize)
                 .Take(filter.PageSize)
                 .Select(p => p.ProductId)
@@ -69,8 +76,10 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(p => p.Categories)
                 .Include(p => p.ProductImages)
                 .Where(p => productIds.Contains(p.ProductId))
-                .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
+
+            // Giữ đúng thứ tự sort
+            items = productIds.Select(id => items.First(p => p.ProductId == id)).ToList();
 
             return (items, totalCount);
         }

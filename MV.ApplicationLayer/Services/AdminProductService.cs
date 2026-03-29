@@ -247,6 +247,9 @@ public class AdminProductService : IAdminProductService
         if (!await _productRepo.ExistsAsync(productId))
             return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
 
+        if (await _productRepo.HasOrdersAsync(productId))
+            return ApiResponse<bool>.ErrorResponse("Cannot delete product that has been ordered.");
+
         await _productRepo.SoftDeleteAsync(productId);
         return ApiResponse<bool>.SuccessResponse(true, "Product deactivated successfully.");
     }
