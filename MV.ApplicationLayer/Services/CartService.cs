@@ -126,7 +126,7 @@ namespace MV.ApplicationLayer.Services
                 {
                     Success = false,
                     Message = "Product out of stock.",
-                    Data = new { availableQuantity = 0 }
+                    Data = new Dictionary<string, int> { { "availableQuantity", 0 } }
                 };
             }
 
@@ -153,8 +153,8 @@ namespace MV.ApplicationLayer.Services
                 return new ApiResponse<object>
                 {
                     Success = false,
-                    Message = "Requested quantity exceeds available stock",
-                    Data = new { availableQuantity = canAddMore > 0 ? canAddMore : 0 }
+                    Message = "Requested quantity exceeds available stock.",
+                    Data = new Dictionary<string, int> { { "availableQuantity", canAddMore > 0 ? canAddMore : 0 } }
                 };
             }
 
