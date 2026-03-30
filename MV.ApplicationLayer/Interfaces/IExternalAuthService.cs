@@ -5,7 +5,7 @@ namespace MV.ApplicationLayer.Interfaces
 {
     public interface IExternalAuthService
     {
-        Task<LoginResponseDto> GoogleLoginAsync(string code, string redirectUri);
-        Task<LoginResponseDto> GitHubLoginAsync(string code, string redirectUri);
+        Task<LoginResponseDto> GoogleLoginAsync(string code, string? redirectUri);
+        Task<LoginResponseDto> GitHubLoginAsync(string code, string? redirectUri);
     }
 }
