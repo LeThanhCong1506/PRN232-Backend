@@ -170,6 +170,7 @@ public class AdminProductService : IAdminProductService
     {
         // --- Validation (outside transaction) ---
         var product = await _context.Products
+            .AsTracking()
             .Include(p => p.Categories)
             .FirstOrDefaultAsync(p => p.ProductId == productId);
 
