@@ -185,73 +185,68 @@ public class AdminProductService : IAdminProductService
         if (!brandExists)
             return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
 
-        // --- Write (wrapped in execution strategy to support Npgsql retry) ---
         try
         {
-            var strategy = _context.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            // Update scalar properties
+            product.Name = request.Name;
+            product.Sku = request.Sku;
+            product.Description = request.Description;
+            product.ProductType = request.ProductType.ToString();
+            product.Price = request.Price;
+            product.StockQuantity = request.StockQuantity;
+            product.BrandId = request.BrandId;
+            product.WarrantyPolicyId = request.WarrantyPolicyId;
+            product.HasSerialTracking = request.HasSerialTracking;
+            product.CompatibilityInfo = request.CompatibilityInfo;
+
+            // Update categories (many-to-many)
+            product.Categories.Clear();
+            if (request.CategoryIds.Any())
             {
-                // Update product properties
-                product.Name = request.Name;
-                product.Sku = request.Sku;
-                product.Description = request.Description;
-                product.ProductType = request.ProductType.ToString();
-                product.Price = request.Price;
-                product.StockQuantity = request.StockQuantity;
-                product.BrandId = request.BrandId;
-                product.WarrantyPolicyId = request.WarrantyPolicyId;
-                product.HasSerialTracking = request.HasSerialTracking;
-                product.CompatibilityInfo = request.CompatibilityInfo;
+                var categories = await _context.Categories
+                    .Where(c => request.CategoryIds.Contains(c.CategoryId))
+                    .ToListAsync();
+                foreach (var category in categories)
+                    product.Categories.Add(category);
+            }
 
-                // Update categories
-                product.Categories.Clear();
-                if (request.CategoryIds.Any())
+            // Update specifications (delete-then-insert)
+            var existingSpecs = await _context.ProductSpecifications
+                .Where(s => s.ProductId == productId).ToListAsync();
+            _context.ProductSpecifications.RemoveRange(existingSpecs);
+
+            if (request.Specifications.Any())
+            {
+                var newSpecs = request.Specifications.Select(s => new ProductSpecification
                 {
-                    var categories = await _context.Categories
-                        .Where(c => request.CategoryIds.Contains(c.CategoryId))
-                        .ToListAsync();
-                    foreach (var category in categories)
-                        product.Categories.Add(category);
-                }
+                    ProductId = productId,
+                    SpecName = s.SpecName,
+                    SpecValue = s.SpecValue,
+                    DisplayOrder = s.DisplayOrder
+                });
+                _context.ProductSpecifications.AddRange(newSpecs);
+            }
 
-                // Update specifications (delete-then-insert)
-                var existingSpecs = await _context.ProductSpecifications
-                    .Where(s => s.ProductId == productId).ToListAsync();
-                _context.ProductSpecifications.RemoveRange(existingSpecs);
+            // Update documents (delete-then-insert)
+            var existingDocs = await _context.ProductDocuments
+                .Where(d => d.ProductId == productId).ToListAsync();
+            _context.ProductDocuments.RemoveRange(existingDocs);
 
-                if (request.Specifications.Any())
+            if (request.Documents.Any())
+            {
+                var newDocs = request.Documents.Select(d => new ProductDocument
                 {
-                    var newSpecs = request.Specifications.Select(s => new ProductSpecification
-                    {
-                        ProductId = productId,
-                        SpecName = s.SpecName,
-                        SpecValue = s.SpecValue,
-                        DisplayOrder = s.DisplayOrder
-                    });
-                    _context.ProductSpecifications.AddRange(newSpecs);
-                }
+                    ProductId = productId,
+                    DocumentType = d.DocumentType,
+                    Title = d.Title,
+                    Url = d.Url,
+                    DisplayOrder = d.DisplayOrder
+                });
+                _context.ProductDocuments.AddRange(newDocs);
+            }
 
-                // Update documents (delete-then-insert)
-                var existingDocs = await _context.ProductDocuments
-                    .Where(d => d.ProductId == productId).ToListAsync();
-                _context.ProductDocuments.RemoveRange(existingDocs);
-
-                if (request.Documents.Any())
-                {
-                    var newDocs = request.Documents.Select(d => new ProductDocument
-                    {
-                        ProductId = productId,
-                        DocumentType = d.DocumentType,
-                        Title = d.Title,
-                        Url = d.Url,
-                        DisplayOrder = d.DisplayOrder
-                    });
-                    _context.ProductDocuments.AddRange(newDocs);
-                }
-
-                // Single SaveChangesAsync — EF Core wraps all changes in one transaction automatically
-                await _context.SaveChangesAsync();
-            });
+            // SaveChangesAsync tự wrap tất cả trong 1 transaction — không cần BeginTransactionAsync
+            await _context.SaveChangesAsync();
 
             var detail = await _productRepo.GetDetailByIdAsync(productId);
             var response = MapToDetailResponse(detail!);
