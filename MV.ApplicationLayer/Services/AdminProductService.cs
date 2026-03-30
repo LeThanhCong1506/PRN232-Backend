@@ -168,101 +168,97 @@ public class AdminProductService : IAdminProductService
 
     public async Task<ApiResponse<ProductDetailResponse>> UpdateProductAsync(int productId, UpdateProductRequest request)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        // --- Validation (outside transaction) ---
+        var product = await _context.Products
+            .Include(p => p.Categories)
+            .FirstOrDefaultAsync(p => p.ProductId == productId);
+
+        if (product == null)
+            return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found.");
+
+        var skuExists = await _context.Products
+            .AnyAsync(p => p.Sku == request.Sku && p.ProductId != productId);
+        if (skuExists)
+            return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists.");
+
+        var brandExists = await _context.Brands.AnyAsync(b => b.BrandId == request.BrandId);
+        if (!brandExists)
+            return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
+
+        // --- Write (wrapped in execution strategy to support Npgsql retry) ---
         try
         {
-            // Load product with categories navigation property
-            var product = await _context.Products
-                .Include(p => p.Categories)
-                .FirstOrDefaultAsync(p => p.ProductId == productId);
-                
-            if (product == null)
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found.");
-
-            // Check SKU uniqueness
-            var skuExists = await _context.Products
-                .AnyAsync(p => p.Sku == request.Sku && p.ProductId != productId);
-            if (skuExists)
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists.");
-
-            // Check brand exists
-            var brandExists = await _context.Brands.AnyAsync(b => b.BrandId == request.BrandId);
-            if (!brandExists)
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
-
-            // Update product properties
-            product.Name = request.Name;
-            product.Sku = request.Sku;
-            product.Description = request.Description;
-            product.ProductType = request.ProductType.ToString();
-            product.Price = request.Price;
-            product.StockQuantity = request.StockQuantity;
-            product.BrandId = request.BrandId;
-            product.WarrantyPolicyId = request.WarrantyPolicyId;
-            product.HasSerialTracking = request.HasSerialTracking;
-            product.CompatibilityInfo = request.CompatibilityInfo;
-
-            // Update categories using navigation property
-            product.Categories.Clear();
-            if (request.CategoryIds.Any())
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                var categories = await _context.Categories
-                    .Where(c => request.CategoryIds.Contains(c.CategoryId))
-                    .ToListAsync();
-                foreach (var category in categories)
+                // Update product properties
+                product.Name = request.Name;
+                product.Sku = request.Sku;
+                product.Description = request.Description;
+                product.ProductType = request.ProductType.ToString();
+                product.Price = request.Price;
+                product.StockQuantity = request.StockQuantity;
+                product.BrandId = request.BrandId;
+                product.WarrantyPolicyId = request.WarrantyPolicyId;
+                product.HasSerialTracking = request.HasSerialTracking;
+                product.CompatibilityInfo = request.CompatibilityInfo;
+
+                // Update categories
+                product.Categories.Clear();
+                if (request.CategoryIds.Any())
                 {
-                    product.Categories.Add(category);
+                    var categories = await _context.Categories
+                        .Where(c => request.CategoryIds.Contains(c.CategoryId))
+                        .ToListAsync();
+                    foreach (var category in categories)
+                        product.Categories.Add(category);
                 }
-            }
 
-            // Update specifications
-            var existingSpecs = await _context.ProductSpecifications
-                .Where(s => s.ProductId == productId).ToListAsync();
-            _context.ProductSpecifications.RemoveRange(existingSpecs);
+                // Update specifications (delete-then-insert)
+                var existingSpecs = await _context.ProductSpecifications
+                    .Where(s => s.ProductId == productId).ToListAsync();
+                _context.ProductSpecifications.RemoveRange(existingSpecs);
 
-            if (request.Specifications.Any())
-            {
-                var newSpecs = request.Specifications.Select(s => new ProductSpecification
+                if (request.Specifications.Any())
                 {
-                    ProductId = productId,
-                    SpecName = s.SpecName,
-                    SpecValue = s.SpecValue,
-                    DisplayOrder = s.DisplayOrder
-                });
-                _context.ProductSpecifications.AddRange(newSpecs);
-            }
+                    var newSpecs = request.Specifications.Select(s => new ProductSpecification
+                    {
+                        ProductId = productId,
+                        SpecName = s.SpecName,
+                        SpecValue = s.SpecValue,
+                        DisplayOrder = s.DisplayOrder
+                    });
+                    _context.ProductSpecifications.AddRange(newSpecs);
+                }
 
-            // Update documents
-            var existingDocs = await _context.ProductDocuments
-                .Where(d => d.ProductId == productId).ToListAsync();
-            _context.ProductDocuments.RemoveRange(existingDocs);
+                // Update documents (delete-then-insert)
+                var existingDocs = await _context.ProductDocuments
+                    .Where(d => d.ProductId == productId).ToListAsync();
+                _context.ProductDocuments.RemoveRange(existingDocs);
 
-            if (request.Documents.Any())
-            {
-                var newDocs = request.Documents.Select(d => new ProductDocument
+                if (request.Documents.Any())
                 {
-                    ProductId = productId,
-                    DocumentType = d.DocumentType,
-                    Title = d.Title,
-                    Url = d.Url,
-                    DisplayOrder = d.DisplayOrder
-                });
-                _context.ProductDocuments.AddRange(newDocs);
-            }
+                    var newDocs = request.Documents.Select(d => new ProductDocument
+                    {
+                        ProductId = productId,
+                        DocumentType = d.DocumentType,
+                        Title = d.Title,
+                        Url = d.Url,
+                        DisplayOrder = d.DisplayOrder
+                    });
+                    _context.ProductDocuments.AddRange(newDocs);
+                }
 
-            // Save all changes in one transaction
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+                // Single SaveChangesAsync — EF Core wraps all changes in one transaction automatically
+                await _context.SaveChangesAsync();
+            });
 
-            // Fetch updated product details
             var detail = await _productRepo.GetDetailByIdAsync(productId);
             var response = MapToDetailResponse(detail!);
-
             return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product updated successfully.");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return ApiResponse<ProductDetailResponse>.ErrorResponse($"An error occurred while updating the database. Please try again. Details: {ex.Message}");
         }
     }
