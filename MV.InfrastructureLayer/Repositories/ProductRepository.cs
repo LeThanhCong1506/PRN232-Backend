@@ -148,6 +148,24 @@ namespace MV.InfrastructureLayer.Repositories
             return affected > 0;
         }
 
+        public async Task<bool?> ToggleActiveAsync(int productId)
+        {
+            var current = await _context.Products
+                .Where(p => p.ProductId == productId)
+                .Select(p => new { p.IsActive })
+                .FirstOrDefaultAsync();
+
+            if (current == null) return null;
+
+            var newValue = !(current.IsActive ?? false);
+            var affected = await _context.Products
+                .Where(p => p.ProductId == productId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.IsActive, newValue));
+
+            return affected > 0 ? newValue : null;
+        }
+
         public async Task<Product> GetProductByIdAsync(int productId)
         {
             return await _context.Products.FindAsync(productId);

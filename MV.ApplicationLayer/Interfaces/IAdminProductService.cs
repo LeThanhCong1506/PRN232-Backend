@@ -13,6 +13,7 @@ public interface IAdminProductService
     Task<ApiResponse<ProductDetailResponse>> CreateProductAsync(CreateProductRequest request);
     Task<ApiResponse<ProductDetailResponse>> UpdateProductAsync(int productId, UpdateProductRequest request);
     Task<ApiResponse<bool>> SoftDeleteProductAsync(int productId);
+    Task<ApiResponse<bool>> ToggleProductActiveAsync(int productId);
     Task<ApiResponse<List<AdminProductImageResponse>>> UploadImagesAsync(int productId, List<IFormFile> files, int? setPrimaryIndex);
     Task<ApiResponse<bool>> DeleteImageAsync(int productId, int imageId);
 }

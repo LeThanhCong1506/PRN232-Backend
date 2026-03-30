@@ -284,6 +284,19 @@ public class AdminProductService : IAdminProductService
         return ApiResponse<bool>.ErrorResponse("An error occurred while updating the database. Please try again.");
     }
 
+    public async Task<ApiResponse<bool>> ToggleProductActiveAsync(int productId)
+    {
+        if (!await _productRepo.ExistsAsync(productId))
+            return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
+
+        var newStatus = await _productRepo.ToggleActiveAsync(productId);
+        if (newStatus == null)
+            return ApiResponse<bool>.ErrorResponse("An error occurred while updating the database. Please try again.");
+
+        var statusText = newStatus.Value ? "activated" : "deactivated";
+        return ApiResponse<bool>.SuccessResponse(newStatus.Value, $"Product {statusText} successfully.");
+    }
+
     public async Task<ApiResponse<List<AdminProductImageResponse>>> UploadImagesAsync(
         int productId, List<IFormFile> files, int? setPrimaryIndex)
     {

@@ -32,5 +32,6 @@ namespace MV.InfrastructureLayer.Interfaces
         // Admin
         Task<(List<Product> Items, int TotalCount)> GetAdminPagedProductsAsync(AdminProductFilter filter);
         Task<bool> SoftDeleteAsync(int productId);
+        Task<bool?> ToggleActiveAsync(int productId);
     }
 }
