@@ -170,7 +170,6 @@ public class PaymentController : ControllerBase
         [FromQuery] string? cancelUrl)
     {
         var order = await _orderRepo.GetOrderByIdAsync(orderId);
-
         if (order == null)
             return NotFound("Order does not exist");
 

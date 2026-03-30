@@ -33,23 +33,25 @@ namespace MV.ApplicationLayer.Services
             _config = config;
         }
 
-        public async Task<LoginResponseDto> GoogleLoginAsync(string code, string redirectUri)
+        public async Task<LoginResponseDto> GoogleLoginAsync(string code, string? redirectUri)
         {
             var clientId = _config["OAuth:Google:ClientId"];
             var clientSecret = _config["OAuth:Google:ClientSecret"];
 
             var client = _httpClientFactory.CreateClient();
-            
-            var tokenRequest = new
-            {
-                client_id = clientId,
-                client_secret = clientSecret,
-                code = code,
-                grant_type = "authorization_code",
-                redirect_uri = redirectUri
-            };
 
-            var tokenResponse = await client.PostAsJsonAsync("https://oauth2.googleapis.com/token", tokenRequest);
+            // Google's token endpoint requires application/x-www-form-urlencoded (not JSON)
+            var formFields = new List<KeyValuePair<string, string>>
+            {
+                new("client_id", clientId ?? ""),
+                new("client_secret", clientSecret ?? ""),
+                new("code", code),
+                new("grant_type", "authorization_code"),
+                new("redirect_uri", redirectUri ?? "")
+            };
+            var formContent = new FormUrlEncodedContent(formFields);
+
+            var tokenResponse = await client.PostAsync("https://oauth2.googleapis.com/token", formContent);
             if (!tokenResponse.IsSuccessStatusCode)
             {
                 var error = await tokenResponse.Content.ReadAsStringAsync();
@@ -88,7 +90,7 @@ namespace MV.ApplicationLayer.Services
             return await LinkOrCreateUserAsync("Google", userInfo.Sub, userInfo.Email, userInfo.Name, userInfo.Picture);
         }
 
-        public async Task<LoginResponseDto> GitHubLoginAsync(string code, string redirectUri)
+        public async Task<LoginResponseDto> GitHubLoginAsync(string code, string? redirectUri)
         {
             var clientId = _config["OAuth:GitHub:ClientId"];
             var clientSecret = _config["OAuth:GitHub:ClientSecret"];
