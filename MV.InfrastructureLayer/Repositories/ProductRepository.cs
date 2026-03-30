@@ -23,7 +23,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
+                .Where(p => p.IsActive == true && p.IsDeleted != true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.SearchTerm))
@@ -179,7 +179,7 @@ namespace MV.InfrastructureLayer.Repositories
                 {
                     CategoryId = c.CategoryId,
                     Name = c.Name,
-                    ProductCount = c.Products.Count()
+                    ProductCount = c.Products.Count(p => p.IsActive == true && p.IsDeleted != true)
                 });
 
             return await query.ToListAsync();
@@ -194,7 +194,7 @@ namespace MV.InfrastructureLayer.Repositories
                     BrandId = b.BrandId,
                     Name = b.Name,
                     LogoUrl = b.LogoUrl ?? "https://www.nosm.ca/wp-content/uploads/2024/01/Photo-placeholder-1024x1024.jpg",
-                    ProductCount = b.Products.Count()
+                    ProductCount = b.Products.Count(p => p.IsActive == true && p.IsDeleted != true)
                 });
 
             return await query.ToListAsync();
@@ -222,6 +222,7 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(p => p.RelatedProducts.OrderBy(r => r.DisplayOrder))
                     .ThenInclude(r => r.RelatedToProduct)
                         .ThenInclude(rp => rp.ProductImages)
+                .Where(p => p.IsActive == true && p.IsDeleted != true)
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
 
             if (product == null) return null;
