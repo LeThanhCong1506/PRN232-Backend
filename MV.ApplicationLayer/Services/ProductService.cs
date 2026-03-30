@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.RequestModels;
 using MV.DomainLayer.DTOs.ResponseModels;
@@ -112,6 +112,16 @@ namespace MV.ApplicationLayer.Services
 
             if (product == null)
             {
+                // Detailed check for specifically why it's not found (inactive or deleted)
+                var rawProduct = await _productRepository.GetByIdAsync(productId);
+                if (rawProduct != null)
+                {
+                    if (rawProduct.IsDeleted == true)
+                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} has been deleted.");
+                    if (rawProduct.IsActive == false)
+                        return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} is currently inactive.");
+                }
+                
                 return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found.");
             }
 
