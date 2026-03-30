@@ -49,11 +49,15 @@ namespace MV.PresentationLayer.Controllers
 
             if (!result.Success)
             {
+                int availableQty = result.Data is Dictionary<string, int> errorData
+                    ? errorData["availableQuantity"]
+                    : 0;
+
                 return BadRequest(new
                 {
                     success = false,
                     message = result.Message,
-                    availableQuantity = ((dynamic)result.Data).availableQuantity
+                    availableQuantity = availableQty
                 });
             }
 

@@ -23,7 +23,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
+                .Where(p => p.IsActive == true && p.IsDeleted != true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.SearchTerm))
@@ -87,9 +87,8 @@ namespace MV.InfrastructureLayer.Repositories
         public async Task<(List<Product> Items, int TotalCount)> GetAdminPagedProductsAsync(AdminProductFilter filter)
         {
             // PERFORMANCE FIX: Tách Count và Load riêng
-            // Bước 1: Build base query KHÔNG có Include
+            // Bước 1: Build base query KHÔNG có Include (Admin thấy tất cả kể cả đã xóa mềm)
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.Search))
@@ -141,14 +140,30 @@ namespace MV.InfrastructureLayer.Repositories
 
         public async Task<bool> SoftDeleteAsync(int productId)
         {
-            var product = await _context.Products.FindAsync(productId);
-            if (product != null)
-            {
-                product.IsActive = false;
-                product.IsDeleted = true;
-                return await _context.SaveChangesAsync() > 0;
-            }
-            return false;
+            var affected = await _context.Products
+                .Where(p => p.ProductId == productId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.IsActive, false)
+                    .SetProperty(p => p.IsDeleted, true));
+            return affected > 0;
+        }
+
+        public async Task<bool?> ToggleActiveAsync(int productId)
+        {
+            var current = await _context.Products
+                .Where(p => p.ProductId == productId)
+                .Select(p => new { p.IsActive })
+                .FirstOrDefaultAsync();
+
+            if (current == null) return null;
+
+            var newValue = !(current.IsActive ?? false);
+            var affected = await _context.Products
+                .Where(p => p.ProductId == productId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.IsActive, newValue));
+
+            return affected > 0 ? newValue : null;
         }
 
         public async Task<Product> GetProductByIdAsync(int productId)
@@ -164,7 +179,7 @@ namespace MV.InfrastructureLayer.Repositories
                 {
                     CategoryId = c.CategoryId,
                     Name = c.Name,
-                    ProductCount = c.Products.Count()
+                    ProductCount = c.Products.Count(p => p.IsActive == true && p.IsDeleted != true)
                 });
 
             return await query.ToListAsync();
@@ -179,7 +194,7 @@ namespace MV.InfrastructureLayer.Repositories
                     BrandId = b.BrandId,
                     Name = b.Name,
                     LogoUrl = b.LogoUrl ?? "https://www.nosm.ca/wp-content/uploads/2024/01/Photo-placeholder-1024x1024.jpg",
-                    ProductCount = b.Products.Count()
+                    ProductCount = b.Products.Count(p => p.IsActive == true && p.IsDeleted != true)
                 });
 
             return await query.ToListAsync();
@@ -207,6 +222,7 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(p => p.RelatedProducts.OrderBy(r => r.DisplayOrder))
                     .ThenInclude(r => r.RelatedToProduct)
                         .ThenInclude(rp => rp.ProductImages)
+                .Where(p => p.IsActive == true && p.IsDeleted != true)
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
 
             if (product == null) return null;

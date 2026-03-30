@@ -168,29 +168,27 @@ public class AdminProductService : IAdminProductService
 
     public async Task<ApiResponse<ProductDetailResponse>> UpdateProductAsync(int productId, UpdateProductRequest request)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        // --- Validation (outside transaction) ---
+        var product = await _context.Products
+            .AsTracking()
+            .Include(p => p.Categories)
+            .FirstOrDefaultAsync(p => p.ProductId == productId);
+
+        if (product == null)
+            return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found.");
+
+        var skuExists = await _context.Products
+            .AnyAsync(p => p.Sku == request.Sku && p.ProductId != productId);
+        if (skuExists)
+            return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists.");
+
+        var brandExists = await _context.Brands.AnyAsync(b => b.BrandId == request.BrandId);
+        if (!brandExists)
+            return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
+
         try
         {
-            // Load product with categories navigation property
-            var product = await _context.Products
-                .Include(p => p.Categories)
-                .FirstOrDefaultAsync(p => p.ProductId == productId);
-                
-            if (product == null)
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with ID {productId} not found.");
-
-            // Check SKU uniqueness
-            var skuExists = await _context.Products
-                .AnyAsync(p => p.Sku == request.Sku && p.ProductId != productId);
-            if (skuExists)
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Product with SKU '{request.Sku}' already exists.");
-
-            // Check brand exists
-            var brandExists = await _context.Brands.AnyAsync(b => b.BrandId == request.BrandId);
-            if (!brandExists)
-                return ApiResponse<ProductDetailResponse>.ErrorResponse($"Brand with ID {request.BrandId} not found.");
-
-            // Update product properties
+            // Update scalar properties
             product.Name = request.Name;
             product.Sku = request.Sku;
             product.Description = request.Description;
@@ -202,7 +200,7 @@ public class AdminProductService : IAdminProductService
             product.HasSerialTracking = request.HasSerialTracking;
             product.CompatibilityInfo = request.CompatibilityInfo;
 
-            // Update categories using navigation property
+            // Update categories (many-to-many)
             product.Categories.Clear();
             if (request.CategoryIds.Any())
             {
@@ -210,12 +208,10 @@ public class AdminProductService : IAdminProductService
                     .Where(c => request.CategoryIds.Contains(c.CategoryId))
                     .ToListAsync();
                 foreach (var category in categories)
-                {
                     product.Categories.Add(category);
-                }
             }
 
-            // Update specifications
+            // Update specifications (delete-then-insert)
             var existingSpecs = await _context.ProductSpecifications
                 .Where(s => s.ProductId == productId).ToListAsync();
             _context.ProductSpecifications.RemoveRange(existingSpecs);
@@ -232,7 +228,7 @@ public class AdminProductService : IAdminProductService
                 _context.ProductSpecifications.AddRange(newSpecs);
             }
 
-            // Update documents
+            // Update documents (delete-then-insert)
             var existingDocs = await _context.ProductDocuments
                 .Where(d => d.ProductId == productId).ToListAsync();
             _context.ProductDocuments.RemoveRange(existingDocs);
@@ -250,19 +246,15 @@ public class AdminProductService : IAdminProductService
                 _context.ProductDocuments.AddRange(newDocs);
             }
 
-            // Save all changes in one transaction
+            // SaveChangesAsync tự wrap tất cả trong 1 transaction — không cần BeginTransactionAsync
             await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
 
-            // Fetch updated product details
             var detail = await _productRepo.GetDetailByIdAsync(productId);
             var response = MapToDetailResponse(detail!);
-
             return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product updated successfully.");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return ApiResponse<ProductDetailResponse>.ErrorResponse($"An error occurred while updating the database. Please try again. Details: {ex.Message}");
         }
     }
@@ -282,6 +274,19 @@ public class AdminProductService : IAdminProductService
         }
         
         return ApiResponse<bool>.ErrorResponse("An error occurred while updating the database. Please try again.");
+    }
+
+    public async Task<ApiResponse<bool>> ToggleProductActiveAsync(int productId)
+    {
+        if (!await _productRepo.ExistsAsync(productId))
+            return ApiResponse<bool>.ErrorResponse($"Product with ID {productId} not found.");
+
+        var newStatus = await _productRepo.ToggleActiveAsync(productId);
+        if (newStatus == null)
+            return ApiResponse<bool>.ErrorResponse("An error occurred while updating the database. Please try again.");
+
+        var statusText = newStatus.Value ? "activated" : "deactivated";
+        return ApiResponse<bool>.SuccessResponse(newStatus.Value, $"Product {statusText} successfully.");
     }
 
     public async Task<ApiResponse<List<AdminProductImageResponse>>> UploadImagesAsync(

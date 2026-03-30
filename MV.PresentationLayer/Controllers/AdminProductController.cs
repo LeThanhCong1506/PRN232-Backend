@@ -83,6 +83,21 @@ public class AdminProductController : ControllerBase
     }
 
     /// <summary>
+    /// Toggle product active/inactive status
+    /// </summary>
+    [HttpPatch("{id}/toggle-active")]
+    [SwaggerOperation(Summary = "[Admin] Toggle product active status")]
+    public async Task<IActionResult> ToggleActive(int id)
+    {
+        var result = await _adminProductService.ToggleProductActiveAsync(id);
+
+        if (!result.Success)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Upload product images (multipart/form-data)
     /// </summary>
     [HttpPost("{id}/images")]
