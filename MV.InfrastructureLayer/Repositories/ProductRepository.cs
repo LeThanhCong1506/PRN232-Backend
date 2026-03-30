@@ -87,9 +87,8 @@ namespace MV.InfrastructureLayer.Repositories
         public async Task<(List<Product> Items, int TotalCount)> GetAdminPagedProductsAsync(AdminProductFilter filter)
         {
             // PERFORMANCE FIX: Tách Count và Load riêng
-            // Bước 1: Build base query KHÔNG có Include
+            // Bước 1: Build base query KHÔNG có Include (Admin thấy tất cả kể cả đã xóa mềm)
             var baseQuery = _context.Products
-                .Where(p => p.IsDeleted != true)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.Search))
