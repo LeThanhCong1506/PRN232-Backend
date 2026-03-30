@@ -122,27 +122,7 @@ public class WarrantyClaimService : IWarrantyClaimService
         var totalItems = await _claimRepository.CountAsync(status);
         var claims = await _claimRepository.GetAllAsync(status, page, pageSize);
 
-        var items = claims.Select(c => new AdminWarrantyClaimResponse
-        {
-            ClaimId = c.ClaimId,
-            Status = c.Status ?? "SUBMITTED",
-            Customer = new ClaimCustomerInfo
-            {
-                UserId = c.UserId,
-                FullName = c.User?.FullName ?? c.User?.Username ?? "Unknown",
-                Phone = c.ContactPhone ?? c.User?.Phone
-            },
-            Product = new ClaimProductInfo
-            {
-                ProductId = c.Warranty?.SerialNumberNavigation?.ProductId ?? 0,
-                Name = c.Warranty?.SerialNumberNavigation?.Product?.Name ?? "Unknown"
-            },
-            IssueDescription = c.IssueDescription,
-            ContactPhone = c.ContactPhone,
-            ResolutionNote = c.ResolutionNote,
-            SubmittedAt = c.CreatedAt ?? DateTime.MinValue,
-            ResolvedDate = c.ResolvedDate
-        }).ToList();
+        var items = claims.Select(MapToAdminResponse).ToList();
 
         var response = new AdminWarrantyClaimPagedResponse
         {
@@ -154,6 +134,57 @@ public class WarrantyClaimService : IWarrantyClaimService
         };
 
         return ApiResponse<AdminWarrantyClaimPagedResponse>.SuccessResponse(response);
+    }
+
+    /// <summary>
+    /// Admin: Get single warranty claim by ID with full details
+    /// </summary>
+    public async Task<ApiResponse<AdminWarrantyClaimResponse>> GetClaimByIdAsync(int claimId)
+    {
+        var claim = await _claimRepository.GetByIdAsync(claimId);
+        if (claim == null)
+        {
+            return ApiResponse<AdminWarrantyClaimResponse>.ErrorResponse($"Warranty claim with ID {claimId} not found.");
+        }
+
+        return ApiResponse<AdminWarrantyClaimResponse>.SuccessResponse(MapToAdminResponse(claim));
+    }
+
+    private AdminWarrantyClaimResponse MapToAdminResponse(WarrantyClaim c)
+    {
+        var product = c.Warranty?.SerialNumberNavigation?.Product;
+        var primaryImage = product?.ProductImages?.OrderByDescending(i => i.IsPrimary).FirstOrDefault()?.ImageUrl;
+
+        return new AdminWarrantyClaimResponse
+        {
+            ClaimId = c.ClaimId,
+            Status = c.Status! ?? "SUBMITTED",
+            Customer = new ClaimCustomerInfo
+            {
+                UserId = c.UserId,
+                FullName = c.User?.FullName ?? c.User?.Username ?? "Unknown",
+                Phone = c.ContactPhone ?? c.User?.Phone
+            },
+            Product = new ClaimProductInfo
+            {
+                ProductId = product?.ProductId ?? 0,
+                Name = product?.Name ?? "Unknown",
+                Sku = product?.Sku ?? "N/A",
+                PrimaryImage = primaryImage
+            },
+            Warranty = new WarrantyClaimWarrantyInfo
+            {
+                WarrantyId = c.WarrantyId,
+                SerialNumber = c.Warranty?.SerialNumber ?? "N/A",
+                PolicyName = c.Warranty?.WarrantyPolicy?.PolicyName ?? "N/A",
+                ExpiryDate = c.Warranty?.EndDate ?? default
+            },
+            IssueDescription = c.IssueDescription,
+            ContactPhone = c.ContactPhone,
+            ResolutionNote = c.ResolutionNote,
+            SubmittedAt = c.CreatedAt ?? DateTime.MinValue,
+            ResolvedDate = c.ResolvedDate
+        };
     }
 
     /// <summary>
@@ -246,28 +277,14 @@ public class WarrantyClaimService : IWarrantyClaimService
     }
 
     /// <summary>
-    /// Customer get my claims
+    /// Customer: Get my warranty claims (paged)
     /// </summary>
     public async Task<ApiResponse<AdminWarrantyClaimPagedResponse>> GetMyClaimsAsync(int userId, int page, int pageSize)
     {
         var totalItems = await _claimRepository.CountByUserIdAsync(userId);
         var claims = await _claimRepository.GetByUserIdAsync(userId, page, pageSize);
 
-        var items = claims.Select(c => new AdminWarrantyClaimResponse
-        {
-            ClaimId = c.ClaimId,
-            Status = c.Status ?? "SUBMITTED",
-            Product = new ClaimProductInfo
-            {
-                ProductId = c.Warranty?.SerialNumberNavigation?.ProductId ?? 0,
-                Name = c.Warranty?.SerialNumberNavigation?.Product?.Name ?? "Unknown"
-            },
-            IssueDescription = c.IssueDescription,
-            ContactPhone = c.ContactPhone,
-            ResolutionNote = c.ResolutionNote,
-            SubmittedAt = c.CreatedAt ?? DateTime.MinValue,
-            ResolvedDate = c.ResolvedDate
-        }).ToList();
+        var items = claims.Select(MapToAdminResponse).ToList();
 
         var response = new AdminWarrantyClaimPagedResponse
         {

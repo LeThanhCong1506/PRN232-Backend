@@ -123,6 +123,25 @@ public class WarrantyClaimController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// [Admin] Lấy chi tiết một warranty claim theo ID
+    /// </summary>
+    /// <param name="claimId">Claim ID cần lấy</param>
+    [HttpGet("/api/admin/warranty-claims/{claimId}")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "[Admin] Get warranty claim detail by ID")]
+    public async Task<IActionResult> GetClaimById(int claimId)
+    {
+        var result = await _warrantyClaimService.GetClaimByIdAsync(claimId);
+
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+
+        return Ok(result);
+    }
+
     private int GetUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");

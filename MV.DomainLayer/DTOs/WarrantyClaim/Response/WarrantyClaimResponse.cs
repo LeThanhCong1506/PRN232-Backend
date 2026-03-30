@@ -19,6 +19,7 @@ public class AdminWarrantyClaimResponse
     public string Status { get; set; } = null!;
     public ClaimCustomerInfo Customer { get; set; } = null!;
     public ClaimProductInfo Product { get; set; } = null!;
+    public WarrantyClaimWarrantyInfo Warranty { get; set; } = null!;
     public string IssueDescription { get; set; } = null!;
     public string? ContactPhone { get; set; }
     public string? ResolutionNote { get; set; }
@@ -37,6 +38,16 @@ public class ClaimProductInfo
 {
     public int ProductId { get; set; }
     public string Name { get; set; } = null!;
+    public string Sku { get; set; } = null!;
+    public string? PrimaryImage { get; set; }
+}
+
+public class WarrantyClaimWarrantyInfo
+{
+    public int WarrantyId { get; set; }
+    public string SerialNumber { get; set; } = null!;
+    public string PolicyName { get; set; } = null!;
+    public DateOnly ExpiryDate { get; set; }
 }
 
 /// <summary>
