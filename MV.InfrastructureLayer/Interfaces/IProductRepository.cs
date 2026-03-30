@@ -13,7 +13,7 @@ namespace MV.InfrastructureLayer.Interfaces
 
         // Product CRUD
         Task<Product?> GetByIdAsync(int productId);
-        Task<Product?> GetDetailByIdAsync(int productId);
+        Task<Product?> GetDetailByIdAsync(int productId, bool includeInactive = false);
         Task<Product> CreateAsync(Product product);
         Task UpdateAsync(Product product);
         Task DeleteAsync(int productId);

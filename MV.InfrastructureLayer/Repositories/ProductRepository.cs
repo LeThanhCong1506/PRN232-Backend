@@ -23,7 +23,7 @@ namespace MV.InfrastructureLayer.Repositories
             // PERFORMANCE FIX: Tách Count và Load riêng
             // Bước 1: Build base query KHÔNG có Include
             var baseQuery = _context.Products
-                .Where(p => p.IsActive == true && p.IsDeleted != true)
+                .Where(p => (p.IsActive != false) && (p.IsDeleted != true))
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(filter.SearchTerm))
@@ -206,11 +206,11 @@ namespace MV.InfrastructureLayer.Repositories
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
         }
 
-        public async Task<Product?> GetDetailByIdAsync(int productId)
+        public async Task<Product?> GetDetailByIdAsync(int productId, bool includeInactive = false)
         {
             // PERFORMANCE FIX: Tách reviews ra query riêng và limit số lượng
             // Load product với basic includes (không include Reviews)
-            var product = await _context.Products
+            var query = _context.Products
                 .AsNoTracking()
                 .AsSingleQuery()
                 .Include(p => p.Brand)
@@ -222,8 +222,16 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(p => p.RelatedProducts.OrderBy(r => r.DisplayOrder))
                     .ThenInclude(r => r.RelatedToProduct)
                         .ThenInclude(rp => rp.ProductImages)
-                .Where(p => p.IsActive == true && p.IsDeleted != true)
-                .FirstOrDefaultAsync(p => p.ProductId == productId);
+                .AsQueryable();
+
+            if (!includeInactive)
+            {
+                // Nếu không phải admin/không yêu cầu xem tất cả, chỉ lấy SP active và chưa xóa
+                // Ở Postgres, so sánh NULL <> true sẽ trả về false, nên cần check kỹ
+                query = query.Where(p => (p.IsActive != false) && (p.IsDeleted != true));
+            }
+
+            var product = await query.FirstOrDefaultAsync(p => p.ProductId == productId);
 
             if (product == null) return null;
 
@@ -289,12 +297,14 @@ namespace MV.InfrastructureLayer.Repositories
         public async Task AddCategoriesToProductAsync(int productId, List<int> categoryIds)
         {
             var product = await _context.Products
+                .AsTracking()
                 .Include(p => p.Categories)
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
 
             if (product == null) return;
 
             var categories = await _context.Categories
+                .AsTracking()
                 .Where(c => categoryIds.Contains(c.CategoryId))
                 .ToListAsync();
 
@@ -312,6 +322,7 @@ namespace MV.InfrastructureLayer.Repositories
         public async Task RemoveCategoryFromProductAsync(int productId, int categoryId)
         {
             var product = await _context.Products
+                .AsTracking()
                 .Include(p => p.Categories)
                 .FirstOrDefaultAsync(p => p.ProductId == productId);
 

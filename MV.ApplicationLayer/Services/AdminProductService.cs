@@ -160,7 +160,7 @@ public class AdminProductService : IAdminProductService
         if (request.Specifications.Any() || request.Documents.Any())
             await _context.SaveChangesAsync();
 
-        var detail = await _productRepo.GetDetailByIdAsync(createdProduct.ProductId);
+        var detail = await _productRepo.GetDetailByIdAsync(createdProduct.ProductId, includeInactive: true);
         var response = MapToDetailResponse(detail!);
 
         return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product created successfully.");
@@ -200,14 +200,24 @@ public class AdminProductService : IAdminProductService
             product.HasSerialTracking = request.HasSerialTracking;
             product.CompatibilityInfo = request.CompatibilityInfo;
 
-            // Update categories (many-to-many)
-            product.Categories.Clear();
-            if (request.CategoryIds.Any())
+            // Update categories (many-to-many) with diffing + explicit tracking
+            var existingCategoryIds = product.Categories.Select(c => c.CategoryId).ToList();
+            var categoryIdsToAdd = request.CategoryIds.Except(existingCategoryIds).ToList();
+            var categoryIdsToRemove = existingCategoryIds.Except(request.CategoryIds).ToList();
+
+            foreach (var id in categoryIdsToRemove)
             {
-                var categories = await _context.Categories
-                    .Where(c => request.CategoryIds.Contains(c.CategoryId))
+                var category = product.Categories.First(c => c.CategoryId == id);
+                product.Categories.Remove(category);
+            }
+
+            if (categoryIdsToAdd.Any())
+            {
+                var categoriesToAdd = await _context.Categories
+                    .AsTracking() // Critical fix: default is NoTracking in Program.cs
+                    .Where(c => categoryIdsToAdd.Contains(c.CategoryId))
                     .ToListAsync();
-                foreach (var category in categories)
+                foreach (var category in categoriesToAdd)
                     product.Categories.Add(category);
             }
 
@@ -249,7 +259,7 @@ public class AdminProductService : IAdminProductService
             // SaveChangesAsync tự wrap tất cả trong 1 transaction — không cần BeginTransactionAsync
             await _context.SaveChangesAsync();
 
-            var detail = await _productRepo.GetDetailByIdAsync(productId);
+            var detail = await _productRepo.GetDetailByIdAsync(productId, includeInactive: true);
             var response = MapToDetailResponse(detail!);
             return ApiResponse<ProductDetailResponse>.SuccessResponse(response, "Product updated successfully.");
         }
