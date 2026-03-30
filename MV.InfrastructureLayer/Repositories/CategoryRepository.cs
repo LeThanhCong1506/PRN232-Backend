@@ -51,7 +51,9 @@ public class CategoryRepository : ICategoryRepository
         // This avoids EF Core cascade re-inserting product_category junction records (product_category_pkey violation).
         await _context.Categories
             .Where(c => c.CategoryId == category.CategoryId)
-            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Name, category.Name));
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(c => c.Name, category.Name)
+                .SetProperty(c => c.ImageUrl, category.ImageUrl));
     }
 
     public async Task DeleteCategoryAsync(int id)
