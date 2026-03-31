@@ -38,6 +38,8 @@ public class ReturnRequestRepository : IReturnRequestRepository
     {
         var query = _context.ReturnRequests
             .Include(r => r.Order)
+                .ThenInclude(o => o.OrderItems)
+                    .ThenInclude(oi => oi.ProductInstances)
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt);
 
