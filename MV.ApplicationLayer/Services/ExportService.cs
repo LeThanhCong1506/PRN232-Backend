@@ -45,6 +45,7 @@ public class ExportService : IExportService
         worksheet.Cell(1, 8).Value = "Payment Method";
         worksheet.Cell(1, 9).Value = "Payment Status";
         worksheet.Cell(1, 10).Value = "Order Status";
+        worksheet.Cell(1, 11).Value = "Item Count";
 
         var row = 2;
         foreach (var order in orders)
