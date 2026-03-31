@@ -27,4 +27,5 @@ public class ReturnRequestResponse
     public DateTime? UpdatedAt { get; set; }
     public DateTime? ProcessedAt { get; set; }
     public string? ProcessedByName { get; set; }
+    public List<ReturnRequestItemResponse> Items { get; set; } = new();
 }
