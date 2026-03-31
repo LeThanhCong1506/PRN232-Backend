@@ -60,6 +60,7 @@ public class ExportService : IExportService
             worksheet.Cell(row, 8).Value = order.PaymentMethod;
             worksheet.Cell(row, 9).Value = order.PaymentStatus;
             worksheet.Cell(row, 10).Value = order.Status;
+            worksheet.Cell(row, 11).Value = order.ItemCount;
             row++;
         }
 
