@@ -113,6 +113,8 @@ public class OrderRepository : IOrderRepository
         return await _context.OrderHeaders
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Product)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductInstances)
             .Include(o => o.Payment)
             .Include(o => o.Coupon)
             .Include(o => o.User)
