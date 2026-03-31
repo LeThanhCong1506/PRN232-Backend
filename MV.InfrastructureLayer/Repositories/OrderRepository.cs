@@ -508,6 +508,7 @@ public class OrderRepository : IOrderRepository
         var items = await _context.OrderHeaders
             .AsNoTracking()
             .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductInstances)
             .Include(o => o.Payment)
             .Include(o => o.User)
             .Where(o => orderIds.Contains(o.OrderId))
