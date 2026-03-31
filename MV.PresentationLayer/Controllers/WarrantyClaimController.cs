@@ -53,11 +53,11 @@ public class WarrantyClaimController : ControllerBase
     }
 
     /// <summary>
-    /// [Customer] Lấy danh sách các warranty claims của mình
+    /// [Customer] Lấy danh sách các warranty claims của mình (kèm serial number)
     /// </summary>
     [HttpGet("/api/warranties/claims")]
     [Authorize]
-    [SwaggerOperation(Summary = "[Customer] Get my warranty claims")]
+    [SwaggerOperation(Summary = "[Customer] Get my warranty claims with serial number")]
     public async Task<IActionResult> GetMyClaims(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
