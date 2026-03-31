@@ -27,6 +27,8 @@ public class ReturnRequestRepository : IReturnRequestRepository
     {
         return await _context.ReturnRequests
             .Include(r => r.Order)
+                .ThenInclude(o => o.OrderItems)
+                    .ThenInclude(oi => oi.ProductInstances)
             .Include(r => r.User)
             .Include(r => r.ProcessedByNavigation)
             .FirstOrDefaultAsync(r => r.ReturnRequestId == returnRequestId);
