@@ -174,7 +174,10 @@ public class AdminOrderService : IAdminOrderService
                 Quantity = oi.Quantity,
                 UnitPrice = oi.UnitPrice,
                 Subtotal = oi.Subtotal,
-                DiscountAmount = oi.DiscountAmount
+                DiscountAmount = oi.DiscountAmount,
+                SerialNumbers = oi.ProductInstances?
+                    .Select(pi => pi.SerialNumber)
+                    .ToList() ?? new List<string>()
             }).ToList()
         };
 

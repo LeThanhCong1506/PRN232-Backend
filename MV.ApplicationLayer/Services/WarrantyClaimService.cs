@@ -277,16 +277,16 @@ public class WarrantyClaimService : IWarrantyClaimService
     }
 
     /// <summary>
-    /// Customer: Get my warranty claims (paged)
+    /// Customer: Get my warranty claims (paged) with SerialNumber
     /// </summary>
-    public async Task<ApiResponse<AdminWarrantyClaimPagedResponse>> GetMyClaimsAsync(int userId, int page, int pageSize)
+    public async Task<ApiResponse<CustomerWarrantyClaimPagedResponse>> GetMyClaimsAsync(int userId, int page, int pageSize)
     {
         var totalItems = await _claimRepository.CountByUserIdAsync(userId);
         var claims = await _claimRepository.GetByUserIdAsync(userId, page, pageSize);
 
-        var items = claims.Select(MapToAdminResponse).ToList();
+        var items = claims.Select(MapToCustomerResponse).ToList();
 
-        var response = new AdminWarrantyClaimPagedResponse
+        var response = new CustomerWarrantyClaimPagedResponse
         {
             Items = items,
             Page = page,
@@ -295,6 +295,27 @@ public class WarrantyClaimService : IWarrantyClaimService
             TotalPages = totalItems > 0 ? (int)Math.Ceiling((double)totalItems / pageSize) : 0
         };
 
-        return ApiResponse<AdminWarrantyClaimPagedResponse>.SuccessResponse(response);
+        return ApiResponse<CustomerWarrantyClaimPagedResponse>.SuccessResponse(response);
+    }
+
+    private static CustomerWarrantyClaimResponse MapToCustomerResponse(WarrantyClaim c)
+    {
+        var product = c.Warranty?.SerialNumberNavigation?.Product;
+        var primaryImage = product?.ProductImages?.OrderByDescending(i => i.IsPrimary).FirstOrDefault()?.ImageUrl;
+
+        return new CustomerWarrantyClaimResponse
+        {
+            ClaimId = c.ClaimId,
+            Status = c.Status ?? "SUBMITTED",
+            SerialNumber = c.Warranty?.SerialNumber ?? "N/A",
+            ProductName = product?.Name ?? "Unknown",
+            ProductImageUrl = primaryImage,
+            PolicyName = c.Warranty?.WarrantyPolicy?.PolicyName ?? "N/A",
+            WarrantyExpiryDate = c.Warranty?.EndDate ?? default,
+            IssueDescription = c.IssueDescription,
+            ResolutionNote = c.ResolutionNote,
+            SubmittedAt = c.CreatedAt ?? DateTime.MinValue,
+            ResolvedDate = c.ResolvedDate
+        };
     }
 }

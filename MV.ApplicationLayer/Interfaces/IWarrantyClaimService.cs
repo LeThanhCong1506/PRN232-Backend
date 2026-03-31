@@ -22,9 +22,9 @@ public interface IWarrantyClaimService
     Task<ApiResponse<ResolveWarrantyClaimResponse>> ResolveClaimAsync(int claimId, ResolveWarrantyClaimRequest request);
 
     /// <summary>
-    /// Customer: Get my warranty claims (paged)
+    /// Customer: Get my warranty claims (paged) with SerialNumber
     /// </summary>
-    Task<ApiResponse<AdminWarrantyClaimPagedResponse>> GetMyClaimsAsync(int userId, int page, int pageSize);
+    Task<ApiResponse<CustomerWarrantyClaimPagedResponse>> GetMyClaimsAsync(int userId, int page, int pageSize);
 
     /// <summary>
     /// Admin: Get single warranty claim by ID with full details
