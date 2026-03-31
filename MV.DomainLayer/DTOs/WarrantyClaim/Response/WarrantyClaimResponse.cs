@@ -69,6 +69,18 @@ public class WarrantyClaimWarrantyInfo
 }
 
 /// <summary>
+/// Response phân trang cho Customer Get My Claims
+/// </summary>
+public class CustomerWarrantyClaimPagedResponse
+{
+    public List<CustomerWarrantyClaimResponse> Items { get; set; } = new();
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalItems { get; set; }
+    public int TotalPages { get; set; }
+}
+
+/// <summary>
 /// Response phân trang cho Admin Get All Claims (BE-4.3.3)
 /// </summary>
 public class AdminWarrantyClaimPagedResponse
