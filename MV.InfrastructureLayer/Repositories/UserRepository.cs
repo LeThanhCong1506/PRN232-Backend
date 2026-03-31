@@ -52,12 +52,12 @@ namespace MV.InfrastructureLayer.Repositories
                 .Include(x => x.Role)
                 .FirstOrDefaultAsync(x => x.UserId == id);
         }
-        public async Task<User?> GetByExternalLoginAsync(int provider)
-        {
-            return await _context.Users
-                .Include(x => x.Province)
-                .FirstOrDefaultAsync(x => x.UserId == provider);
-        }
+        //public async Task<User?> GetByExternalLoginAsync(int provider)
+        //{
+        //    return await _context.Users
+        //        .Include(x => x.Province)
+        //        .FirstOrDefaultAsync(x => x.UserId == provider);
+        //}
         public async Task<Role?> GetRoleByNameAsync(string roleName)
         {
             return await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
@@ -93,9 +93,5 @@ namespace MV.InfrastructureLayer.Repositories
                 .FirstOrDefaultAsync(x => x.ExternalProvider == provider && x.ExternalId == externalId && x.IsActive == true);
         }
 
-        public Task<Role?> GetRoleByNameAsync(string roleName)
-        {
-            return _context.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
-        }
     }
 }
