@@ -194,6 +194,7 @@ public class OrderRepository : IOrderRepository
         var items = await _context.OrderHeaders
             .AsSingleQuery() // SingleQuery: 1 connection per query, tránh exhaust pool
             .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductInstances)
             .Include(o => o.Payment)
             .Where(o => orderIds.Contains(o.OrderId))
             .OrderByDescending(o => o.CreatedAt)
