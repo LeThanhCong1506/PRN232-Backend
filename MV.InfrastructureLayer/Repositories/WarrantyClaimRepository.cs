@@ -28,6 +28,14 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
             .FirstOrDefaultAsync(c => c.ClaimId == claimId);
     }
 
+    public async Task<WarrantyClaim?> GetByIdForResolveAsync(int claimId)
+    {
+        // Resolve flow only needs claim + warranty for status transition and side effects.
+        return await _context.WarrantyClaims
+            .Include(c => c.Warranty)
+            .FirstOrDefaultAsync(c => c.ClaimId == claimId);
+    }
+
     public async Task<WarrantyClaim> CreateAsync(WarrantyClaim claim)
     {
         // Use raw SQL because PostgreSQL requires explicit cast for claim_status_enum
