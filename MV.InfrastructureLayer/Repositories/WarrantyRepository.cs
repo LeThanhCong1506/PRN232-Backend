@@ -92,8 +92,15 @@ public class WarrantyRepository : IWarrantyRepository
 
     public async Task UpdateAsync(Warranty warranty)
     {
-        _context.Warranties.Update(warranty);
-        await _context.SaveChangesAsync();
+        // Use raw SQL to avoid EF Core re-adding detached navigation entities (e.g. WarrantyClaims)
+        // into the change tracker, which would cause an UPDATE without ::claim_status_enum cast → 500
+        var pIsActive = new Npgsql.NpgsqlParameter("p0", warranty.IsActive.HasValue ? (object)warranty.IsActive.Value : DBNull.Value);
+        var pNotes = new Npgsql.NpgsqlParameter("p1", (object?)warranty.Notes ?? DBNull.Value);
+        var pWarrantyId = new Npgsql.NpgsqlParameter("p2", warranty.WarrantyId);
+
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE warranty SET is_active = @p0, notes = @p1 WHERE warranty_id = @p2",
+            pIsActive, pNotes, pWarrantyId);
     }
 
     public async Task DeleteAsync(int id)

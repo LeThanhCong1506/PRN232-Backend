@@ -202,7 +202,7 @@ public class WarrantyClaimService : IWarrantyClaimService
     /// </summary>
     public async Task<ApiResponse<ResolveWarrantyClaimResponse>> ResolveClaimAsync(int claimId, ResolveWarrantyClaimRequest request)
     {
-        var claim = await _claimRepository.GetByIdAsync(claimId);
+        var claim = await _claimRepository.GetByIdForResolveAsync(claimId);
         if (claim == null)
         {
             return ApiResponse<ResolveWarrantyClaimResponse>.ErrorResponse($"Warranty claim with ID {claimId} not found.");
