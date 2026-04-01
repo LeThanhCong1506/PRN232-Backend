@@ -68,12 +68,12 @@ public class ChatbotService : IChatbotService
         { "thanks", "😊 You're welcome! Is there anything else I can help with?" },
     };
 
-    // ===== Keywords that trigger product suggestions =====
+    // ===== Keywords that trigger product DB suggestions (must be real product search terms) =====
     private static readonly string[] ProductSearchKeywords =
     {
         "arduino", "esp32", "esp8266", "raspberry", "sensor", "kit",
         "module", "servo", "motor", "led", "lcd", "oled", "relay",
-        "breadboard", "resistor", "microcontroller", "shield"
+        "breadboard", "resistor", "microcontroller", "shield", "robot", "iot"
     };
 
     // ===== System Prompt =====
@@ -159,10 +159,14 @@ Price reference (Vietnamese Dong):
             }
         }
 
-        // Attach real product suggestions if question mentions a product keyword
+        // Attach real product suggestions by checking:
+        // 1. The question itself (e.g. user types "arduino")
+        // 2. The AI/FAQ response text (e.g. user asks "best sellers" → AI mentions "arduino")
+        // This ensures product cards appear even for generic queries like "best seller products"
         if (response.Source != "error")
         {
-            var keyword = ExtractProductKeyword(question);
+            var keyword = ExtractProductKeyword(question)
+                          ?? ExtractProductKeyword(response.Answer);
             if (keyword != null)
                 response.Products = await GetProductSuggestionsAsync(keyword);
         }

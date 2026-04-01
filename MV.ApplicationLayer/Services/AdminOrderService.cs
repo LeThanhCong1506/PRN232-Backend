@@ -284,6 +284,20 @@ public class AdminOrderService : IAdminOrderService
             await _orderRepo.UpdatePaymentAsync(order.Payment);
         }
 
+        // Send notification when admin manually confirms payment
+        if (newStatus == "COMPLETED")
+        {
+            try
+            {
+                await _notificationService.SendPaymentConfirmedAsync(order.UserId, orderId, order.OrderNumber, order.Payment.Amount);
+                await _notificationService.SendAdminPaymentConfirmedAsync(orderId, order.OrderNumber, order.Payment.Amount);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send payment confirmed notification for order {OrderId}", orderId);
+            }
+        }
+
         return ApiResponse<bool>.SuccessResponse(true, $"Payment status updated to {newStatus}.");
     }
 
