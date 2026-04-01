@@ -92,8 +92,10 @@ namespace MV.ApplicationLayer.Services
 
         public async Task<LoginResponseDto> GitHubLoginAsync(string code, string? redirectUri)
         {
-            var clientId = _config["OAuth:GitHub:ClientId"];
-            var clientSecret = _config["OAuth:GitHub:ClientSecret"];
+            // Use Mobile OAuth App credentials when the request comes from the mobile app
+            bool isMobile = redirectUri?.Contains("railway.app") == true;
+            var clientId = isMobile ? _config["OAuth:GitHubMobile:ClientId"] : _config["OAuth:GitHub:ClientId"];
+            var clientSecret = isMobile ? _config["OAuth:GitHubMobile:ClientSecret"] : _config["OAuth:GitHub:ClientSecret"];
 
             var client = _httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
