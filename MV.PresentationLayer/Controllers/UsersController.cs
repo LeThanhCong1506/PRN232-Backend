@@ -195,5 +195,18 @@ namespace MV.PresentationLayer.Controllers
             else
                 return BadRequest(result);
         }
+
+        /// <summary>
+        /// Toggle user IsActive (Ban / Unban). Admin only.
+        /// </summary>
+        [HttpPatch("{id:int}/toggle-status")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ToggleStatus(int id)
+        {
+            var result = await _service.ToggleUserStatusAsync(id);
+            if (result)
+                return Ok(new { message = "User status toggled successfully" });
+            return NotFound(new { message = "User not found" });
+        }
     }
 }
