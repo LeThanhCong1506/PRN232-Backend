@@ -200,6 +200,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<IReturnRequestService, ReturnRequestService>();
             builder.Services.AddScoped<IShippingFeeService, ShippingFeeService>();
             builder.Services.AddScoped<IExportService, ExportService>();
+            builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 
             // OAuth
             builder.Services.AddHttpClient();
