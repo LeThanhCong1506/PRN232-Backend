@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MV.ApplicationLayer.Interfaces;
 using MV.DomainLayer.DTOs.Invoice.Request;
-using MV.DomainLayer.DTOs.Invoice.Response;
 using MV.DomainLayer.DTOs.ResponseModels;
-using MV.InfrastructureLayer.DBContext;
 using System.Security.Claims;
 
 namespace MV.PresentationLayer.Controllers;
@@ -14,11 +12,11 @@ namespace MV.PresentationLayer.Controllers;
 [Authorize]
 public class InvoiceController : ControllerBase
 {
-    private readonly StemDbContext _context;
+    private readonly IInvoiceService _invoiceService;
 
-    public InvoiceController(StemDbContext context)
+    public InvoiceController(IInvoiceService invoiceService)
     {
-        _context = context;
+        _invoiceService = invoiceService;
     }
 
     /// <summary>
@@ -35,98 +33,18 @@ public class InvoiceController : ControllerBase
             return Unauthorized(ApiResponse<object>.ErrorResponse("Invalid Token"));
 
         var isAdmin = User.IsInRole("Admin") || User.IsInRole("Staff");
+        var result = await _invoiceService.GenerateInvoicePreviewAsync(orderId, currentUserId.Value, isAdmin, request);
 
-        var order = await _context.OrderHeaders
-            .AsNoTracking()
-            .Include(o => o.OrderItems)
-            .Include(o => o.Payment)
-            .FirstOrDefaultAsync(o => o.OrderId == orderId);
-
-        if (order == null)
-            return NotFound(ApiResponse<object>.ErrorResponse($"Order with ID {orderId} not found."));
-
-        if (!isAdmin && order.UserId != currentUserId.Value)
-            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.ErrorResponse("Unauthorized to access this order invoice."));
-
-        var validationErrors = ValidateInvoiceRequest(request);
-        if (validationErrors.Any())
-            return BadRequest(ApiResponse<object>.ErrorResponse("Invalid invoice payload.", validationErrors));
-
-        var invoiceType = request.InvoiceType.ToUpperInvariant();
-        var billingName = invoiceType == "COMPANY" ? request.CompanyName!.Trim() : request.PersonalName!.Trim();
-
-        var response = new InvoicePreviewResponse
+        if (!result.Success)
         {
-            InvoiceNumber = $"INV-{order.OrderNumber}",
-            InvoiceType = invoiceType,
-            IssuedAt = DateTime.UtcNow,
-            TaxCode = request.TaxCode.Trim(),
-            BillingName = billingName,
-            RepresentativeName = request.RepresentativeName?.Trim(),
-            BillingAddress = request.BillingAddress.Trim(),
-            Order = new InvoicePreviewResponse.OrderSnapshotInfo
-            {
-                OrderId = order.OrderId,
-                OrderNumber = order.OrderNumber,
-                CreatedAt = order.CreatedAt,
-                CustomerName = order.CustomerName,
-                CustomerEmail = order.CustomerEmail,
-                CustomerPhone = order.CustomerPhone,
-                SubtotalAmount = order.SubtotalAmount,
-                ShippingFee = order.ShippingFee ?? 0,
-                DiscountAmount = order.DiscountAmount ?? 0,
-                TotalAmount = order.TotalAmount
-            },
-            Items = order.OrderItems.Select(i => new InvoicePreviewResponse.InvoiceItemInfo
-            {
-                OrderItemId = i.OrderItemId,
-                ProductId = i.ProductId,
-                ProductName = i.ProductName ?? "Unknown product",
-                ProductSku = i.ProductSku,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                Subtotal = i.Subtotal
-            }).ToList(),
-            Payment = order.Payment == null
-                ? null
-                : new InvoicePreviewResponse.PaymentSnapshotInfo
-                {
-                    PaymentId = order.Payment.PaymentId,
-                    Amount = order.Payment.Amount,
-                    PaymentDate = order.Payment.PaymentDate,
-                    TransactionId = order.Payment.TransactionId,
-                    PaymentReference = order.Payment.PaymentReference,
-                    ReceivedAmount = order.Payment.ReceivedAmount
-                }
-        };
-
-        return Ok(ApiResponse<InvoicePreviewResponse>.SuccessResponse(response, "Invoice preview generated successfully."));
-    }
-
-    private static List<string> ValidateInvoiceRequest(GenerateInvoiceRequest request)
-    {
-        var errors = new List<string>();
-        var invoiceType = request.InvoiceType.ToUpperInvariant();
-
-        if (!request.TaxCode.All(char.IsDigit))
-            errors.Add("Tax code must contain digits only.");
-
-        if (invoiceType == "PERSONAL")
-        {
-            if (string.IsNullOrWhiteSpace(request.PersonalName))
-                errors.Add("PersonalName is required for PERSONAL invoice.");
+            if (result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return NotFound(result);
+            if (result.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase))
+                return StatusCode(StatusCodes.Status403Forbidden, result);
+            return BadRequest(result);
         }
 
-        if (invoiceType == "COMPANY")
-        {
-            if (string.IsNullOrWhiteSpace(request.CompanyName))
-                errors.Add("CompanyName is required for COMPANY invoice.");
-
-            if (string.IsNullOrWhiteSpace(request.RepresentativeName))
-                errors.Add("RepresentativeName is required for COMPANY invoice.");
-        }
-
-        return errors;
+        return Ok(result);
     }
 
     private int? GetCurrentUserId()
