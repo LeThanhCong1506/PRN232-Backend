@@ -142,7 +142,7 @@ public class WarrantyClaimRepository : IWarrantyClaimRepository
     public async Task<List<WarrantyClaim>> GetByUserIdAsync(int userId, int page, int pageSize)
     {
         var baseQuery = _context.WarrantyClaims.Where(c => c.UserId == userId);
-        
+
         var claimIds = await baseQuery
             .AsNoTracking()
             .OrderByDescending(c => c.CreatedAt)
