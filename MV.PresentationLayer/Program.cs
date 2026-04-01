@@ -195,6 +195,7 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<ICheckoutService, CheckoutService>();
             builder.Services.AddScoped<IAdminProductService, AdminProductService>();
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
+            builder.Services.AddScoped<ICouponService, CouponService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
             builder.Services.AddScoped<IReturnRequestService, ReturnRequestService>();
             builder.Services.AddScoped<IShippingFeeService, ShippingFeeService>();

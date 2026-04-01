@@ -134,6 +134,19 @@ public class ReturnRequestService : IReturnRequestService
         CreatedAt = r.CreatedAt,
         UpdatedAt = r.UpdatedAt,
         ProcessedAt = r.ProcessedAt,
-        ProcessedByName = r.ProcessedByNavigation?.FullName ?? r.ProcessedByNavigation?.Username
+        ProcessedByName = r.ProcessedByNavigation?.FullName ?? r.ProcessedByNavigation?.Username,
+        Items = r.Order?.OrderItems?.Select(oi => new ReturnRequestItemResponse
+        {
+            OrderItemId = oi.OrderItemId,
+            ProductId = oi.ProductId,
+            ProductName = oi.ProductName,
+            ProductSku = oi.ProductSku,
+            ProductImageUrl = oi.ProductImageUrl,
+            Quantity = oi.Quantity,
+            UnitPrice = oi.UnitPrice,
+            SerialNumbers = oi.ProductInstances?
+                .Select(pi => pi.SerialNumber)
+                .ToList() ?? new List<string>()
+        }).ToList() ?? new List<ReturnRequestItemResponse>()
     };
 }

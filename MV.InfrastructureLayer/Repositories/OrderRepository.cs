@@ -113,6 +113,8 @@ public class OrderRepository : IOrderRepository
         return await _context.OrderHeaders
             .Include(o => o.OrderItems)
                 .ThenInclude(oi => oi.Product)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductInstances)
             .Include(o => o.Payment)
             .Include(o => o.Coupon)
             .Include(o => o.User)
@@ -158,6 +160,7 @@ public class OrderRepository : IOrderRepository
         var items = await _context.OrderHeaders
             .AsSingleQuery() // SingleQuery: 1 connection per query, tránh exhaust pool
             .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductInstances)
             .Include(o => o.Payment)
             .Where(o => orderIds.Contains(o.OrderId))
             .OrderByDescending(o => o.CreatedAt)
@@ -191,6 +194,7 @@ public class OrderRepository : IOrderRepository
         var items = await _context.OrderHeaders
             .AsSingleQuery() // SingleQuery: 1 connection per query, tránh exhaust pool
             .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductInstances)
             .Include(o => o.Payment)
             .Where(o => orderIds.Contains(o.OrderId))
             .OrderByDescending(o => o.CreatedAt)
@@ -504,6 +508,7 @@ public class OrderRepository : IOrderRepository
         var items = await _context.OrderHeaders
             .AsNoTracking()
             .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.ProductInstances)
             .Include(o => o.Payment)
             .Include(o => o.User)
             .Where(o => orderIds.Contains(o.OrderId))
