@@ -1,4 +1,4 @@
-﻿using MV.DomainLayer.DTOs.Login.Request;
+using MV.DomainLayer.DTOs.Login.Request;
 using MV.DomainLayer.DTOs.Login.Response;
 
 namespace MV.ApplicationLayer.Interfaces
@@ -10,5 +10,6 @@ namespace MV.ApplicationLayer.Interfaces
         Task<List<UserDto>> GetAllAsync();
         Task<UserDto?> GetByIdAsync(int id);
         Task<bool> UpdateAsync(int id, UpdateUserDto dto);
+        Task<bool> ToggleUserStatusAsync(int id);
     }
 }

@@ -174,7 +174,10 @@ public class AdminOrderService : IAdminOrderService
                 Quantity = oi.Quantity,
                 UnitPrice = oi.UnitPrice,
                 Subtotal = oi.Subtotal,
-                DiscountAmount = oi.DiscountAmount
+                DiscountAmount = oi.DiscountAmount,
+                SerialNumbers = oi.ProductInstances?
+                    .Select(pi => pi.SerialNumber)
+                    .ToList() ?? new List<string>()
             }).ToList()
         };
 
@@ -279,6 +282,20 @@ public class AdminOrderService : IAdminOrderService
             order.Payment.Notes = request.Note;
             order.Payment.UpdatedAt = DateTimeHelper.VietnamNow();
             await _orderRepo.UpdatePaymentAsync(order.Payment);
+        }
+
+        // Send notification when admin manually confirms payment
+        if (newStatus == "COMPLETED")
+        {
+            try
+            {
+                await _notificationService.SendPaymentConfirmedAsync(order.UserId, orderId, order.OrderNumber, order.Payment.Amount);
+                await _notificationService.SendAdminPaymentConfirmedAsync(orderId, order.OrderNumber, order.Payment.Amount);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send payment confirmed notification for order {OrderId}", orderId);
+            }
         }
 
         return ApiResponse<bool>.SuccessResponse(true, $"Payment status updated to {newStatus}.");

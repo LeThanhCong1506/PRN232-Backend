@@ -184,7 +184,11 @@ public class WarrantyService : IWarrantyService
                 if (monthsRemaining < 0) monthsRemaining = 0;
 
                 string status;
-                if (w.IsActive == true && w.EndDate >= today)
+                if (w.Notes != null && w.Notes.StartsWith("IN_REPAIR"))
+                    status = "IN_REPAIR";
+                else if (w.Notes != null && w.Notes.StartsWith("REPAIRED"))
+                    status = "REPAIRED";
+                else if (w.IsActive == true && w.EndDate >= today)
                     status = "ACTIVE";
                 else if (w.EndDate < today)
                     status = "EXPIRED";

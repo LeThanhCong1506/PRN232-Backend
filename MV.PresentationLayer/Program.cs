@@ -143,6 +143,9 @@ namespace MV.PresentationLayer
                     // CRITICAL: SePay webhook gửi JSON có thể khác case (TransferAmount vs transferAmount)
                     // System.Text.Json mặc định case-sensitive → model binding fail → 400 trước khi vào controller
                     options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                    // Serialize responses as camelCase so Mobile (Gson @SerializedName) can map correctly
+                    // e.g. "Products" → "products", "ProductId" → "productId", "AccessToken" → "accessToken"
+                    options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
                     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
                 })
                 .ConfigureApiBehaviorOptions(options =>
@@ -192,10 +195,12 @@ namespace MV.PresentationLayer
             builder.Services.AddScoped<ICheckoutService, CheckoutService>();
             builder.Services.AddScoped<IAdminProductService, AdminProductService>();
             builder.Services.AddScoped<IAdminOrderService, AdminOrderService>();
+            builder.Services.AddScoped<ICouponService, CouponService>();
             builder.Services.AddScoped<IReviewService, ReviewService>();
             builder.Services.AddScoped<IReturnRequestService, ReturnRequestService>();
             builder.Services.AddScoped<IShippingFeeService, ShippingFeeService>();
             builder.Services.AddScoped<IExportService, ExportService>();
+            builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 
             // OAuth
             builder.Services.AddHttpClient();

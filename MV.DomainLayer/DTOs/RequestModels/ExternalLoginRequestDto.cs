@@ -7,7 +7,7 @@ namespace MV.DomainLayer.DTOs.RequestModels
         [Required]
         public string Code { get; set; } = null!;
 
-        [Required]
-        public string RedirectUri { get; set; } = null!;
+        // RedirectUri is optional: Android requestServerAuthCode() flow passes empty string
+        public string? RedirectUri { get; set; }
     }
 }

@@ -662,7 +662,10 @@ public class OrderService : IOrderService
                 Quantity = oi.Quantity,
                 UnitPrice = oi.UnitPrice,
                 DiscountAmount = oi.DiscountAmount,
-                Subtotal = oi.Subtotal
+                Subtotal = oi.Subtotal,
+                SerialNumbers = oi.ProductInstances?
+                    .Select(pi => pi.SerialNumber)
+                    .ToList() ?? new List<string>()
             }).ToList(),
             Payment = paymentResponse,
             Coupon = couponResponse

@@ -74,5 +74,7 @@ public class AdminOrderDetailResponse
         public decimal UnitPrice { get; set; }
         public decimal Subtotal { get; set; }
         public decimal? DiscountAmount { get; set; }
+        public List<string> SerialNumbers { get; set; } = new();
+        public bool HasSerialTracking => SerialNumbers.Count > 0;
     }
 }

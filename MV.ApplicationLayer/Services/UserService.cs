@@ -118,5 +118,15 @@ namespace MV.ApplicationLayer.Services
             await _repo.UpdateAsync(user);
             return true;
         }
+
+        public async Task<bool> ToggleUserStatusAsync(int id)
+        {
+            var user = await _repo.GetByIdAsync(id);
+            if (user == null) return false;
+            // Toggle: true -> false, false/null -> true
+            user.IsActive = !(user.IsActive ?? true);
+            await _repo.UpdateAsync(user);
+            return true;
+        }
     }
 }

@@ -5,6 +5,7 @@ namespace MV.InfrastructureLayer.Interfaces;
 public interface IWarrantyClaimRepository
 {
     Task<WarrantyClaim?> GetByIdAsync(int claimId);
+    Task<WarrantyClaim?> GetByIdForResolveAsync(int claimId);
     Task<WarrantyClaim> CreateAsync(WarrantyClaim claim);
     Task UpdateAsync(WarrantyClaim claim);
 
